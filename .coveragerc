@@ -1,0 +1,6 @@
+[run]
+branch = True
+source = sushy-tools
+
+[report]
+ignore_errors = True
