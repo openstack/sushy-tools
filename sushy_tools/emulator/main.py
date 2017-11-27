@@ -16,115 +16,94 @@
 #    under the License.
 
 import argparse
+import functools
+import os
 import ssl
-import xml.etree.ElementTree as ET
 
 import flask
-import libvirt
+
+from sushy_tools.emulator.drivers import libvirtdriver
+
 
 app = flask.Flask(__name__)
 # Turn off strict_slashes on all routes
 app.url_map.strict_slashes = False
 
-LIBVIRT_URI = None
-
-BOOT_DEVICE_MAP = {
-    'Pxe': 'network',
-    'Hdd': 'hd',
-    'Cd': 'cdrom',
-}
-
-BOOT_DEVICE_MAP_REV = {v: k for k, v in BOOT_DEVICE_MAP.items()}
+driver = None
 
 
-class libvirt_open(object):
+def init_virt_driver(decorated_func):
+    @functools.wraps(decorated_func)
+    def decorator(*args, **kwargs):
+        global driver
 
-    def __init__(self, uri, readonly=False):
-        self.uri = uri
-        self.readonly = readonly
+        if driver is None:
 
-    def __enter__(self):
-        try:
-            self._conn = (libvirt.openReadOnly(self.uri)
-                          if self.readonly else
-                          libvirt.open(self.uri))
-            return self._conn
-        except libvirt.libvirtError as e:
-            print('Error when connecting to the libvirt URI "%(uri)s": '
-                  '%(error)s' % {'uri': self.uri, 'error': e})
-            flask.abort(500)
+            driver = libvirtdriver.LibvirtDriver(
+                os.environ.get('SUSHY_EMULATOR_LIBVIRT_URL')
+            )
 
-    def __exit__(self, type, value, traceback):
-        self._conn.close()
+        return decorated_func(*args, **kwargs)
+
+    return decorator
 
 
-def get_libvirt_domain(connection, domain):
-    try:
-        return connection.lookupByName(domain)
-    except libvirt.libvirtError:
-        flask.abort(404)
+def returns_json(decorated_func):
+    @functools.wraps(decorated_func)
+    def decorator(*args, **kwargs):
+        response = decorated_func(*args, **kwargs)
+        if isinstance(response, flask.Response):
+            return flask.Response(response, content_type='application/json')
+        else:
+            return response
+
+    return decorator
+
+
+@app.errorhandler(Exception)
+@returns_json
+def all_exception_handler(message):
+    return flask.render_template('error.json', message=message)
 
 
 @app.route('/redfish/v1/')
+@init_virt_driver
+@returns_json
 def root_resource():
     return flask.render_template('root.json')
 
 
 @app.route('/redfish/v1/Systems')
+@init_virt_driver
+@returns_json
 def system_collection_resource():
-    with libvirt_open(LIBVIRT_URI, readonly=True) as conn:
-        domains = conn.listDefinedDomains()
-        return flask.render_template(
-            'system_collection.json', system_count=len(domains),
-            systems=domains)
+    systems = driver.systems
 
-
-def _get_total_cpus(domain, tree):
-    total_cpus = 0
-    if domain.isActive():
-        total_cpus = domain.maxVcpus()
-    else:
-        # If we can't get it from maxVcpus() try to find it by
-        # inspecting the domain XML
-        if total_cpus <= 0:
-            vcpu_element = tree.find('.//vcpu')
-            if vcpu_element is not None:
-                total_cpus = int(vcpu_element.text)
-    return total_cpus
-
-
-def _get_boot_source_target(tree):
-    boot_source_target = None
-    boot_element = tree.find('.//boot')
-    if boot_element is not None:
-        boot_source_target = (
-            BOOT_DEVICE_MAP_REV.get(boot_element.get('dev')))
-    return boot_source_target
+    return flask.render_template(
+        'system_collection.json', system_count=len(systems),
+        systems=systems)
 
 
 @app.route('/redfish/v1/Systems/<identity>', methods=['GET', 'PATCH'])
+@init_virt_driver
+@returns_json
 def system_resource(identity):
     if flask.request.method == 'GET':
-        with libvirt_open(LIBVIRT_URI, readonly=True) as conn:
-            domain = get_libvirt_domain(conn, identity)
-            power_state = 'On' if domain.isActive() else 'Off'
-            total_memory_gb = int(domain.maxMemory() / 1024 / 1024)
-
-            tree = ET.fromstring(domain.XMLDesc())
-            total_cpus = _get_total_cpus(domain, tree)
-            boot_source_target = _get_boot_source_target(tree)
-
-            return flask.render_template(
-                'system.json', identity=identity, uuid=domain.UUIDString(),
-                power_state=power_state, total_memory_gb=total_memory_gb,
-                total_cpus=total_cpus, boot_source_target=boot_source_target)
+        return flask.render_template(
+            'system.json', identity=identity,
+            uuid=driver.uuid(identity),
+            power_state=driver.get_power_state(identity),
+            total_memory_gb=driver.get_total_memory(identity),
+            total_cpus=driver.get_total_cpus(identity),
+            boot_source_target=driver.get_boot_device(identity)
+        )
 
     elif flask.request.method == 'PATCH':
         boot = flask.request.json.get('Boot')
         if not boot:
             return 'PATCH only works for the Boot element', 400
 
-        target = BOOT_DEVICE_MAP.get(boot.get('BootSourceOverrideTarget'))
+        target = boot.get('BootSourceOverrideTarget')
         if not target:
             return 'Missing the BootSourceOverrideTarget element', 400
 
@@ -135,50 +114,19 @@ def system_resource(identity):
         # TODO(lucasagomes): We should allow changing the boot mode from
         # BIOS to UEFI (and vice-versa)
 
-        with libvirt_open(LIBVIRT_URI) as conn:
-            domain = get_libvirt_domain(conn, identity)
-            tree = ET.fromstring(domain.XMLDesc())
-            for os_element in tree.findall('os'):
-                # Remove all "boot" elements
-                for boot_element in os_element.findall('boot'):
-                    os_element.remove(boot_element)
-
-                # Add a new boot element with the request boot device
-                boot_element = ET.SubElement(os_element, 'boot')
-                boot_element.set('dev', target)
-
-            conn.defineXML(ET.tostring(tree).decode('utf-8'))
+        driver.set_boot_device(identity, target)
 
         return '', 204
 
 
 @app.route('/redfish/v1/Systems/<identity>/Actions/ComputerSystem.Reset',
            methods=['POST'])
+@init_virt_driver
+@returns_json
 def system_reset_action(identity):
     reset_type = flask.request.json.get('ResetType')
-    with libvirt_open(LIBVIRT_URI) as conn:
-        domain = get_libvirt_domain(conn, identity)
-        try:
-            if reset_type in ('On', 'ForceOn'):
-                if not domain.isActive():
-                    domain.create()
-            elif reset_type == 'ForceOff':
-                if domain.isActive():
-                    domain.destroy()
-            elif reset_type == 'GracefulShutdown':
-                if domain.isActive():
-                    domain.shutdown()
-            elif reset_type == 'GracefulRestart':
-                if domain.isActive():
-                    domain.reboot()
-            elif reset_type == 'ForceRestart':
-                if domain.isActive():
-                    domain.reset()
-            elif reset_type == 'Nmi':
-                if domain.isActive():
-                    domain.injectNMI()
-        except libvirt.libvirtError:
-            flask.abort(500)
+
+    driver.set_power_state(identity, reset_type)
 
     return '', 204
 
@@ -191,8 +139,10 @@ def parse_args():
                         help='The port to bind the server to')
     parser.add_argument('-u', '--libvirt-uri',
                         type=str,
-                        default='qemu:///system',
-                        help='The libvirt URI')
+                        default='',
+                        help='The libvirt URI. Can also be set via '
+                             'environment variable '
+                             '$SUSHY_EMULATOR_LIBVIRT_URL')
     parser.add_argument('-c', '--ssl-certificate',
                         type=str,
                         help='SSL certificate to use for HTTPS')
@@ -203,9 +153,11 @@ def parse_args():
 
 
 def main():
-    global LIBVIRT_URI
+    global driver
+
     args = parse_args()
-    LIBVIRT_URI = args.libvirt_uri
+
+    driver = libvirtdriver.LibvirtDriver(args.libvirt_uri)
 
     ssl_context = None
     if args.ssl_certificate and args.ssl_key:

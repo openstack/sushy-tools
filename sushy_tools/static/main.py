@@ -22,6 +22,7 @@ import sys
 
 try:
     from http import server as http_server
+
 except ImportError:
     import BaseHTTPServer as http_server  # Py2
 
@@ -91,6 +92,7 @@ def parse_args():
 
 def main():
     global REDFISH_MOCKUP_FILES
+
     args = parse_args()
     if not os.path.exists(args.mockup_files):
         print('Mockup files %s not found' % args.mockup_files)

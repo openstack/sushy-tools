@@ -18,15 +18,19 @@
         "HealthRollUp": "OK"
     },
     "IndicatorLED": "Off",
+    {%- if power_state %}
     "PowerState": "{{ power_state }}",
+    {%- endif %}
     "Boot": {
         "BootSourceOverrideEnabled": "Continuous",
+        {%- if boot_source_target %}
         "BootSourceOverrideTarget": "{{ boot_source_target }}",
         "BootSourceOverrideTarget@Redfish.AllowableValues": [
             "Pxe",
             "Cd",
             "Hdd"
         ],
+        {%- endif %}
         "BootSourceOverrideMode": "UEFI",
         "UefiTargetBootSourceOverride": "/0x31/0x33/0x01/0x01"
     },
@@ -55,7 +59,9 @@
     },
     "BiosVersion": "P79 v1.33 (02/28/2015)",
     "ProcessorSummary": {
+        {%- if total_cpus %}
         "Count": {{ total_cpus }},
+        {%- endif %}
         "ProcessorFamily": "Multi-Core Intel(R) Xeon(R) processor 7xxx Series",
         "Status": {
             "State": "Enabled",
@@ -64,7 +70,9 @@
         }
     },
     "MemorySummary": {
+        {%- if total_memory_gb %}
         "TotalSystemMemoryGiB": {{ total_memory_gb }},
+        {%- endif %}
         "Status": {
             "State": "Enabled",
             "Health": "OK",

@@ -1,0 +1,12 @@
+{
+  "error": {
+    "code": "Base.1.0.GeneralError",
+    "message": "{{ message }}",
+    "@Message.ExtendedInfo": [
+      {
+        "@odata.type": "/redfish/v1/$metadata#Message.1.0.0.Message",
+        "MessageId": "Base.1.0.GeneralError"
+      }
+    ]
+  }
+}
