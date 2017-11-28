@@ -1,14 +1,19 @@
 
-Welcome to Sushy Tools documentation!
-=====================================
+.. include:: ../../README.rst
 
-
-The sushy-tools uses the main Sushy documentation, you can access it at the
-`OpenStack Documentation <https://docs.openstack.org/sushy/>`_ site.
-
-Contents:
+Documentation
+=============
 
 .. toctree::
-   :maxdepth: 1
+  :maxdepth: 2
 
-   contributor/index
+  install/index
+  user/index
+  contributor/index
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`

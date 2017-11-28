@@ -1,5 +1,6 @@
 
-About Sushy Tools
-=================
+============
+Contributing
+============
 
-.. include:: ../../../README.rst
+.. include:: ../../../CONTRIBUTING.rst
