@@ -66,7 +66,7 @@ class LibvirtDriver(AbstractDriver):
 
         :returns: driver information as string
         """
-        return '<libvirt driver>'
+        return '<libvirt>'
 
     @property
     def systems(self):
@@ -79,6 +79,9 @@ class LibvirtDriver(AbstractDriver):
 
     def uuid(self, identity):
         """Get computer system UUID
+
+        The universal unique identifier (UUID) for this system. Can be used
+        in place of system name if there are duplicates.
 
         :returns: computer system UUID
         """
@@ -104,6 +107,7 @@ class LibvirtDriver(AbstractDriver):
             If not specified, current system power state is returned.
             Valid values  are: *On*, *ForceOn*, *ForceOff*, *GracefulShutdown*,
             *GracefulRestart*, *ForceRestart*, *Nmi*.
+
         :raises: `FishyError` if power state can't be set
         """
         with libvirt_open(self._uri) as conn:

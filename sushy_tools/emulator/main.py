@@ -21,9 +21,19 @@ import os
 import ssl
 import sys
 
-import flask
+try:
+    from sushy_tools.emulator.drivers import libvirtdriver
 
-from sushy_tools.emulator.drivers import libvirtdriver
+except ImportError:
+    libvirtdriver = None
+
+try:
+    from sushy_tools.emulator.drivers import novadriver
+
+except ImportError:
+    novadriver = None
+
+import flask
 
 
 app = flask.Flask(__name__)
@@ -40,9 +50,23 @@ def init_virt_driver(decorated_func):
 
         if driver is None:
 
-            driver = libvirtdriver.LibvirtDriver(
-                os.environ.get('SUSHY_EMULATOR_LIBVIRT_URL')
-            )
+            if 'OS_CLOUD' in os.environ:
+                if not novadriver:
+                    app.logger.error('Nova driver not loaded')
+                    sys.exit(1)
+
+                driver = novadriver.OpenStackDriver(os.environ['OS_CLOUD'])
+
+            else:
+                if not libvirtdriver:
+                    app.logger.error('libvirt driver not loaded')
+                    sys.exit(1)
+
+                driver = libvirtdriver.LibvirtDriver(
+                    os.environ.get('SUSHY_EMULATOR_LIBVIRT_URL')
+                )
+
+                app.logger.info('Running with %s', driver.driver)
 
         return decorated_func(*args, **kwargs)
 
@@ -80,6 +104,8 @@ def root_resource():
 def system_collection_resource():
     systems = driver.systems
 
+    app.logger.info('Serving systems list')
+
     return flask.render_template(
         'system_collection.json', system_count=len(systems),
         systems=systems)
@@ -90,6 +116,9 @@ def system_collection_resource():
 @returns_json
 def system_resource(identity):
     if flask.request.method == 'GET':
+
+        app.logger.info('Serving resources for system "%s"', identity)
+
         return flask.render_template(
             'system.json', identity=identity,
             uuid=driver.uuid(identity),
@@ -117,6 +146,9 @@ def system_resource(identity):
 
         driver.set_boot_device(identity, target)
 
+        app.logger.info('Set boot device to "%s" for system "%s"',
+                        target, identity)
+
         return '', 204
 
 
@@ -129,27 +161,39 @@ def system_reset_action(identity):
 
     driver.set_power_state(identity, reset_type)
 
+    app.logger.info('System "%s" power state set to "%s"',
+                    identity, reset_type)
+
     return '', 204
 
 
 def parse_args():
     parser = argparse.ArgumentParser('sushy-emulator')
-    parser.add_argument('-p', '--port',
+    parser.add_argument('--port',
                         type=int,
                         default=8000,
                         help='The port to bind the server to')
-    parser.add_argument('-u', '--libvirt-uri',
-                        type=str,
-                        default='',
-                        help='The libvirt URI. Can also be set via '
-                             'environment variable '
-                             '$SUSHY_EMULATOR_LIBVIRT_URL')
-    parser.add_argument('-c', '--ssl-certificate',
+    parser.add_argument('--ssl-certificate',
                         type=str,
                         help='SSL certificate to use for HTTPS')
-    parser.add_argument('-k', '--ssl-key',
+    parser.add_argument('--ssl-key',
                         type=str,
                         help='SSL key to use for HTTPS')
+
+    backend_group = parser.add_mutually_exclusive_group()
+    backend_group.add_argument('--os-cloud',
+                               type=str,
+                               help='OpenStack cloud name. Can also be set '
+                                    'via environment variable '
+                                    '$OS_CLOUD')
+    backend_group.add_argument('--libvirt-uri',
+                               type=str,
+                               default='',
+                               help='The libvirt URI. Can also be set via '
+                                    'environment variable '
+                                    '$SUSHY_EMULATOR_LIBVIRT_URL. '
+                                    'Default is qemu:///system')
+
     return parser.parse_args()
 
 
@@ -158,14 +202,28 @@ def main():
 
     args = parse_args()
 
-    driver = libvirtdriver.LibvirtDriver(args.libvirt_uri)
+    if args.os_cloud:
+        if not novadriver:
+            app.logger.error('Nova driver not loaded')
+            sys.exit(1)
+
+        driver = novadriver.OpenStackDriver(args.os_cloud)
+
+    else:
+        if not libvirtdriver:
+            app.logger.error('libvirt driver not loaded')
+            sys.exit(1)
+
+        driver = libvirtdriver.LibvirtDriver(args.libvirt_uri)
+
+    app.logger.info('Running with %s', driver.driver)
 
     ssl_context = None
     if args.ssl_certificate and args.ssl_key:
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
         ssl_context.load_cert_chain(args.ssl_certificate, args.ssl_key)
 
-    app.run(host='', port=args.port, ssl_context=ssl_context)
+    app.run(host='127.0.0.1', port=args.port, ssl_context=ssl_context)
 
     return 0
 
