@@ -22,17 +22,27 @@
     "PowerState": "{{ power_state }}",
     {%- endif %}
     "Boot": {
-        "BootSourceOverrideEnabled": "Continuous",
         {%- if boot_source_target %}
+        "BootSourceOverrideEnabled": "Continuous",
         "BootSourceOverrideTarget": "{{ boot_source_target }}",
         "BootSourceOverrideTarget@Redfish.AllowableValues": [
             "Pxe",
             "Cd",
             "Hdd"
+        {%- if boot_source_mode %}
         ],
-        {%- endif %}
-        "BootSourceOverrideMode": "UEFI",
+        {%- if 'uefi' in boot_source_mode.lower() %}
+        "BootSourceOverrideMode": "{{ boot_source_mode }}",
         "UefiTargetBootSourceOverride": "/0x31/0x33/0x01/0x01"
+        {%- else %}
+        "BootSourceOverrideMode": "{{ boot_source_mode }}"
+        {%- endif %}
+        {%- else %}
+        ]
+        {%- endif %}
+        {%- else %}
+        "BootSourceOverrideEnabled": "Continuous"
+        {%- endif %}
     },
     "TrustedModules": [
         {

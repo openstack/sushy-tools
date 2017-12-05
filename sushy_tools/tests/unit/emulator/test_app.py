@@ -63,7 +63,7 @@ class EmulatorTestCase(base.BaseTestCase):
         render_mock.assert_called_once_with(
             'system.json', identity='xxxx-yyyy-zzzz', uuid='zzzz-yyyy-xxxx',
             power_state='On', total_memory_gb=1, total_cpus=2,
-            boot_source_target='Cd')
+            boot_source_target='Cd', boot_source_mode='Legacy')
 
     @mock.patch('libvirt.open', autospec=True)
     def test_system_resource_patch(self, libvirt_mock):
