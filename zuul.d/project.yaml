@@ -1,0 +1,10 @@
+- project:
+    name: openstack/sushy-tools
+    check:
+      jobs:
+        - sushy-tools-tempest-dsvm-ironic-ipa-partition-redfish-src
+        - build-openstack-sphinx-docs
+    gate:
+      jobs:
+        - sushy-tools-tempest-dsvm-ironic-ipa-partition-redfish-src
+        - build-openstack-sphinx-docs
