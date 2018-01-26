@@ -1,0 +1,9 @@
+{
+    "@odata.type": "#EthernetInterface.v1_0_2.EthernetInterface",
+    "Id": "{{ nic['id'] }}",
+    "Name": "VNIC {{ nic['id'] }}",
+    "PermanentMACAddress": "{{ nic['mac'] }}",
+    "MACAddress": "{{ nic['mac'] }}",
+    "@odata.context": "/redfish/v1/$metadata#EthernetInterface.EthernetInterface",
+    "@odata.id": "/redfish/v1/Systems/{{ identity }}/EthernetInterfaces/{{ nic['id'] }}"
+}

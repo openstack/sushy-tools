@@ -318,3 +318,31 @@ class EmulatorTestCase(base.BaseTestCase):
                           'xxx-yyy-zzz',
                           {"BootMode": "Uefi",
                            "ProcTurboMode": "Enabled"})
+
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_get_nics(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/domain_nics.xml') as f:
+            domain_xml = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock.XMLDesc.return_value = domain_xml
+
+        nics = self.test_driver.get_nics('xxx-yyy-zzz')
+        self.assertEqual([{'id': '00:11:22:33:44:55',
+                           'mac': '00:11:22:33:44:55'},
+                          {'id': '52:54:00:4e:5d:37',
+                           'mac': '52:54:00:4e:5d:37'}],
+                         sorted(nics, key=lambda k: k['id']))
+
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_get_nics_empty(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/domain.xml') as f:
+            domain_xml = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock.XMLDesc.return_value = domain_xml
+
+        nics = self.test_driver.get_nics('xxx-yyy-zzz')
+        self.assertEqual([], nics)

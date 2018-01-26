@@ -472,3 +472,19 @@ class LibvirtDriver(AbstractDriver):
         """
         self._process_bios(identity, self.DEFAULT_BIOS_ATTRIBUTES,
                            update_existing_attributes=True)
+
+    def get_nics(self, identity):
+        """Get list of network interfaces and their MAC addresses
+
+        Use MAC address as network interface's id
+
+        :param identity: libvirt domain name or ID
+
+        :returns: list of network interfaces dict with their attributes
+        """
+        with libvirt_open(self._uri, readonly=True) as conn:
+            domain = conn.lookupByName(identity)
+            tree = ET.fromstring(domain.XMLDesc())
+            return [{'id': iface.get('address'), 'mac': iface.get('address')}
+                    for iface in tree.findall(
+                    ".//devices/interface[@type='network']/mac")]

@@ -15,6 +15,7 @@
 
 import os
 
+from munch import Munch
 from oslotest import base
 from six.moves import mock
 
@@ -182,3 +183,65 @@ class EmulatorTestCase(base.BaseTestCase):
             NotImplementedError,
             test_driver.reset_bios,
             'xxx-yyy-zzz')
+
+    def test_get_nics(self, nova_mock):
+        addresses = Munch(
+            {u'public': [
+                Munch({u'OS-EXT-IPS-MAC:mac_addr': u'fa:16:3e:46:e3:ac',
+                       u'version': 6,
+                       u'addr': u'2001:db8::7',
+                       u'OS-EXT-IPS:type': u'fixed'}),
+                Munch({u'OS-EXT-IPS-MAC:mac_addr': u'fa:16:3e:46:e3:ac',
+                       u'version': 4,
+                       u'addr': u'172.24.4.4',
+                       u'OS-EXT-IPS:type': u'fixed'})],
+             u'private': [
+                Munch({u'OS-EXT-IPS-MAC:mac_addr': u'fa:16:3e:22:18:31',
+                       u'version': 6,
+                       u'addr': u'fdc2:e509:41b8:0:f816:3eff:fe22:1831',
+                       u'OS-EXT-IPS:type': u'fixed'}),
+                Munch({u'OS-EXT-IPS-MAC:mac_addr': u'fa:16:3e:22:18:31',
+                       u'version': 4,
+                       u'addr': u'10.0.0.10',
+                       u'OS-EXT-IPS:type': u'fixed'})]})
+        server = mock.Mock(addresses=addresses)
+        nova_mock.return_value.get_server.return_value = server
+
+        test_driver = OpenStackDriver('fake-cloud')
+        nics = test_driver.get_nics('xxxx-yyyy-zzzz')
+        self.assertEqual([{'id': 'fa:16:3e:22:18:31',
+                           'mac': 'fa:16:3e:22:18:31'},
+                          {'id': 'fa:16:3e:46:e3:ac',
+                           'mac': 'fa:16:3e:46:e3:ac'}],
+                         sorted(nics, key=lambda k: k['id']))
+
+    def test_get_nics_empty(self, nova_mock):
+        server = mock.Mock(addresses=None)
+        nova_mock.return_value.get_server.return_value = server
+        test_driver = OpenStackDriver('fake-cloud')
+        nics = test_driver.get_nics('xxxx-yyyy-zzzz')
+        self.assertEqual(set(), nics)
+
+    def test_get_nics_error(self, nova_mock):
+        addresses = Munch(
+            {u'public': [
+                Munch({u'version': 6,
+                       u'addr': u'2001:db8::7'}),
+                Munch({u'version': 4,
+                       u'addr': u'172.24.4.4'})],
+             u'private': [
+                Munch({u'OS-EXT-IPS-MAC:mac_addr': u'fa:16:3e:22:18:31',
+                       u'version': 6,
+                       u'addr': u'fdc2:e509:41b8:0:f816:3eff:fe22:1831',
+                       u'OS-EXT-IPS:type': u'fixed'}),
+                Munch({u'OS-EXT-IPS-MAC:mac_addr': u'fa:16:3e:22:18:31',
+                       u'version': 4,
+                       u'addr': u'10.0.0.10',
+                       u'OS-EXT-IPS:type': u'fixed'})]})
+        server = mock.Mock(addresses=addresses)
+        nova_mock.return_value.get_server.return_value = server
+        test_driver = OpenStackDriver('fake-cloud')
+        nics = test_driver.get_nics('xxxx-yyyy-zzzz')
+        self.assertEqual([{'id': 'fa:16:3e:22:18:31',
+                           'mac': 'fa:16:3e:22:18:31'}],
+                         nics)

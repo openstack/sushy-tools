@@ -164,6 +164,31 @@ def system_resource(identity):
         return '', 204
 
 
+@app.route('/redfish/v1/Systems/<identity>/EthernetInterfaces',
+           methods=['GET'])
+@init_virt_driver
+@returns_json
+def ethernet_interfaces_collection(identity):
+    nics = driver.get_nics(identity)
+    return flask.render_template(
+        'ethernet_interfaces_collection.json', identity=identity,
+        nics=nics)
+
+
+@app.route('/redfish/v1/Systems/<identity>/EthernetInterfaces/<nic_id>',
+           methods=['GET'])
+@init_virt_driver
+@returns_json
+def ethernet_interface(identity, nic_id):
+    nics = driver.get_nics(identity)
+    for nic in nics:
+        if nic['id'] == nic_id:
+            return flask.render_template(
+                'ethernet_interface.json', identity=identity, nic=nic)
+
+    return 'Not found', 404
+
+
 @app.route('/redfish/v1/Systems/<identity>/Actions/ComputerSystem.Reset',
            methods=['POST'])
 @init_virt_driver

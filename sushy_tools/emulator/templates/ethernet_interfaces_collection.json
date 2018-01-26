@@ -1,0 +1,17 @@
+{
+    "@odata.type": "#EthernetInterfaceCollection.EthernetInterfaceCollection",
+    "Name": "Ethernet Interface Collection",
+    "Description": "Virtual NICs",
+    "Members@odata.count": {{ nics|length }},
+    "Members": [
+        {% for nic in nics %}
+                {
+                    "@odata.id": "/redfish/v1/Systems/{{ identity }}/EthernetInterfaces/{{ nic.id }}"
+                }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ],
+    "Oem": {},
+    "@odata.context": "/redfish/v1/$metadata#EthernetInterfaceCollection.EthernetInterfaceCollection",
+    "@odata.id": "/redfish/v1/Systems/{{ identity }}/EthernetInterfaces"
+}
+

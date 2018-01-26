@@ -144,3 +144,10 @@ class AbstractDriver(object):
 
         :raises: `FishyError` if BIOS attributes cannot be processed
         """
+
+    @abc.abstractmethod
+    def get_nics(self, identity):
+        """Get list of NICs and their attributes
+
+        :returns: list of dictionaries of NICs and their attributes
+        """
