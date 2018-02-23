@@ -102,7 +102,7 @@ def _get_boot_source_target(tree):
     return boot_source_target
 
 
-@app.route('/redfish/v1/Systems/<identity>', methods=['GET', 'PATCH'])
+@app.route('/redfish/v1/Systems/<identity>/EthernetInterfaces/', methods=['GET', 'PATCH'])
 def system_resource(identity):
     if flask.request.method == 'GET':
         with libvirt_open(LIBVIRT_URI, readonly=True) as conn:
