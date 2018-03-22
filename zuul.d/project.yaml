@@ -3,7 +3,9 @@
       jobs:
         - sushy-tools-tempest-dsvm-ironic-ipa-partition-redfish-src
         - build-openstack-sphinx-docs
+        - openstack-tox-lower-constraints
     gate:
       jobs:
         - sushy-tools-tempest-dsvm-ironic-ipa-partition-redfish-src
         - build-openstack-sphinx-docs
+        - openstack-tox-lower-constraints
