@@ -190,7 +190,7 @@ class LibvirtDriver(AbstractDriver):
                 boot_element.set('dev', target)
 
             try:
-                self._conn.defineXML(ET.tostring(tree).decode('utf-8'))
+                conn.defineXML(ET.tostring(tree).decode('utf-8'))
 
             except libvirt.libvirtError as e:
                 msg = ('Error changing boot device at libvirt URI "%(uri)s": '
