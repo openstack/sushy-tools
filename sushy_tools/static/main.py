@@ -72,6 +72,10 @@ class RequestHandler(http_server.BaseHTTPRequestHandler):
 
 def parse_args():
     parser = argparse.ArgumentParser('sushy-static')
+    parser.add_argument('-i', '--interface',
+                        type=str,
+                        default='',
+                        help='Local interface to listen at')
     parser.add_argument('-p', '--port',
                         type=int,
                         default=8000,
@@ -99,7 +103,8 @@ def main():
         return 1
 
     REDFISH_MOCKUP_FILES = os.path.realpath(args.mockup_files)
-    httpd = http_server.HTTPServer(('', args.port), RequestHandler)
+    httpd = http_server.HTTPServer((args.interface, args.port),
+                                   RequestHandler)
 
     if args.ssl_certificate and args.ssl_key:
         httpd.socket = ssl.wrap_socket(

@@ -178,7 +178,11 @@ def system_reset_action(identity):
 
 def parse_args():
     parser = argparse.ArgumentParser('sushy-emulator')
-    parser.add_argument('--port',
+    parser.add_argument('-i', '--interface',
+                        type=str,
+                        default='',
+                        help='Local interface to listen at')
+    parser.add_argument('-p', '--port',
                         type=int,
                         default=8000,
                         help='The port to bind the server to')
@@ -232,7 +236,7 @@ def main():
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
         ssl_context.load_cert_chain(args.ssl_certificate, args.ssl_key)
 
-    app.run(port=args.port, ssl_context=ssl_context)
+    app.run(host=args.interface, port=args.port, ssl_context=ssl_context)
 
     return 0
 
