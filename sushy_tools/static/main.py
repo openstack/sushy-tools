@@ -96,7 +96,7 @@ def main():
     args = parse_args()
     if not os.path.exists(args.mockup_files):
         print('Mockup files %s not found' % args.mockup_files)
-        sys.exit(1)
+        return 1
 
     REDFISH_MOCKUP_FILES = os.path.realpath(args.mockup_files)
     httpd = http_server.HTTPServer(('', args.port), RequestHandler)
@@ -108,6 +108,8 @@ def main():
 
     httpd.serve_forever()
 
+    return 0
+
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

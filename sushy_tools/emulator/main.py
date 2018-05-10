@@ -19,6 +19,7 @@ import argparse
 import functools
 import os
 import ssl
+import sys
 
 import flask
 
@@ -166,6 +167,8 @@ def main():
 
     app.run(host='', port=args.port, ssl_context=ssl_context)
 
+    return 0
+
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
