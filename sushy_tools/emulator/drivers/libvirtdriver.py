@@ -83,6 +83,8 @@ class LibvirtDriver(AbstractDriver):
         The universal unique identifier (UUID) for this system. Can be used
         in place of system name if there are duplicates.
 
+        :param identity: libvirt domain name or ID
+
         :returns: computer system UUID
         """
         with libvirt_open(self._uri, readonly=True) as conn:
@@ -91,6 +93,8 @@ class LibvirtDriver(AbstractDriver):
 
     def get_power_state(self, identity):
         """Get computer system power state
+
+        :param identity: libvirt domain name or ID
 
         :returns: current power state as *On* or *Off* `str` or `None`
             if power state can't be determined
@@ -103,6 +107,7 @@ class LibvirtDriver(AbstractDriver):
     def set_power_state(self, identity, state):
         """Set computer system power state
 
+        :param identity: libvirt domain name or ID
         :param state: string literal requesting power state transition.
             If not specified, current system power state is returned.
             Valid values  are: *On*, *ForceOn*, *ForceOff*, *GracefulShutdown*,
@@ -143,6 +148,8 @@ class LibvirtDriver(AbstractDriver):
     def get_boot_device(self, identity):
         """Get computer system boot device name
 
+        :param identity: libvirt domain name or ID
+
         :returns: boot device name as `str` or `None` if device name
             can't be determined
         """
@@ -163,6 +170,7 @@ class LibvirtDriver(AbstractDriver):
     def set_boot_device(self, identity, boot_source):
         """Get/Set computer system boot device name
 
+        :param identity: libvirt domain name or ID
         :param boot_source: optional string literal requesting boot device
             change on the system. If not specified, current boot device is
             returned. Valid values are: *Pxe*, *Hdd*, *Cd*.
@@ -205,6 +213,8 @@ class LibvirtDriver(AbstractDriver):
     def get_total_memory(self, identity):
         """Get computer system total memory
 
+        :param identity: libvirt domain name or ID
+
         :returns: available RAM in GiB as `int` or `None` if total memory
             count can't be determined
         """
@@ -214,6 +224,8 @@ class LibvirtDriver(AbstractDriver):
 
     def get_total_cpus(self, identity):
         """Get computer system total count of available CPUs
+
+        :param identity: libvirt domain name or ID
 
         :returns: available CPU count as `int` or `None` if CPU count
             can't be determined
