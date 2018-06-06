@@ -20,17 +20,17 @@ includes Redfish content mocks for Redfish 1.0.0.
 
 .. code-block:: bash
 
-   $ curl -o DSP2043_1.0.0.zip \
+   curl -o DSP2043_1.0.0.zip \
         https://www.dmtf.org/sites/default/files/standards/documents/DSP2043_1.0.0.zip
-   $ unzip -d mockups DSP2043_1.0.0.zip
-   $ sushy-static -m mockups/public-rackmount
+   unzip -d mockups DSP2043_1.0.0.zip
+   sushy-static -m mockups/public-rackmount
 
 Once you have the static simulator running, you can use it as it was a
 read-only bare-metal controller listening at *localhost:8000* (by default):
 
 .. code-block:: bash
 
-   $ curl http://localhost:8000/redfish/v1/Systems/
+   curl http://localhost:8000/redfish/v1/Systems/
    {
        "@odata.type": "#ComputerSystemCollection.ComputerSystemCollection",
        "Name": "Computer System Collection",
@@ -52,10 +52,10 @@ Virtual Redfish BMC
 -------------------
 
 The virtual Redfish BMC is functionally similar to the
-`Virtual BMC <https://github.com/openstack/virtualbmc>`_ tool except that the
-frontend protocol is Redfish rather than IPMI. The Redfish commands coming
-from the client get executed against the virtualization backend. That lets
-you control virtual machine instances over Redfish.
+`Virtual BMC <https://git.openstack.org/cgit/openstack/virtualbmc>`_ tool
+except that the frontend protocol is Redfish rather than IPMI. The Redfish
+commands coming from the client get executed against the virtualization
+backend. That lets you control virtual machine instances over Redfish.
 
 The libvirt backend
 +++++++++++++++++++
@@ -65,7 +65,7 @@ First thing you need is to set up some libvirt-managed virtual machines
 
 .. code-block:: bash
 
-   # virt-install \
+   virt-install \
       --name vbm-node \
       --ram 1024 \
       --disk path=/var/kvm/images/fedora26.img,size=30 \
@@ -80,7 +80,7 @@ Next you can fire up the Redfish virtual BMC which will listen at
 
 .. code-block:: bash
 
-   $ sushy-emulator
+   sushy-emulator
     * Running on http://localhost:8000/ (Press CTRL+C to quit)
 
 Now you should be able to see your libvirt domain among the Redfish
@@ -88,7 +88,7 @@ Now you should be able to see your libvirt domain among the Redfish
 
 .. code-block:: bash
 
-   $ curl http://localhost:8000/redfish/v1/Systems/
+   curl http://localhost:8000/redfish/v1/Systems/
    {
        "@odata.type": "#ComputerSystemCollection.ComputerSystemCollection",
        "Name": "Computer System Collection",
@@ -103,22 +103,23 @@ Now you should be able to see your libvirt domain among the Redfish
        "@odata.context": "/redfish/v1/$metadata#ComputerSystemCollection.ComputerSystemCollection",
        "@odata.id": "/redfish/v1/Systems",
        "@Redfish.Copyright": "Copyright 2014-2016 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+   }
 
 You should be able to flip its power state via the Redfish call:
 
 .. code-block:: bash
 
-   $ curl -d '{"ResetType":"On"}' \
+   curl -d '{"ResetType":"On"}' \
        -H "Content-Type: application/json" -X POST \
         http://localhost:8000/redfish/v1/Systems/vbmc-node/Actions/ComputerSystem.Reset
 
-   $ curl -d '{"ResetType":"ForceOff"}' \
+   curl -d '{"ResetType":"ForceOff"}' \
        -H "Content-Type: application/json" -X POST \
         http://localhost:8000/redfish/v1/Systems/vbmc-node/Actions/ComputerSystem.Reset
 
 You can have as many domains as you need. The domains can be concurrently
 managed over Redfish and some other tool like
-`Virtual BMC <https://github.com/openstack/virtualbmc>`_.
+`Virtual BMC <https://git.openstack.org/cgit/openstack/virtualbmc>`_.
 
 The OpenStack backend
 +++++++++++++++++++++
@@ -144,7 +145,7 @@ Next you can invoke the Redfish virtual BMC pointing it to your OVB cloud:
 
 .. code-block:: bash
 
-   $ sushy-emulator --os-cloud rdo-cloud
+   sushy-emulator --os-cloud rdo-cloud
     * Running on http://localhost:8000/ (Press CTRL+C to quit)
 
 By this point you should be able to see your OpenStack instances among the
@@ -152,7 +153,7 @@ Redfish *Systems*:
 
 .. code-block:: bash
 
-   $ curl http://localhost:8000/redfish/v1/Systems/
+   curl http://localhost:8000/redfish/v1/Systems/
    {
        "@odata.type": "#ComputerSystemCollection.ComputerSystemCollection",
        "Name": "Computer System Collection",
@@ -167,19 +168,20 @@ Redfish *Systems*:
        "@odata.context": "/redfish/v1/$metadata#ComputerSystemCollection.ComputerSystemCollection",
        "@odata.id": "/redfish/v1/Systems",
        "@Redfish.Copyright": "Copyright 2014-2016 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+   }
 
 And flip its power state via the Redfish call:
 
 .. code-block:: bash
 
-   $ curl -d '{"ResetType":"On"}' \
+   curl -d '{"ResetType":"On"}' \
        -H "Content-Type: application/json" -X POST \
         http://localhost:8000/redfish/v1/Systems/vbmc-node/Actions/ComputerSystem.Reset
 
-   $ curl -d '{"ResetType":"ForceOff"}' \
+   curl -d '{"ResetType":"ForceOff"}' \
        -H "Content-Type: application/json" -X POST \
         http://localhost:8000/redfish/v1/Systems/vbmc-node/Actions/ComputerSystem.Reset
 
 You can have as many OpenStack instances as you need. The instances can be
 concurrently managed over Redfish and functionally similar tools like
-`Virtual BMC <https://github.com/openstack/virtualbmc>`_.
+`Virtual BMC <https://git.openstack.org/cgit/openstack/virtualbmc>`_.
