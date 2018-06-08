@@ -38,6 +38,13 @@ class OpenStackDriver(AbstractDriver):
 
     BOOT_DEVICE_MAP_REV = {v: k for k, v in BOOT_DEVICE_MAP.items()}
 
+    BOOT_MODE_MAP = {
+        'Legacy': 'bios',
+        'Uefi': 'uefi',
+    }
+
+    BOOT_MODE_MAP_REV = {v: k for k, v in BOOT_MODE_MAP.items()}
+
     def __init__(self, os_cloud, readonly=False):
         self._cc = openstack.connect(cloud=os_cloud)
         self._os_cloud = os_cloud
@@ -187,6 +194,37 @@ class OpenStackDriver(AbstractDriver):
             instance.id, {'libvirt:pxe-first': '1'
                           if target == 'network' else ''}
         )
+
+    def get_boot_mode(self, identity):
+        """Get computer system boot mode.
+
+        :returns: either *Uefi* or *Legacy* as `str` or `None` if
+            current boot mode can't be determined
+        """
+        instance = self._get_instance(identity)
+
+        image = self._nc.glance.find_image(instance.image['id'])
+
+        hw_firmware_type = getattr(image, 'hw_firmware_type', None)
+
+        return self.BOOT_MODE_MAP_REV.get(hw_firmware_type)
+
+    def set_boot_mode(self, identity, boot_mode):
+        """Set computer system boot mode.
+
+        :param boot_mode: optional string literal requesting boot mode
+            change on the system. If not specified, current boot mode is
+            returned. Valid values are: *Uefi*, *Legacy*.
+
+        :raises: `FishyError` if boot mode can't be set
+        """
+        # just to make sure passed identity exists
+        self._get_instance(identity)
+
+        msg = ('The cloud driver %(driver)s does not allow changing boot '
+               'mode through Redfish' % {'driver': self.driver})
+
+        raise FishyError(msg)
 
     def get_total_memory(self, identity):
         """Get computer system total memory

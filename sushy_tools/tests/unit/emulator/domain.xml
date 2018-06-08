@@ -7,6 +7,7 @@
   <os>
     <type arch='i686' machine='pc'>hvm</type>
     <boot dev='cdrom'/>
+    <loader type='rom'/>
   </os>
   <devices>
     <emulator>/usr/bin/qemu-system-x86_64</emulator>

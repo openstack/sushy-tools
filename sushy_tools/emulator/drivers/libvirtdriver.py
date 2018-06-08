@@ -47,6 +47,8 @@ class libvirt_open(object):
 class LibvirtDriver(AbstractDriver):
     """Libvirt driver"""
 
+    # XML schema: https://libvirt.org/formatdomain.html#elementsOSBIOS
+
     BOOT_DEVICE_MAP = {
         'Pxe': 'network',
         'Hdd': 'hd',
@@ -56,6 +58,13 @@ class LibvirtDriver(AbstractDriver):
     BOOT_DEVICE_MAP_REV = {v: k for k, v in BOOT_DEVICE_MAP.items()}
 
     LIBVIRT_URI = 'qemu:///system'
+
+    BOOT_MODE_MAP = {
+        'Legacy': 'rom',
+        'Uefi': 'pflash',
+    }
+
+    BOOT_MODE_MAP_REV = {v: k for k, v in BOOT_MODE_MAP.items()}
 
     def __init__(self, uri=None):
         self._uri = uri or self.LIBVIRT_URI
@@ -173,6 +182,7 @@ class LibvirtDriver(AbstractDriver):
 
             domain = conn.lookupByName(identity)
 
+            # XML schema: https://libvirt.org/formatdomain.html#elementsOSBIOS
             tree = ET.fromstring(domain.XMLDesc())
 
             try:
@@ -198,6 +208,71 @@ class LibvirtDriver(AbstractDriver):
 
             except libvirt.libvirtError as e:
                 msg = ('Error changing boot device at libvirt URI "%(uri)s": '
+                       '%(error)s' % {'uri': self._uri, 'error': e})
+
+                raise FishyError(msg)
+
+    def get_boot_mode(self, identity):
+        """Get computer system boot mode.
+
+        :returns: either *Uefi* or *Legacy* as `str` or `None` if
+            current boot mode can't be determined
+        """
+        with libvirt_open(self._uri, readonly=True) as conn:
+
+            domain = conn.lookupByName(identity)
+
+            # XML schema: https://libvirt.org/formatdomain.html#elementsOSBIOS
+            tree = ET.fromstring(domain.XMLDesc())
+
+            loader_element = tree.find('.//loader')
+
+            if loader_element is not None:
+                boot_mode = (
+                    self.BOOT_MODE_MAP_REV.get(loader_element.get('type'))
+                )
+
+                return boot_mode
+
+    def set_boot_mode(self, identity, boot_mode):
+        """Set computer system boot mode.
+
+        :param boot_mode: optional string literal requesting boot mode
+            change on the system. If not specified, current boot mode is
+            returned. Valid values are: *Uefi*, *Legacy*.
+
+        :raises: `FishyError` if boot mode can't be set
+        """
+        with libvirt_open(self._uri) as conn:
+
+            domain = conn.lookupByName(identity)
+
+            # XML schema: https://libvirt.org/formatdomain.html#elementsOSBIOS
+            tree = ET.fromstring(domain.XMLDesc())
+
+            try:
+                target = self.BOOT_MODE_MAP[boot_mode]
+
+            except KeyError:
+                msg = ('Unknown boot mode requested: '
+                       '%(boot_mode)s' % {'boot_mode': boot_mode})
+
+                raise FishyError(msg)
+
+            for os_element in tree.findall('os'):
+                # Remove all "boot" elements
+                for loader_element in os_element.findall('loader'):
+                    os_element.remove(loader_element)
+
+                # Add a new loader element with the request boot mode
+                loader_element = ET.SubElement(os_element, 'loader')
+                loader_element.set('type', target)
+
+            try:
+                self._conn.defineXML(ET.tostring(tree).decode('utf-8'))
+
+            except libvirt.libvirtError as e:
+                msg = ('Error changing boot mode at libvirt URI "%(uri)s": '
                        '%(error)s' % {'uri': self._uri, 'error': e})
 
                 raise FishyError(msg)

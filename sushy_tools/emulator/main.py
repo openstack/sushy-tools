@@ -125,7 +125,8 @@ def system_resource(identity):
             power_state=driver.get_power_state(identity),
             total_memory_gb=driver.get_total_memory(identity),
             total_cpus=driver.get_total_cpus(identity),
-            boot_source_target=driver.get_boot_device(identity)
+            boot_source_target=driver.get_boot_device(identity),
+            boot_source_mode=driver.get_boot_mode(identity)
         )
 
     elif flask.request.method == 'PATCH':
@@ -134,20 +135,28 @@ def system_resource(identity):
             return 'PATCH only works for the Boot element', 400
 
         target = boot.get('BootSourceOverrideTarget')
-        if not target:
-            return 'Missing the BootSourceOverrideTarget element', 400
 
-        # NOTE(lucasagomes): In libvirt we always set the boot
-        # device frequency to "continuous" so, we are ignoring the
-        # BootSourceOverrideEnabled element here
+        if target:
+            # NOTE(lucasagomes): In libvirt we always set the boot
+            # device frequency to "continuous" so, we are ignoring the
+            # BootSourceOverrideEnabled element here
 
-        # TODO(lucasagomes): We should allow changing the boot mode from
-        # BIOS to UEFI (and vice-versa)
+            driver.set_boot_device(identity, target)
 
-        driver.set_boot_device(identity, target)
+            app.logger.info('Set boot device to "%s" for system "%s"',
+                            target, identity)
 
-        app.logger.info('Set boot device to "%s" for system "%s"',
-                        target, identity)
+        mode = boot.get('BootSourceOverrideMode')
+
+        if mode:
+            driver.set_boot_mode(identity, mode)
+
+            app.logger.info('Set boot mode to "%s" for system "%s"',
+                            mode, identity)
+
+        if not target and not mode:
+            return ('Missing the BootSourceOverrideTarget and/or '
+                    'BootSourceOverrideMode element', 400)
 
         return '', 204
 
@@ -205,14 +214,14 @@ def main():
     if args.os_cloud:
         if not novadriver:
             app.logger.error('Nova driver not loaded')
-            sys.exit(1)
+            return 1
 
         driver = novadriver.OpenStackDriver(args.os_cloud)
 
     else:
         if not libvirtdriver:
             app.logger.error('libvirt driver not loaded')
-            sys.exit(1)
+            return 1
 
         driver = libvirtdriver.LibvirtDriver(args.libvirt_uri)
 
