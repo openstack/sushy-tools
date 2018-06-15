@@ -57,6 +57,9 @@ class OpenStackDriver(AbstractDriver):
         msg = ('Error finding instance by UUID "%(identity)s" at OS '
                'cloud %(os_cloud)s"' % {'identity': identity,
                                         'os_cloud': self._os_cloud})
+
+        logger.debug(msg)
+
         raise FishyError(msg)
 
     def _get_flavor(self, identity):
@@ -83,6 +86,8 @@ class OpenStackDriver(AbstractDriver):
     def uuid(self, identity):
         """Get computer system UUID by name
 
+        :param identity: OpenStack instance name or ID
+
         :returns: computer system UUID
         """
         instance = self._get_instance(identity)
@@ -91,10 +96,16 @@ class OpenStackDriver(AbstractDriver):
     def get_power_state(self, identity):
         """Get computer system power state
 
+        :param identity: OpenStack instance name or ID
+
         :returns: *On* or *Off*`str` or `None`
             if power state can't be determined
         """
-        instance = self._get_instance(identity)
+        try:
+            instance = self._get_instance(identity)
+
+        except FishyError:
+            return
 
         if instance.power_state == self.NOVA_POWER_STATE_ON:
             return 'On'
@@ -104,6 +115,7 @@ class OpenStackDriver(AbstractDriver):
     def set_power_state(self, identity, state):
         """Set computer system power state
 
+        :param identity: OpenStack instance name or ID
         :param state: optional string literal requesting power state
             transition If not specified, current system power state is
             returned. Valid values  are: *On*, *ForceOn*, *ForceOff*,
@@ -147,14 +159,16 @@ class OpenStackDriver(AbstractDriver):
     def get_boot_device(self, identity):
         """Get computer system boot device name
 
-        :param boot_source: optional string literal requesting boot device
-            change on the system. If not specified, current boot device is
-            returned. Valid values are: *Pxe*, *Hdd*, *Cd*.
+        :param identity: OpenStack instance name or ID
 
         :returns: boot device name as `str` or `None` if device name
-            can't be determined
+            can't be determined. Valid values are: *Pxe*, *Hdd*, *Cd*.
         """
-        instance = self._get_instance(identity)
+        try:
+            instance = self._get_instance(identity)
+
+        except FishyError:
+            return
 
         metadata = self._cc.compute.get_server_metadata(instance.id).to_dict()
 
@@ -170,6 +184,7 @@ class OpenStackDriver(AbstractDriver):
     def set_boot_device(self, identity, boot_source):
         """Set computer system boot device name
 
+        :param identity: OpenStack instance name or ID
         :param boot_source: optional string literal requesting boot device
             change on the system. If not specified, current boot device is
             returned. Valid values are: *Pxe*, *Hdd*, *Cd*.
@@ -229,19 +244,31 @@ class OpenStackDriver(AbstractDriver):
     def get_total_memory(self, identity):
         """Get computer system total memory
 
+        :param identity: OpenStack instance name or ID
+
         :returns: available RAM in GiB as `int` or `None` if total memory
             count can't be determined
         """
-        flavor = self._get_flavor(identity)
+        try:
+            flavor = self._get_flavor(identity)
 
-        return int(math.ceil(flavor.ram // 1024))
+        except FishyError:
+            return
+
+        return int(math.ceil(flavor.ram / 1024.))
 
     def get_total_cpus(self, identity):
         """Get computer system total count of available CPUs
 
+        :param identity: OpenStack instance name or ID
+
         :returns: available CPU count as `int` or `None`
             if total memory count can't be determined
         """
-        flavor = self._get_flavor(identity)
+        try:
+            flavor = self._get_flavor(identity)
+
+        except FishyError:
+            return
 
         return flavor.vcpus

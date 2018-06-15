@@ -66,7 +66,7 @@ def init_virt_driver(decorated_func):
                     os.environ.get('SUSHY_EMULATOR_LIBVIRT_URL')
                 )
 
-                app.logger.info('Running with %s', driver.driver)
+                app.logger.debug('Running with %s', driver.driver)
 
         return decorated_func(*args, **kwargs)
 
@@ -104,7 +104,7 @@ def root_resource():
 def system_collection_resource():
     systems = driver.systems
 
-    app.logger.info('Serving systems list')
+    app.logger.debug('Serving systems list')
 
     return flask.render_template(
         'system_collection.json', system_count=len(systems),
@@ -117,7 +117,7 @@ def system_collection_resource():
 def system_resource(identity):
     if flask.request.method == 'GET':
 
-        app.logger.info('Serving resources for system "%s"', identity)
+        app.logger.debug('Serving resources for system "%s"', identity)
 
         return flask.render_template(
             'system.json', identity=identity,
@@ -225,14 +225,14 @@ def main():
 
         driver = libvirtdriver.LibvirtDriver(args.libvirt_uri)
 
-    app.logger.info('Running with %s', driver.driver)
+    app.logger.debug('Running with %s', driver.driver)
 
     ssl_context = None
     if args.ssl_certificate and args.ssl_key:
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
         ssl_context.load_cert_chain(args.ssl_certificate, args.ssl_key)
 
-    app.run(host='127.0.0.1', port=args.port, ssl_context=ssl_context)
+    app.run(port=args.port, ssl_context=ssl_context)
 
     return 0
 
