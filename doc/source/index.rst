@@ -8,6 +8,7 @@ Documentation
   :maxdepth: 2
 
   install/index
+  admin/index
   user/index
   contributor/index
 
