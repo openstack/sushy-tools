@@ -1,23 +1,13 @@
 {
     "@odata.type": "#ComputerSystem.v1_1_0.ComputerSystem",
     "Id": "{{ identity }}",
-    "Name": "WebFrontEnd483",
-    "SystemType": "Physical",
-    "AssetTag": "Chicago-45Z-2381",
-    "Manufacturer": "Contoso",
-    "Model": "3500RX",
-    "SKU": "8675309",
-    "SerialNumber": "437XR1138R2",
-    "PartNumber": "224071-J23",
-    "Description": "Web Front End node",
+    "Name": "{{ identity }}",
     "UUID": "{{ uuid }}",
-    "HostName": "web483",
     "Status": {
         "State": "Enabled",
         "Health": "OK",
         "HealthRollUp": "OK"
     },
-    "IndicatorLED": "Off",
     {%- if power_state %}
     "PowerState": "{{ power_state }}",
     {%- endif %}
@@ -44,35 +34,10 @@
         "BootSourceOverrideEnabled": "Continuous"
         {%- endif %}
     },
-    "TrustedModules": [
-        {
-            "FirmwareVersion": "1.13b",
-            "InterfaceType": "TPM1_2",
-            "Status": {
-                "State": "Enabled",
-                "Health": "OK"
-            }
-        }
-    ],
-    "Oem": {
-        "Contoso": {
-            "@odata.type": "http://Contoso.com/Schema#Contoso.ComputerSystem",
-            "ProductionLocation": {
-                "FacilityName": "PacWest Production Facility",
-                "Country": "USA"
-            }
-        },
-        "Chipwise": {
-            "@odata.type": "http://Chipwise.com/Schema#Chipwise.ComputerSystem",
-            "Style": "Executive"
-        }
-    },
-    "BiosVersion": "P79 v1.33 (02/28/2015)",
     "ProcessorSummary": {
         {%- if total_cpus %}
         "Count": {{ total_cpus }},
         {%- endif %}
-        "ProcessorFamily": "Multi-Core Intel(R) Xeon(R) processor 7xxx Series",
         "Status": {
             "State": "Enabled",
             "Health": "OK",
@@ -104,9 +69,6 @@
     "SimpleStorage": {
         "@odata.id": "/redfish/v1/Systems/{{ identity }}/SimpleStorage"
     },
-    "LogServices": {
-        "@odata.id": "/redfish/v1/Systems/{{ identity }}/LogServices"
-    },
     "Links": {
         "Chassis": [
         ],
@@ -125,11 +87,6 @@
                 "Nmi",
                 "ForceOn"
             ]
-        },
-        "Oem": {
-            "#Contoso.Reset": {
-                "target": "/redfish/v1/Systems/{{ identity }}/Oem/Contoso/Actions/Contoso.Reset"
-            }
         }
     },
     "@odata.context": "/redfish/v1/$metadata#ComputerSystem.ComputerSystem",
