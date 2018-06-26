@@ -126,7 +126,7 @@ The OpenStack backend
 
 You can use an OpenStack cloud instances to simulate Redfish-managed
 baremetal machines. This setup is known under the name of
-`OpenStack Virtial Baremetal <http://openstack-virtual-baremetal.readthedocs.io/en/latest/>`_.
+`OpenStack Virtual Baremetal <http://openstack-virtual-baremetal.readthedocs.io/en/latest/>`_.
 We will largely re-use its OpenStack infrastructure and configuration
 instructions. After all, what we are trying to do here is to set up the
 Redfish simulator alongside the
@@ -134,7 +134,7 @@ Redfish simulator alongside the
 tool which is used for exactly the same purpose at OVB with the only
 difference that it works over the *IPMI* protocol as opposed to *Redfish*.
 
-The easiest way is probably to set up your OpenStack Virtial Baremetal cloud
+The easiest way is probably to set up your OpenStack Virtual Baremetal cloud
 by following
 `its instructions <http://openstack-virtual-baremetal.readthedocs.io/en/latest/>`_.
 
