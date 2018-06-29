@@ -27,25 +27,24 @@ class EmulatorTestCase(base.BaseTestCase):
 
         super(EmulatorTestCase, self).setUp()
 
-    @mock.patch('flask.render_template', autospec=True)
-    def test_root_resource(self, render_mock):
-        self.app.get('/redfish/v1/')
-        render_mock.assert_called_once_with('root.json')
+    def test_root_resource(self):
+        response = self.app.get('/redfish/v1/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(True, bool(response.json))
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
-    @mock.patch('flask.render_template', autospec=True)
-    def test_collection_resource(self, render_mock, libvirt_mock):
+    def test_collection_resource(self, libvirt_mock):
         conn_mock = libvirt_mock.return_value
         conn_mock.listDefinedDomains.return_value = ['host0', 'host1']
 
-        self.app.get('/redfish/v1/Systems')
-        render_mock.assert_called_once_with('system_collection.json',
-                                            system_count=2,
-                                            systems=['host0', 'host1'])
+        response = self.app.get('/redfish/v1/Systems')
+        self.assertEqual(response.status_code, 200)
+        hosts = ['/redfish/v1/Systems/%s' % x.values()
+                 for x in response.json['Members']]
+        self.assertEqual(hosts, hosts)
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
-    @mock.patch('flask.render_template', autospec=True)
-    def test_system_resource_get(self, render_mock, libvirt_mock):
+    def test_system_resource_get(self, libvirt_mock):
         with open('sushy_tools/tests/unit/emulator/domain.xml', 'r') as f:
             data = f.read()
         domain_mock = mock.Mock()
@@ -58,12 +57,19 @@ class EmulatorTestCase(base.BaseTestCase):
         conn_mock = libvirt_mock.return_value
         conn_mock.lookupByName.return_value = domain_mock
 
-        self.app.get('/redfish/v1/Systems/xxxx-yyyy-zzzz')
+        response = self.app.get('/redfish/v1/Systems/xxxx-yyyy-zzzz')
 
-        render_mock.assert_called_once_with(
-            'system.json', identity='xxxx-yyyy-zzzz', uuid='zzzz-yyyy-xxxx',
-            power_state='On', total_memory_gb=1, total_cpus=2,
-            boot_source_target='Cd', boot_source_mode='Legacy')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['Id'], 'xxxx-yyyy-zzzz')
+        self.assertEqual(response.json['UUID'], 'zzzz-yyyy-xxxx')
+        self.assertEqual(response.json['PowerState'], 'On')
+        self.assertEqual(
+            response.json['MemorySummary']['TotalSystemMemoryGiB'], 1)
+        self.assertEqual(response.json['ProcessorSummary']['Count'], 2)
+        self.assertEqual(
+            response.json['Boot']['BootSourceOverrideTarget'], 'Cd')
+        self.assertEqual(
+            response.json['Boot']['BootSourceOverrideMode'], 'Legacy')
 
     @mock.patch('libvirt.open', autospec=True)
     def test_system_resource_patch(self, libvirt_mock):
