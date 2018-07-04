@@ -78,9 +78,13 @@ def returns_json(decorated_func):
     def decorator(*args, **kwargs):
         response = decorated_func(*args, **kwargs)
         if isinstance(response, flask.Response):
-            return flask.Response(response, content_type='application/json')
-        else:
             return response
+        if isinstance(response, tuple):
+            contents, status = response
+        else:
+            contents, status = response, 200
+        return flask.Response(response=contents, status=status,
+                              content_type='application/json')
 
     return decorator
 
