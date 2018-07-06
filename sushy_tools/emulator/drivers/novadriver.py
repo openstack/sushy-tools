@@ -272,3 +272,15 @@ class OpenStackDriver(AbstractDriver):
             return
 
         return flavor.vcpus
+
+    def get_bios(self, identity):
+        """Not supported as Openstack SDK does not expose API for BIOS"""
+        raise NotImplementedError
+
+    def set_bios(self, identity, attributes):
+        """Not supported as Openstack SDK does not expose API for BIOS"""
+        raise NotImplementedError
+
+    def reset_bios(self, identity):
+        """Not supported as Openstack SDK does not expose API for BIOS"""
+        raise NotImplementedError
