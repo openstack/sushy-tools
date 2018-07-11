@@ -7,7 +7,7 @@ development and testing of the Redfish protocol implementations and,
 in particular, Sushy library (https://docs.openstack.org/sushy/).
 
 The package ships two simulators - static Redfish responder and
-cloud-backed virtual Redfish BMC.
+virtual Redfish BMC that is backed by libvirt or OpenStack cloud.
 
 The static Redfish responder is a simple REST API server which
 responds the same things to client queries. It is effectively

@@ -1,9 +1,9 @@
 
-Using Redfish simulators
-========================
+Using Redfish emulators
+=======================
 
-The sushy-tools package includes two simulators - static Redfish responder
-and cloud-backed Redfish proxy.
+The sushy-tools package includes two emulators - static Redfish responder
+and virtual Redfish BMC that is backed by libvirt or OpenStack cloud.
 
 Static Redfish BMC
 ------------------
@@ -25,7 +25,7 @@ includes Redfish content mocks for Redfish 1.0.0.
    unzip -d mockups DSP2043_1.0.0.zip
    sushy-static -m mockups/public-rackmount
 
-Once you have the static simulator running, you can use it as it was a
+Once you have the static emulator running, you can use it as it was a
 read-only bare-metal controller listening at *localhost:8000* (by default):
 
 .. code-block:: bash
@@ -129,7 +129,7 @@ baremetal machines. This setup is known under the name of
 `OpenStack Virtual Baremetal <http://openstack-virtual-baremetal.readthedocs.io/en/latest/>`_.
 We will largely re-use its OpenStack infrastructure and configuration
 instructions. After all, what we are trying to do here is to set up the
-Redfish simulator alongside the
+Redfish emulator alongside the
 `openstackvbmc <https://docs.openstack.org/tripleo-docs/latest/install/environments/virtualbmc.html>`_
 tool which is used for exactly the same purpose at OVB with the only
 difference that it works over the *IPMI* protocol as opposed to *Redfish*.

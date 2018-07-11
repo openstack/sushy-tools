@@ -1,11 +1,11 @@
 
-Configuring simulators
-======================
+Configuring emulators
+=====================
 
-Running simulators in background
---------------------------------
+Running emulators in background
+-------------------------------
 
-The simulators run as interactive processes attached to the
+The emulators run as interactive processes attached to the
 terminal by default. You can create a systemd service to run the
 emulators in background.
 For each emulator create a systemd unit file and
@@ -22,8 +22,8 @@ adjust arguments as necessary, for example::
   StandardOutput=syslog
   StandardError=syslog
 
-If you want to run simulators with different configuration, for example,
-``sushy-static`` simulator with different mockup files, then create a new
+If you want to run emulators with different configuration, for example,
+``sushy-static`` emulator with different mockup files, then create a new
 systemd unit file.
 
 You can also use ``gunicorn`` to run ``sushy-emulator``, for example::
