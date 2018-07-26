@@ -10,7 +10,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import json
 import libvirt
 
 from oslotest import base
@@ -21,6 +20,7 @@ from sushy_tools.emulator import main
 from sushy_tools.error import FishyError
 
 
+@mock.patch.object(main, 'driver', None)  # This enables libvirt driver
 class EmulatorTestCase(base.BaseTestCase):
 
     def setUp(self):
@@ -34,7 +34,7 @@ class EmulatorTestCase(base.BaseTestCase):
     def test_root_resource(self):
         response = self.app.get('/redfish/v1/')
         self.assertEqual(200, response.status_code)
-        self.assertEqual(True, bool(response.json))
+        self.assertTrue(response.json)
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
     def test_collection_resource(self, libvirt_mock):
@@ -43,9 +43,10 @@ class EmulatorTestCase(base.BaseTestCase):
 
         response = self.app.get('/redfish/v1/Systems')
         self.assertEqual(200, response.status_code)
-        hosts = ['/redfish/v1/Systems/%s' % x.values()
-                 for x in response.json['Members']]
-        self.assertEqual(hosts, hosts)
+        self.assertEqual({'@odata.id': '/redfish/v1/Systems/host0'},
+                         response.json['Members'][0])
+        self.assertEqual({'@odata.id': '/redfish/v1/Systems/host1'},
+                         response.json['Members'][1])
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
     def test_system_resource_get(self, libvirt_mock):
@@ -86,9 +87,9 @@ class EmulatorTestCase(base.BaseTestCase):
         conn_mock = libvirt_mock.return_value
         conn_mock.lookupByName.return_value = domain_mock
         conn_mock.defineXML = mock.Mock()
-        data0 = json.dumps({'Boot': {'BootSourceOverrideTarget': 'Cd'}})
+        data = {'Boot': {'BootSourceOverrideTarget': 'Cd'}}
         response = self.app.patch('/redfish/v1/Systems/xxxx-yyyy-zzzz',
-                                  data=data0, content_type='application/json')
+                                  json=data)
         self.assertEqual(204, response.status_code)
 
     @mock.patch('libvirt.open', autospec=True)
@@ -99,10 +100,10 @@ class EmulatorTestCase(base.BaseTestCase):
         conn_mock = libvirt_mock.return_value
         conn_mock.lookupByName.return_value = domain_mock
 
-        data = json.dumps({'ResetType': 'On'})
+        data = {'ResetType': 'On'}
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
-            data=data, content_type='application/json')
+            json=data)
         self.assertEqual(204, response.status_code)
         domain_mock.create.assert_not_called()
 
@@ -113,10 +114,10 @@ class EmulatorTestCase(base.BaseTestCase):
 
         conn_mock = libvirt_mock.return_value
         conn_mock.lookupByName.return_value = domain_mock
-        data = json.dumps({'ResetType': 'ForceOn'})
+        data = {'ResetType': 'ForceOn'}
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
-            data=data, content_type='application/json')
+            json=data)
         self.assertEqual(204, response.status_code)
         domain_mock.create.assert_not_called()
 
@@ -127,10 +128,10 @@ class EmulatorTestCase(base.BaseTestCase):
 
         conn_mock = libvirt_mock.return_value
         conn_mock.lookupByName.return_value = domain_mock
-        data = json.dumps({'ResetType': 'ForceOff'})
+        data = {'ResetType': 'ForceOff'}
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
-            data=data, content_type='application/json')
+            json=data)
         self.assertEqual(204, response.status_code)
         domain_mock.destroy.assert_called_once_with()
 
@@ -141,10 +142,10 @@ class EmulatorTestCase(base.BaseTestCase):
 
         conn_mock = libvirt_mock.return_value
         conn_mock.lookupByName.return_value = domain_mock
-        data = json.dumps({'ResetType': 'GracefulShutdown'})
+        data = {'ResetType': 'GracefulShutdown'}
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
-            data=data, content_type='application/json')
+            json=data)
         self.assertEqual(204, response.status_code)
         domain_mock.shutdown.assert_called_once_with()
 
@@ -155,10 +156,10 @@ class EmulatorTestCase(base.BaseTestCase):
 
         conn_mock = libvirt_mock.return_value
         conn_mock.lookupByName.return_value = domain_mock
-        data = json.dumps({'ResetType': 'GracefulRestart'})
+        data = {'ResetType': 'GracefulRestart'}
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
-            data=data, content_type='application/json')
+            json=data)
         self.assertEqual(204, response.status_code)
         domain_mock.reboot.assert_called_once_with()
 
@@ -169,10 +170,10 @@ class EmulatorTestCase(base.BaseTestCase):
 
         conn_mock = libvirt_mock.return_value
         conn_mock.lookupByName.return_value = domain_mock
-        data = json.dumps({'ResetType': 'ForceRestart'})
+        data = {'ResetType': 'ForceRestart'}
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
-            data=data, content_type='application/json')
+            json=data)
         self.assertEqual(204, response.status_code)
         domain_mock.reset.assert_called_once_with()
 
@@ -183,10 +184,10 @@ class EmulatorTestCase(base.BaseTestCase):
 
         conn_mock = libvirt_mock.return_value
         conn_mock.lookupByName.return_value = domain_mock
-        data = json.dumps({'ResetType': 'Nmi'})
+        data = {'ResetType': 'Nmi'}
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
-            data=data, content_type='application/json')
+            json=data)
         self.assertEqual(204, response.status_code)
         domain_mock.injectNMI.assert_called_once_with()
 
