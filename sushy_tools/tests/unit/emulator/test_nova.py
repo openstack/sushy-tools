@@ -32,7 +32,7 @@ class EmulatorTestCase(base.BaseTestCase):
     @mock.patch('openstack.connect', autospec=True)
     def test_root_resource(self, nova_mock):
         response = self.app.get('/redfish/v1/')
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(200, response.status_code)
         self.assertTrue(response.json)
 
     @mock.patch('openstack.connect', autospec=True)
@@ -43,11 +43,11 @@ class EmulatorTestCase(base.BaseTestCase):
 
         response = self.app.get('/redfish/v1/Systems')
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['Members'][0],
-                         {'@odata.id': '/redfish/v1/Systems/host0'})
-        self.assertEqual(response.json['Members'][1],
-                         {'@odata.id': '/redfish/v1/Systems/host1'})
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({'@odata.id': '/redfish/v1/Systems/host0'},
+                         response.json['Members'][0])
+        self.assertEqual({'@odata.id': '/redfish/v1/Systems/host1'},
+                         response.json['Members'][1])
 
     @mock.patch('openstack.connect', autospec=True)
     def test_system_resource_get(self, nova_mock):
@@ -64,24 +64,24 @@ class EmulatorTestCase(base.BaseTestCase):
 
         response = self.app.get('/redfish/v1/Systems/xxxx-yyyy-zzzz')
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['Id'], 'xxxx-yyyy-zzzz')
-        self.assertEqual(response.json['UUID'], 'zzzz-yyyy-xxxx')
-        self.assertEqual(response.json['PowerState'], 'On')
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('xxxx-yyyy-zzzz', response.json['Id'])
+        self.assertEqual('zzzz-yyyy-xxxx', response.json['UUID'])
+        self.assertEqual('On', response.json['PowerState'])
         self.assertEqual(
             response.json['MemorySummary']['TotalSystemMemoryGiB'], 1)
-        self.assertEqual(response.json['ProcessorSummary']['Count'], 2)
+        self.assertEqual(2, response.json['ProcessorSummary']['Count'])
         self.assertEqual(
-            response.json['Boot']['BootSourceOverrideTarget'], 'Pxe')
+            'Pxe', response.json['Boot']['BootSourceOverrideTarget'])
         self.assertEqual(
-            response.json['Boot']['BootSourceOverrideMode'], 'Legacy')
+            'Legacy', response.json['Boot']['BootSourceOverrideMode'])
 
     @mock.patch('openstack.connect', autospec=True)
     def test_system_resource_patch(self, nova_mock):
         data = {'Boot': {'BootSourceOverrideTarget': 'Cd'}}
         response = self.app.patch('/redfish/v1/Systems/xxxx-yyyy-zzzz',
                                   json=data)
-        self.assertEqual(response.status_code, 204)
+        self.assertEqual(204, response.status_code)
         server = nova_mock.return_value
         server.compute.set_server_metadata.called_once_with(
             {'libvirt:pxe-first': ''})
@@ -95,7 +95,7 @@ class EmulatorTestCase(base.BaseTestCase):
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
             json=data)
-        self.assertEqual(response.status_code, 204)
+        self.assertEqual(204, response.status_code)
         server.compute.start_server.called_once()
 
     @mock.patch('openstack.connect', autospec=True)
@@ -107,7 +107,7 @@ class EmulatorTestCase(base.BaseTestCase):
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
             json=data)
-        self.assertEqual(response.status_code, 204)
+        self.assertEqual(204, response.status_code)
         server.compute.start_server.called_once()
 
     @mock.patch('openstack.connect', autospec=True)
@@ -119,7 +119,7 @@ class EmulatorTestCase(base.BaseTestCase):
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
             json=data)
-        self.assertEqual(response.status_code, 204)
+        self.assertEqual(204, response.status_code)
         server.compute.stop_server.called_once()
 
     @mock.patch('openstack.connect', autospec=True)
@@ -131,7 +131,7 @@ class EmulatorTestCase(base.BaseTestCase):
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
             json=data)
-        self.assertEqual(response.status_code, 204)
+        self.assertEqual(204, response.status_code)
         server.compute.stop_server.called_once()
 
     @mock.patch('openstack.connect', autospec=True)
@@ -143,7 +143,7 @@ class EmulatorTestCase(base.BaseTestCase):
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
             json=data)
-        self.assertEqual(response.status_code, 204)
+        self.assertEqual(204, response.status_code)
         server.compute.reboot_server.called_once()
 
     @mock.patch('openstack.connect', autospec=True)
@@ -155,5 +155,5 @@ class EmulatorTestCase(base.BaseTestCase):
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
             json=data)
-        self.assertEqual(response.status_code, 204)
+        self.assertEqual(204, response.status_code)
         server.compute.reboot_server.called_once()

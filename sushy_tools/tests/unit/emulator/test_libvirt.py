@@ -30,7 +30,7 @@ class EmulatorTestCase(base.BaseTestCase):
 
     def test_root_resource(self):
         response = self.app.get('/redfish/v1/')
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(200, response.status_code)
         self.assertEqual(True, bool(response.json))
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
@@ -39,7 +39,7 @@ class EmulatorTestCase(base.BaseTestCase):
         conn_mock.listDefinedDomains.return_value = ['host0', 'host1']
 
         response = self.app.get('/redfish/v1/Systems')
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(200, response.status_code)
         hosts = ['/redfish/v1/Systems/%s' % x.values()
                  for x in response.json['Members']]
         self.assertEqual(hosts, hosts)
@@ -60,17 +60,17 @@ class EmulatorTestCase(base.BaseTestCase):
 
         response = self.app.get('/redfish/v1/Systems/xxxx-yyyy-zzzz')
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['Id'], 'xxxx-yyyy-zzzz')
-        self.assertEqual(response.json['UUID'], 'zzzz-yyyy-xxxx')
-        self.assertEqual(response.json['PowerState'], 'On')
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('xxxx-yyyy-zzzz', response.json['Id'])
+        self.assertEqual('zzzz-yyyy-xxxx', response.json['UUID'])
+        self.assertEqual('On', response.json['PowerState'])
         self.assertEqual(
-            response.json['MemorySummary']['TotalSystemMemoryGiB'], 1)
-        self.assertEqual(response.json['ProcessorSummary']['Count'], 2)
+            1, response.json['MemorySummary']['TotalSystemMemoryGiB'])
+        self.assertEqual(2, response.json['ProcessorSummary']['Count'])
         self.assertEqual(
-            response.json['Boot']['BootSourceOverrideTarget'], 'Cd')
+            'Cd', response.json['Boot']['BootSourceOverrideTarget'])
         self.assertEqual(
-            response.json['Boot']['BootSourceOverrideMode'], 'Legacy')
+            'Legacy', response.json['Boot']['BootSourceOverrideMode'])
 
     @mock.patch('libvirt.open', autospec=True)
     def test_system_resource_patch(self, libvirt_mock):
@@ -86,7 +86,7 @@ class EmulatorTestCase(base.BaseTestCase):
         data0 = json.dumps({'Boot': {'BootSourceOverrideTarget': 'Cd'}})
         response = self.app.patch('/redfish/v1/Systems/xxxx-yyyy-zzzz',
                                   data=data0, content_type='application/json')
-        self.assertEqual(response.status, '204 NO CONTENT')
+        self.assertEqual(204, response.status_code)
 
     @mock.patch('libvirt.open', autospec=True)
     def test_system_reset_action_on(self, libvirt_mock):
@@ -100,7 +100,7 @@ class EmulatorTestCase(base.BaseTestCase):
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
             data=data, content_type='application/json')
-        self.assertEqual(response.status, '204 NO CONTENT')
+        self.assertEqual(204, response.status_code)
         domain_mock.create.assert_not_called()
 
     @mock.patch('libvirt.open', autospec=True)
@@ -114,7 +114,7 @@ class EmulatorTestCase(base.BaseTestCase):
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
             data=data, content_type='application/json')
-        self.assertEqual(response.status, '204 NO CONTENT')
+        self.assertEqual(204, response.status_code)
         domain_mock.create.assert_not_called()
 
     @mock.patch('libvirt.open', autospec=True)
@@ -128,7 +128,7 @@ class EmulatorTestCase(base.BaseTestCase):
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
             data=data, content_type='application/json')
-        self.assertEqual(response.status, '204 NO CONTENT')
+        self.assertEqual(204, response.status_code)
         domain_mock.destroy.assert_called_once_with()
 
     @mock.patch('libvirt.open', autospec=True)
@@ -142,7 +142,7 @@ class EmulatorTestCase(base.BaseTestCase):
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
             data=data, content_type='application/json')
-        self.assertEqual(response.status, '204 NO CONTENT')
+        self.assertEqual(204, response.status_code)
         domain_mock.shutdown.assert_called_once_with()
 
     @mock.patch('libvirt.open', autospec=True)
@@ -156,7 +156,7 @@ class EmulatorTestCase(base.BaseTestCase):
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
             data=data, content_type='application/json')
-        self.assertEqual(response.status, '204 NO CONTENT')
+        self.assertEqual(204, response.status_code)
         domain_mock.reboot.assert_called_once_with()
 
     @mock.patch('libvirt.open', autospec=True)
@@ -170,7 +170,7 @@ class EmulatorTestCase(base.BaseTestCase):
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
             data=data, content_type='application/json')
-        self.assertEqual(response.status, '204 NO CONTENT')
+        self.assertEqual(204, response.status_code)
         domain_mock.reset.assert_called_once_with()
 
     @mock.patch('libvirt.open', autospec=True)
@@ -184,5 +184,5 @@ class EmulatorTestCase(base.BaseTestCase):
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
             data=data, content_type='application/json')
-        self.assertEqual(response.status, '204 NO CONTENT')
+        self.assertEqual(204, response.status_code)
         domain_mock.injectNMI.assert_called_once_with()
