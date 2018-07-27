@@ -11,11 +11,14 @@
 #    under the License.
 
 import json
+import libvirt
 
 from oslotest import base
 from six.moves import mock
 
+from sushy_tools.emulator.drivers.libvirtdriver import LibvirtDriver
 from sushy_tools.emulator import main
+from sushy_tools.error import FishyError
 
 
 class EmulatorTestCase(base.BaseTestCase):
@@ -25,7 +28,7 @@ class EmulatorTestCase(base.BaseTestCase):
 
         # This enables libvirt driver
         main.driver = None
-
+        self.test_driver = LibvirtDriver()
         super(EmulatorTestCase, self).setUp()
 
     def test_root_resource(self):
@@ -186,3 +189,131 @@ class EmulatorTestCase(base.BaseTestCase):
             data=data, content_type='application/json')
         self.assertEqual(204, response.status_code)
         domain_mock.injectNMI.assert_called_once_with()
+
+    @mock.patch('libvirt.open', autospec=True)
+    def test_get_bios(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/domain.xml') as f:
+            domain_xml = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock.XMLDesc.return_value = domain_xml
+
+        bios_attributes = self.test_driver.get_bios('xxx-yyy-zzz')
+        self.assertEqual(LibvirtDriver.DEFAULT_BIOS_ATTRIBUTES,
+                         bios_attributes)
+        self.assertEqual(1, conn_mock.defineXML.call_count)
+
+    @mock.patch('libvirt.open', autospec=True)
+    def test_get_bios_existing(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/domain_bios.xml') as f:
+            domain_xml = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock.XMLDesc.return_value = domain_xml
+
+        bios_attributes = self.test_driver.get_bios('xxx-yyy-zzz')
+        self.assertEqual({"BootMode": "Bios",
+                          "EmbeddedSata": "Raid",
+                          "NicBoot1": "NetworkBoot",
+                          "ProcTurboMode": "Disabled"},
+                         bios_attributes)
+        conn_mock.defineXML.assert_not_called()
+
+    @mock.patch('libvirt.open', autospec=True)
+    def test_set_bios(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/domain_bios.xml') as f:
+            domain_xml = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock.XMLDesc.return_value = domain_xml
+
+        self.test_driver.set_bios('xxx-yyy-zzz',
+                                  {"BootMode": "Uefi",
+                                   "ProcTurboMode": "Enabled"})
+        self.assertEqual(1, conn_mock.defineXML.call_count)
+
+    @mock.patch('libvirt.open', autospec=True)
+    def test_reset_bios(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/domain_bios.xml') as f:
+            domain_xml = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock.XMLDesc.return_value = domain_xml
+
+        self.test_driver.reset_bios('xxx-yyy-zzz')
+        self.assertEqual(1, conn_mock.defineXML.call_count)
+
+    def test__process_bios_attributes_get_default(self):
+        with open('sushy_tools/tests/unit/emulator/domain.xml') as f:
+            domain_xml = f.read()
+
+        result = self.test_driver._process_bios_attributes(domain_xml)
+        self.assertTrue(result.attributes_written)
+        self.assertEqual(LibvirtDriver.DEFAULT_BIOS_ATTRIBUTES,
+                         result.bios_attributes)
+        self._assert_bios_xml(result.tree)
+
+    def test__process_bios_attributes_get_default_metadata_exists(self):
+        with open('sushy_tools/tests/unit/emulator/'
+                  'domain_metadata.xml') as f:
+            domain_xml = f.read()
+
+        result = self.test_driver._process_bios_attributes(domain_xml)
+        self.assertTrue(result.attributes_written)
+        self.assertEqual(LibvirtDriver.DEFAULT_BIOS_ATTRIBUTES,
+                         result.bios_attributes)
+        self._assert_bios_xml(result.tree)
+
+    def test__process_bios_attributes_get_existing(self):
+        with open('sushy_tools/tests/unit/emulator/domain_bios.xml') as f:
+            domain_xml = f.read()
+
+        result = self.test_driver._process_bios_attributes(domain_xml)
+        self.assertFalse(result.attributes_written)
+        self.assertEqual({"BootMode": "Bios",
+                          "EmbeddedSata": "Raid",
+                          "NicBoot1": "NetworkBoot",
+                          "ProcTurboMode": "Disabled"},
+                         result.bios_attributes)
+        self._assert_bios_xml(result.tree)
+
+    def test__process_bios_attributes_update(self):
+        with open('sushy_tools/tests/unit/emulator/domain_bios.xml') as f:
+            domain_xml = f.read()
+        result = self.test_driver._process_bios_attributes(
+            domain_xml,
+            {"BootMode": "Uefi",
+             "ProcTurboMode": "Enabled"},
+            True)
+        self.assertTrue(result.attributes_written)
+        self.assertEqual({"BootMode": "Uefi",
+                         "ProcTurboMode": "Enabled"},
+                         result.bios_attributes)
+        self._assert_bios_xml(result.tree)
+
+    def _assert_bios_xml(self, tree):
+        ns = {'sushy': 'http://openstack.org/xmlns/libvirt/sushy'}
+        self.assertIsNotNone(tree.find('metadata')
+                             .find('sushy:bios', ns)
+                             .find('sushy:attributes', ns))
+
+    @mock.patch('libvirt.open', autospec=True)
+    def test__process_bios_error(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/domain.xml') as f:
+            domain_xml = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock.XMLDesc.return_value = domain_xml
+        conn_mock.defineXML.side_effect = libvirt.libvirtError(
+            'because I can')
+
+        self.assertRaises(FishyError,
+                          self.test_driver._process_bios,
+                          'xxx-yyy-zzz',
+                          {"BootMode": "Uefi",
+                           "ProcTurboMode": "Enabled"})

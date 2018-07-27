@@ -18,6 +18,7 @@ import os
 from oslotest import base
 from six.moves import mock
 
+from sushy_tools.emulator.drivers.novadriver import OpenStackDriver
 from sushy_tools.emulator import main
 
 
@@ -157,3 +158,27 @@ class EmulatorTestCase(base.BaseTestCase):
             json=data)
         self.assertEqual(204, response.status_code)
         server.compute.reboot_server.called_once()
+
+    @mock.patch('openstack.connect', autospec=True)
+    def test_get_bios(self, nova_mock):
+        test_driver = OpenStackDriver('fake-cloud')
+        self.assertRaises(
+            NotImplementedError,
+            test_driver.get_bios, 'xxx-yyy-zzz')
+
+    @mock.patch('openstack.connect', autospec=True)
+    def test_set_bios(self, nova_mock):
+        test_driver = OpenStackDriver('fake-cloud')
+        self.assertRaises(
+            NotImplementedError,
+            test_driver.set_bios,
+            'xxx-yyy-zzz',
+            {'attribute 1': 'value 1'})
+
+    @mock.patch('openstack.connect', autospec=True)
+    def test_reset_bios(self, nova_mock):
+        test_driver = OpenStackDriver('fake-cloud')
+        self.assertRaises(
+            NotImplementedError,
+            test_driver.reset_bios,
+            'xxx-yyy-zzz')

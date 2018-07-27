@@ -15,6 +15,7 @@
 
 import argparse
 import functools
+import json
 import os
 import ssl
 import sys
@@ -175,6 +176,56 @@ def system_reset_action(identity):
     app.logger.info('System "%s" power state set to "%s"',
                     identity, reset_type)
 
+    return '', 204
+
+
+@app.route('/redfish/v1/Systems/<identity>/BIOS', methods=['GET'])
+@init_virt_driver
+@returns_json
+def bios(identity):
+    bios = driver.get_bios(identity)
+
+    app.logger.debug('Serving BIOS for system "%s"', identity)
+
+    return flask.render_template(
+        'bios.json',
+        identity=identity,
+        bios_current_attributes=json.dumps(bios, sort_keys=True, indent=6))
+
+
+@app.route('/redfish/v1/Systems/<identity>/BIOS/Settings',
+           methods=['GET', 'PATCH'])
+@init_virt_driver
+@returns_json
+def bios_settings(identity):
+
+    if flask.request.method == 'GET':
+        bios = driver.get_bios(identity)
+
+        app.logger.debug('Serving BIOS Settings for system "%s"', identity)
+
+        return flask.render_template(
+            'bios_settings.json',
+            identity=identity,
+            bios_pending_attributes=json.dumps(bios, sort_keys=True, indent=6))
+
+    elif flask.request.method == 'PATCH':
+        attributes = flask.request.json.get('Attributes')
+
+        driver.set_bios(identity, attributes)
+        app.logger.info('System "%s" BIOS attributes "%s" updated',
+                        identity, attributes)
+        return '', 204
+
+
+@app.route('/redfish/v1/Systems/<identity>/BIOS/Actions/Bios.ResetBios',
+           methods=['POST'])
+@init_virt_driver
+@returns_json
+def system_reset_bios(identity):
+
+    driver.reset_bios(identity)
+    app.logger.info('BIOS for system "%s" reset', identity)
     return '', 204
 
 

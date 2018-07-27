@@ -1,0 +1,23 @@
+{
+    "@odata.type": "#Bios.v1_0_0.Bios",
+    "Id": "BIOS",
+    "Name": "BIOS Configuration Current Settings",
+    "AttributeRegistry": "BiosAttributeRegistryP89.v1_0_0",
+    "Attributes": {{ bios_current_attributes }},
+    "@Redfish.Settings": {
+        "@odata.type": "#Settings.v1_0_0.Settings",
+        "SettingsObject": {
+            "@odata.id": "/redfish/v1/Systems/{{ identity }}/BIOS/Settings"
+        }
+    },
+    "Actions": {
+        "#Bios.ResetBios": {
+            "target": "/redfish/v1/Systems/{{ identity }}/BIOS/Actions/Bios.ResetBios"
+        },
+        "#Bios.ChangePassword": {
+            "target": "/redfish/v1/Systems/{{ identity }}/BIOS/Actions/Bios.ChangePassword"
+        }
+    },
+    "@odata.context": "/redfish/v1/$metadata#Bios.Bios",
+    "@odata.id": "/redfish/v1/Systems/{{ identity }}/BIOS"
+}

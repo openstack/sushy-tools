@@ -119,3 +119,28 @@ class AbstractDriver(object):
         :returns: available CPU count as `int` or `None` if CPU count
             can't be determined
         """
+
+    @abc.abstractmethod
+    def get_bios(self, identity):
+        """Get BIOS attributes for the system
+
+        :returns: key-value pairs of BIOS attributes
+
+        :raises: `FishyError` if BIOS attributes cannot be processed
+        """
+
+    @abc.abstractmethod
+    def set_bios(self, identity, attributes):
+        """Update BIOS attributes
+
+        :param attributes: key-value pairs of attributes to update
+
+        :raises: `FishyError` if BIOS attributes cannot be processed
+        """
+
+    @abc.abstractmethod
+    def reset_bios(self, identity):
+        """Reset BIOS attributes to default
+
+        :raises: `FishyError` if BIOS attributes cannot be processed
+        """

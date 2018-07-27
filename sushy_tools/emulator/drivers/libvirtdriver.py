@@ -15,6 +15,7 @@
 
 import xml.etree.ElementTree as ET
 
+from collections import namedtuple
 from sushy_tools.emulator.drivers.base import AbstractDriver
 from sushy_tools.error import FishyError
 
@@ -65,6 +66,11 @@ class LibvirtDriver(AbstractDriver):
     }
 
     BOOT_MODE_MAP_REV = {v: k for k, v in BOOT_MODE_MAP.items()}
+
+    DEFAULT_BIOS_ATTRIBUTES = {"BootMode": "Uefi",
+                               "EmbeddedSata": "Raid",
+                               "NicBoot1": "NetworkBoot",
+                               "ProcTurboMode": "Enabled"}
 
     def __init__(self, uri=None):
         self._uri = uri or self.LIBVIRT_URI
@@ -324,3 +330,143 @@ class LibvirtDriver(AbstractDriver):
                     total_cpus = int(vcpu_element.text)
 
             return total_cpus or None
+
+    def _process_bios_attributes(self,
+                                 domain_xml,
+                                 bios_attributes=DEFAULT_BIOS_ATTRIBUTES,
+                                 update_existing_attributes=False):
+        """Process Libvirt domain XML for BIOS attributes
+
+        This method supports adding default BIOS attributes,
+        retrieving existing BIOS attributes and
+        updating existing BIOS attributes.
+
+        This method is introduced to make XML testable otherwise have to
+        compare XML strings to test if XML saved to libvirt is as expected.
+
+        Sample of custom XML:
+        <domain type="kvm">
+        [...]
+          <metadata xmlns:sushy="http://openstack.org/xmlns/libvirt/sushy">
+            <sushy:bios>
+              <sushy:attributes>
+                <sushy:attribute name="ProcTurboMode" value="Enabled"/>
+                <sushy:attribute name="BootMode" value="Uefi"/>
+                <sushy:attribute name="NicBoot1" value="NetworkBoot"/>
+                <sushy:attribute name="EmbeddedSata" value="Raid"/>
+              </sushy:attributes>
+            </sushy:bios>
+          </metadata>
+        [...]
+
+        :param domain_xml: Libvirt domain XML to process
+        :param bios_attributes: BIOS attributes for updates or default
+            values if not specified
+        :param update_existing_attributes: Update existing BIOS attributes
+
+        :returns: namedtuple of tree: processed XML element tree,
+            attributes_written: if changes were made to XML,
+            bios_attributes: dict of BIOS attributes
+        """
+        namespace = 'http://openstack.org/xmlns/libvirt/sushy'
+        ET.register_namespace('sushy', namespace)
+        ns = {'sushy': namespace}
+
+        tree = ET.fromstring(domain_xml)
+        metadata = tree.find('metadata')
+
+        if metadata is None:
+            metadata = ET.SubElement(tree, 'metadata')
+        bios = metadata.find('sushy:bios', ns)
+
+        attributes_written = False
+        if bios is not None and update_existing_attributes:
+            metadata.remove(bios)
+            bios = None
+        if bios is None:
+            bios = ET.SubElement(metadata, '{%s}bios' % (namespace))
+            attributes = ET.SubElement(bios, '{%s}attributes' % (namespace))
+            for key, value in sorted(bios_attributes.items()):
+                ET.SubElement(attributes,
+                              '{%s}attribute' % (namespace),
+                              name=key,
+                              value=value)
+            attributes_written = True
+
+        bios_attributes = {atr.attrib['name']: atr.attrib['value']
+                           for atr in tree.find('.//sushy:attributes', ns)}
+
+        BiosProcessResult = namedtuple('BiosProcessResult',
+                                       'tree, attributes_written,'
+                                       'bios_attributes')
+        return BiosProcessResult(tree, attributes_written, bios_attributes)
+
+    def _process_bios(self, identity,
+                      bios_attributes=DEFAULT_BIOS_ATTRIBUTES,
+                      update_existing_attributes=False):
+        """Process Libvirt domain XML for BIOS attributes and update it if necessary
+
+        :param identity: libvirt domain name or ID
+        :param bios_attributes: Full list of BIOS attributes to use if
+            they are missing or update necessary
+        :param update: Update existing BIOS attributes
+
+        :returns: New or existing dict of BIOS attributes
+
+        :raises: `FishyError` if BIOS attributes cannot be saved
+        """
+        with libvirt_open(self._uri) as conn:
+            libvirt_domain = conn.lookupByName(identity)
+            result = self._process_bios_attributes(libvirt_domain.XMLDesc(),
+                                                   bios_attributes,
+                                                   update_existing_attributes)
+
+            if result.attributes_written:
+                try:
+                    conn.defineXML(ET.tostring(result.tree).decode('utf-8'))
+                except libvirt.libvirtError as e:
+                    msg = ('Error updating BIOS attributes'
+                           ' at libvirt URI "%(uri)s": '
+                           '%(error)s' % {'uri': self._uri, 'error': e})
+                    raise FishyError(msg)
+            return result.bios_attributes
+
+    def get_bios(self, identity):
+        """Get BIOS section
+
+        If there are no BIOS attributes, domain is updated with default values.
+
+        :param identity: libvirt domain name or ID
+        :returns: dict of BIOS attributes
+        """
+        return self._process_bios(identity)
+
+    def set_bios(self, identity, attributes):
+        """Update BIOS attributes
+
+        These values do not have any effect on VM. This is a workaround
+        because there is no libvirt API to manage BIOS settings.
+        By storing fake BIOS attributes they are attached to VM and are
+        persisted through VM lifecycle.
+
+        Updates to attributes are immediate unlike in real BIOS that
+        would require system reboot.
+
+        :param identity: libvirt domain name or ID
+        :param attributes: dict of BIOS attributes to update. Can pass only
+            attributes that need update, not all
+        """
+        bios_attributes = self.get_bios(identity)
+
+        bios_attributes.update(attributes)
+
+        self._process_bios(identity, bios_attributes,
+                           update_existing_attributes=True)
+
+    def reset_bios(self, identity):
+        """Reset BIOS attributes to default
+
+        :param identity: libvirt domain name or ID
+        """
+        self._process_bios(identity, self.DEFAULT_BIOS_ATTRIBUTES,
+                           update_existing_attributes=True)
