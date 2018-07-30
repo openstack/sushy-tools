@@ -13,178 +13,174 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import os
-
 from munch import Munch
 from oslotest import base
 from six.moves import mock
 
 from sushy_tools.emulator.drivers.novadriver import OpenStackDriver
-from sushy_tools.emulator import main
+from sushy_tools.error import FishyError
 
 
-@mock.patch.object(os, 'environ', dict(OS_CLOUD='fake-cloud', **os.environ))
-@mock.patch.object(main, 'driver', None)  # This enables Nova driver
-@mock.patch('openstack.connect', autospec=True)
-class EmulatorTestCase(base.BaseTestCase):
+class NovaDriverTestCase(base.BaseTestCase):
 
     def setUp(self):
-        self.app = main.app.test_client()
-        super(EmulatorTestCase, self).setUp()
+        self.nova_patcher = mock.patch('openstack.connect', autospec=True)
+        self.nova_mock = self.nova_patcher.start()
 
-    def test_root_resource(self, nova_mock):
-        response = self.app.get('/redfish/v1/')
-        self.assertEqual(200, response.status_code)
-        self.assertTrue(response.json)
+        self.test_driver = OpenStackDriver('fake-cloud')
 
-    def test_collection_resource(self, nova_mock):
+        super(NovaDriverTestCase, self).setUp()
+
+    def tearDown(self):
+        self.nova_patcher.stop()
+        super(NovaDriverTestCase, self).tearDown()
+
+    def test_uuid(self):
+        server = mock.Mock(id='zzzz-yyyy-xxxx')
+        self.nova_mock.return_value.get_server.return_value = server
+        uuid = self.test_driver.uuid('zzzz-yyyy-xxxx')
+        self.assertEqual('zzzz-yyyy-xxxx', uuid)
+
+    def test_systems(self):
         server0 = mock.Mock(id='host0')
         server1 = mock.Mock(id='host1')
-        nova_mock.return_value.list_servers.return_value = [server0, server1]
+        self.nova_mock.return_value.list_servers.return_value = [
+            server0, server1]
 
-        response = self.app.get('/redfish/v1/Systems')
+        systems = self.test_driver.systems
 
-        self.assertEqual(200, response.status_code)
-        self.assertEqual({'@odata.id': '/redfish/v1/Systems/host0'},
-                         response.json['Members'][0])
-        self.assertEqual({'@odata.id': '/redfish/v1/Systems/host1'},
-                         response.json['Members'][1])
+        self.assertEqual(['host0', 'host1'], systems)
 
-    def test_system_resource_get(self, nova_mock):
+    def test_get_power_state_on(self,):
         server = mock.Mock(id='zzzz-yyyy-xxxx',
-                           power_state=1,
-                           image={'id': 'xxxx-zzzz-yyyy'})
-        nova_mock.return_value.get_server.return_value = server
+                           power_state=1)
+        self.nova_mock.return_value.get_server.return_value = server
 
-        flavor = mock.Mock(ram=1024, vcpus=2)
-        nova_mock.return_value.get_flavor.return_value = flavor
+        power_state = self.test_driver.get_power_state('zzzz-yyyy-xxxx')
 
+        self.assertEqual('On', power_state)
+
+    def test_get_power_state_off(self):
+        server = mock.Mock(id='zzzz-yyyy-xxxx',
+                           power_state=0)
+        self.nova_mock.return_value.get_server.return_value = server
+
+        power_state = self.test_driver.get_power_state('zzzz-yyyy-xxxx')
+
+        self.assertEqual('Off', power_state)
+
+    def test_set_power_state_on(self):
+        server = mock.Mock(id='zzzz-yyyy-xxxx', power_state=0)
+        self.nova_mock.return_value.get_server.return_value = server
+        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'On')
+        compute = self.nova_mock.return_value.compute
+        compute.start_server.assert_called_once_with('zzzz-yyyy-xxxx')
+
+    def test_set_power_state_forceon(self):
+        server = mock.Mock(id='zzzz-yyyy-xxxx', power_state=0)
+        self.nova_mock.return_value.get_server.return_value = server
+        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'ForceOn')
+        compute = self.nova_mock.return_value.compute
+        compute.start_server.assert_called_once_with('zzzz-yyyy-xxxx')
+
+    def test_set_power_state_forceoff(self):
+        server = mock.Mock(id='zzzz-yyyy-xxxx', power_state=1)
+        self.nova_mock.return_value.get_server.return_value = server
+        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'ForceOff')
+        compute = self.nova_mock.return_value.compute
+        compute.stop_server.assert_called_once_with('zzzz-yyyy-xxxx')
+
+    def test_set_power_state_gracefulshutdown(self):
+        server = mock.Mock(id='zzzz-yyyy-xxxx', power_state=1)
+        self.nova_mock.return_value.get_server.return_value = server
+        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'GracefulShutdown')
+        compute = self.nova_mock.return_value.compute
+        compute.stop_server.assert_called_once_with('zzzz-yyyy-xxxx')
+
+    def test_set_power_state_gracefulrestart(self):
+        server = mock.Mock(id='zzzz-yyyy-xxxx', power_state=1)
+        self.nova_mock.return_value.get_server.return_value = server
+        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'GracefulRestart')
+        compute = self.nova_mock.return_value.compute
+        compute.reboot_server.assert_called_once_with(
+            'zzzz-yyyy-xxxx', reboot_type='SOFT')
+
+    def test_set_power_state_forcerestart(self):
+        server = mock.Mock(id='zzzz-yyyy-xxxx', power_state=1)
+        self.nova_mock.return_value.get_server.return_value = server
+        self.test_driver.set_power_state(
+            'zzzz-yyyy-xxxx', 'ForceRestart')
+        compute = self.nova_mock.return_value.compute
+        compute.reboot_server.assert_called_once_with(
+            'zzzz-yyyy-xxxx', reboot_type='HARD')
+
+    def test_get_boot_device(self):
+        server = mock.Mock(id='zzzz-yyyy-xxxx')
+        self.nova_mock.return_value.get_server.return_value = server
+
+        boot_device = self.test_driver.get_boot_device('zzzz-yyyy-xxxx')
+
+        self.assertEqual('Pxe', boot_device)
+        get_server_metadata = (
+            self.nova_mock.return_value.compute.get_server_metadata)
+        get_server_metadata.assert_called_once_with(server.id)
+
+    def test_set_boot_device(self):
+        server = mock.Mock(id='zzzz-yyyy-xxxx')
+        self.nova_mock.return_value.get_server.return_value = server
+
+        compute = self.nova_mock.return_value.compute
+        set_server_metadata = compute.set_server_metadata
+
+        self.test_driver.set_boot_device('zzzz-yyyy-xxxx', 'Pxe')
+
+        set_server_metadata.assert_called_once_with(
+            'zzzz-yyyy-xxxx', **{'libvirt:pxe-first': '1'}
+        )
+
+    def test_get_boot_mode(self):
         image = mock.Mock(hw_firmware_type='bios')
-        nova_mock.return_value.image.find_image.return_value = image
+        self.nova_mock.return_value.image.find_image.return_value = image
 
-        response = self.app.get('/redfish/v1/Systems/xxxx-yyyy-zzzz')
+        boot_mode = self.test_driver.get_boot_mode('zzzz-yyyy-xxxx')
 
-        self.assertEqual(200, response.status_code)
-        self.assertEqual('xxxx-yyyy-zzzz', response.json['Id'])
-        self.assertEqual('zzzz-yyyy-xxxx', response.json['UUID'])
-        self.assertEqual('On', response.json['PowerState'])
-        self.assertEqual(
-            response.json['MemorySummary']['TotalSystemMemoryGiB'], 1)
-        self.assertEqual(2, response.json['ProcessorSummary']['Count'])
-        self.assertEqual(
-            'Pxe', response.json['Boot']['BootSourceOverrideTarget'])
-        self.assertEqual(
-            'Legacy', response.json['Boot']['BootSourceOverrideMode'])
+        self.assertEqual('Legacy', boot_mode)
 
-    def test_system_resource_patch(self, nova_mock):
-        nova_conn_mock = nova_mock.return_value
-        server = mock.Mock(power_state=0)
-        nova_conn_mock.get_server.return_value = server
-
-        data = {'Boot': {'BootSourceOverrideTarget': 'Cd'}}
-        response = self.app.patch('/redfish/v1/Systems/xxxx-yyyy-zzzz',
-                                  json=data)
-        self.assertEqual(204, response.status_code)
-
-        nova_conn_mock.compute.set_server_metadata.assert_called_once_with(
-            server.id, **{'libvirt:pxe-first': ''})
-
-    def test_system_reset_action_on(self, nova_mock):
-        nova_conn_mock = nova_mock.return_value
-        server = mock.Mock(power_state=0)
-        nova_conn_mock.get_server.return_value = server
-
-        data = {'ResetType': 'On'}
-        response = self.app.post(
-            '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
-            json=data)
-        self.assertEqual(204, response.status_code)
-        nova_conn_mock.compute.start_server.assert_called_once_with(server.id)
-
-    def test_system_reset_action_forceon(self, nova_mock):
-        nova_conn_mock = nova_mock.return_value
-        server = mock.Mock(power_state=0)
-        nova_conn_mock.get_server.return_value = server
-
-        data = {'ResetType': 'ForceOn'}
-        response = self.app.post(
-            '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
-            json=data)
-        self.assertEqual(204, response.status_code)
-        nova_conn_mock.compute.start_server.assert_called_once_with(server.id)
-
-    def test_system_reset_action_forceoff(self, nova_mock):
-        nova_conn_mock = nova_mock.return_value
-        server = mock.Mock(power_state=1)
-        nova_conn_mock.get_server.return_value = server
-
-        data = {'ResetType': 'ForceOff'}
-        response = self.app.post(
-            '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
-            json=data)
-        self.assertEqual(204, response.status_code)
-        nova_conn_mock.compute.stop_server.assert_called_once_with(server.id)
-
-    def test_system_reset_action_shutdown(self, nova_mock):
-        nova_conn_mock = nova_mock.return_value
-        server = mock.Mock(power_state=1)
-        nova_conn_mock.get_server.return_value = server
-
-        data = {'ResetType': 'GracefulShutdown'}
-        response = self.app.post(
-            '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
-            json=data)
-        self.assertEqual(204, response.status_code)
-        nova_conn_mock.compute.stop_server.assert_called_once_with(server.id)
-
-    def test_system_reset_action_restart(self, nova_mock):
-        nova_conn_mock = nova_mock.return_value
-        server = mock.Mock(power_state=1)
-        nova_conn_mock.get_server.return_value = server
-
-        data = {'ResetType': 'GracefulRestart'}
-        response = self.app.post(
-            '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
-            json=data)
-        self.assertEqual(204, response.status_code)
-        nova_conn_mock.compute.reboot_server.assert_called_once_with(
-            server.id, reboot_type='SOFT')
-
-    def test_system_reset_action_forcerestart(self, nova_mock):
-        nova_conn_mock = nova_mock.return_value
-        server = mock.Mock(power_state=1)
-        nova_conn_mock.get_server.return_value = server
-
-        data = {'ResetType': 'ForceRestart'}
-        response = self.app.post(
-            '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
-            json=data)
-        self.assertEqual(204, response.status_code)
-        nova_conn_mock.compute.reboot_server.assert_called_once_with(
-            server.id, reboot_type='HARD')
-
-    def test_get_bios(self, nova_mock):
-        test_driver = OpenStackDriver('fake-cloud')
+    def test_set_boot_mode(self):
         self.assertRaises(
-            NotImplementedError,
-            test_driver.get_bios, 'xxx-yyy-zzz')
+            FishyError, self.test_driver.set_boot_mode,
+            'zzzz-yyyy-xxxx', 'Legacy')
 
-    def test_set_bios(self, nova_mock):
-        test_driver = OpenStackDriver('fake-cloud')
+    def test_get_total_memory(self):
+        flavor = mock.Mock(ram=1024)
+        self.nova_mock.return_value.get_flavor.return_value = flavor
+
+        memory = self.test_driver.get_total_memory('zzzz-yyyy-xxxx')
+
+        self.assertEqual(1, memory)
+
+    def test_get_total_cpus(self):
+        flavor = mock.Mock(vcpus=2)
+        self.nova_mock.return_value.get_flavor.return_value = flavor
+
+        cpus = self.test_driver.get_total_cpus('zzzz-yyyy-xxxx')
+
+        self.assertEqual(2, cpus)
+
+    def test_get_bios(self):
         self.assertRaises(
-            NotImplementedError,
-            test_driver.set_bios,
-            'xxx-yyy-zzz',
-            {'attribute 1': 'value 1'})
+            NotImplementedError, self.test_driver.get_bios, 'zzzz-yyyy-xxxx')
 
-    def test_reset_bios(self, nova_mock):
-        test_driver = OpenStackDriver('fake-cloud')
+    def test_set_bios(self):
         self.assertRaises(
-            NotImplementedError,
-            test_driver.reset_bios,
-            'xxx-yyy-zzz')
+            NotImplementedError, self.test_driver.set_bios,
+            'zzzz-yyyy-xxxx', {})
 
-    def test_get_nics(self, nova_mock):
+    def test_reset_bios(self):
+        self.assertRaises(
+            NotImplementedError, self.test_driver.reset_bios, 'zzzz-yyyy-xxxx')
+
+    def test_get_nics(self):
         addresses = Munch(
             {u'public': [
                 Munch({u'OS-EXT-IPS-MAC:mac_addr': u'fa:16:3e:46:e3:ac',
@@ -205,24 +201,22 @@ class EmulatorTestCase(base.BaseTestCase):
                        u'addr': u'10.0.0.10',
                        u'OS-EXT-IPS:type': u'fixed'})]})
         server = mock.Mock(addresses=addresses)
-        nova_mock.return_value.get_server.return_value = server
+        self.nova_mock.return_value.get_server.return_value = server
 
-        test_driver = OpenStackDriver('fake-cloud')
-        nics = test_driver.get_nics('xxxx-yyyy-zzzz')
+        nics = self.test_driver.get_nics('xxxx-yyyy-zzzz')
         self.assertEqual([{'id': 'fa:16:3e:22:18:31',
                            'mac': 'fa:16:3e:22:18:31'},
                           {'id': 'fa:16:3e:46:e3:ac',
                            'mac': 'fa:16:3e:46:e3:ac'}],
                          sorted(nics, key=lambda k: k['id']))
 
-    def test_get_nics_empty(self, nova_mock):
+    def test_get_nics_empty(self):
         server = mock.Mock(addresses=None)
-        nova_mock.return_value.get_server.return_value = server
-        test_driver = OpenStackDriver('fake-cloud')
-        nics = test_driver.get_nics('xxxx-yyyy-zzzz')
+        self.nova_mock.return_value.get_server.return_value = server
+        nics = self.test_driver.get_nics('xxxx-yyyy-zzzz')
         self.assertEqual(set(), nics)
 
-    def test_get_nics_error(self, nova_mock):
+    def test_get_nics_error(self):
         addresses = Munch(
             {u'public': [
                 Munch({u'version': 6,
@@ -239,9 +233,8 @@ class EmulatorTestCase(base.BaseTestCase):
                        u'addr': u'10.0.0.10',
                        u'OS-EXT-IPS:type': u'fixed'})]})
         server = mock.Mock(addresses=addresses)
-        nova_mock.return_value.get_server.return_value = server
-        test_driver = OpenStackDriver('fake-cloud')
-        nics = test_driver.get_nics('xxxx-yyyy-zzzz')
+        self.nova_mock.return_value.get_server.return_value = server
+        nics = self.test_driver.get_nics('xxxx-yyyy-zzzz')
         self.assertEqual([{'id': 'fa:16:3e:22:18:31',
                            'mac': 'fa:16:3e:22:18:31'}],
                          nics)

@@ -10,8 +10,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import json
-
 from oslotest import base
 from six.moves import mock
 
@@ -33,7 +31,118 @@ class EmulatorTestCase(base.BaseTestCase):
 
         self.assertEqual('500 INTERNAL SERVER ERROR', response.status)
 
-    def test_bios(self, driver_mock):
+    def test_root_resource(self, driver_mock):
+        response = self.app.get('/redfish/v1/')
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('RedvirtService', response.json['Id'])
+
+    def test_collection_resource(self, driver_mock):
+        type(driver_mock).systems = mock.PropertyMock(
+            return_value=['host0', 'host1'])
+        response = self.app.get('/redfish/v1/Systems')
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({'@odata.id': '/redfish/v1/Systems/host0'},
+                         response.json['Members'][0])
+        self.assertEqual({'@odata.id': '/redfish/v1/Systems/host1'},
+                         response.json['Members'][1])
+
+    def test_system_resource_get(self, driver_mock):
+        driver_mock.uuid.return_value = 'zzzz-yyyy-xxxx'
+        driver_mock.get_power_state.return_value = 'On'
+        driver_mock.get_total_memory.return_value = 1
+        driver_mock.get_total_cpus.return_value = 2
+        driver_mock.get_boot_device.return_value = 'Cd'
+        driver_mock.get_boot_mode.return_value = 'Legacy'
+
+        response = self.app.get('/redfish/v1/Systems/xxxx-yyyy-zzzz')
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('xxxx-yyyy-zzzz', response.json['Id'])
+        self.assertEqual('zzzz-yyyy-xxxx', response.json['UUID'])
+        self.assertEqual('On', response.json['PowerState'])
+        self.assertEqual(
+            1, response.json['MemorySummary']['TotalSystemMemoryGiB'])
+        self.assertEqual(2, response.json['ProcessorSummary']['Count'])
+        self.assertEqual(
+            'Cd', response.json['Boot']['BootSourceOverrideTarget'])
+        self.assertEqual(
+            'Legacy', response.json['Boot']['BootSourceOverrideMode'])
+
+    def test_system_resource_patch(self, driver_mock):
+        data = {'Boot': {'BootSourceOverrideTarget': 'Cd'}}
+        response = self.app.patch('/redfish/v1/Systems/xxxx-yyyy-zzzz',
+                                  json=data)
+        self.assertEqual(204, response.status_code)
+        set_boot_device = driver_mock.set_boot_device
+        set_boot_device.assert_called_once_with('xxxx-yyyy-zzzz', 'Cd')
+
+    def test_system_reset_action_on(self, driver_mock):
+        data = {'ResetType': 'On'}
+        response = self.app.post(
+            '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
+            json=data)
+        self.assertEqual(204, response.status_code)
+        set_power_state = driver_mock.set_power_state
+        set_power_state.assert_called_once_with('xxxx-yyyy-zzzz', 'On')
+
+    def test_system_reset_action_forceon(self, driver_mock):
+        data = {'ResetType': 'ForceOn'}
+        response = self.app.post(
+            '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
+            json=data)
+        self.assertEqual(204, response.status_code)
+        set_power_state = driver_mock.set_power_state
+        set_power_state.assert_called_once_with('xxxx-yyyy-zzzz', 'ForceOn')
+
+    def test_system_reset_action_forceoff(self, driver_mock):
+        data = {'ResetType': 'ForceOff'}
+        response = self.app.post(
+            '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
+            json=data)
+        self.assertEqual(204, response.status_code)
+        set_power_state = driver_mock.set_power_state
+        set_power_state.assert_called_once_with('xxxx-yyyy-zzzz', 'ForceOff')
+
+    def test_system_reset_action_shutdown(self, driver_mock):
+        data = {'ResetType': 'GracefulShutdown'}
+        response = self.app.post(
+            '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
+            json=data)
+        self.assertEqual(204, response.status_code)
+        set_power_state = driver_mock.set_power_state
+        set_power_state.assert_called_once_with(
+            'xxxx-yyyy-zzzz', 'GracefulShutdown')
+
+    def test_system_reset_action_restart(self, driver_mock):
+        data = {'ResetType': 'GracefulRestart'}
+        response = self.app.post(
+            '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
+            json=data)
+        self.assertEqual(204, response.status_code)
+        set_power_state = driver_mock.set_power_state
+        set_power_state.assert_called_once_with(
+            'xxxx-yyyy-zzzz', 'GracefulRestart')
+
+    def test_system_reset_action_forcerestart(self, driver_mock):
+        data = {'ResetType': 'ForceRestart'}
+        response = self.app.post(
+            '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
+            json=data)
+        self.assertEqual(204, response.status_code)
+        set_power_state = driver_mock.set_power_state
+        set_power_state.assert_called_once_with(
+            'xxxx-yyyy-zzzz', 'ForceRestart')
+
+    def test_system_reset_action_nmi(self, driver_mock):
+        data = {'ResetType': 'Nmi'}
+        response = self.app.post(
+            '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
+            json=data)
+        self.assertEqual(204, response.status_code)
+        set_power_state = driver_mock.set_power_state
+        set_power_state.assert_called_once_with('xxxx-yyyy-zzzz', 'Nmi')
+
+    def test_get_bios(self, driver_mock):
         driver_mock.get_bios.return_value = {"attribute 1": "value 1",
                                              "attribute 2": "value 2"}
         response = self.app.get('/redfish/v1/Systems/xxxx-yyyy-zzzz/BIOS')
@@ -44,35 +153,46 @@ class EmulatorTestCase(base.BaseTestCase):
                           "attribute 2": "value 2"},
                          response.json['Attributes'])
 
-    def test_bios_settings(self, driver_mock):
+    def test_get_bios_existing(self, driver_mock):
         driver_mock.get_bios.return_value = {"attribute 1": "value 1",
                                              "attribute 2": "value 2"}
         response = self.app.get(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/BIOS/Settings')
 
-        self.assertEqual('200 OK', response.status)
+        self.assertEqual(200, response.status_code)
         self.assertEqual('Settings', response.json['Id'])
         self.assertEqual({"attribute 1": "value 1",
                           "attribute 2": "value 2"},
                          response.json['Attributes'])
 
     def test_bios_settings_patch(self, driver_mock):
+        data = {'Attributes': {'key': 'value'}}
         self.app.driver = driver_mock
         response = self.app.patch(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/BIOS/Settings',
-            data=json.dumps({'Attributes': {'key': 'value'}}),
-            content_type='application/json')
+            json=data)
 
-        self.assertEqual('204 NO CONTENT', response.status)
+        self.assertEqual(204, response.status_code)
         driver_mock.set_bios.assert_called_once_with('xxxx-yyyy-zzzz',
                                                      {'key': 'value'})
+
+    def test_set_bios(self, driver_mock):
+        data = {'Attributes': {'key': 'value'}}
+        self.app.driver = driver_mock
+        response = self.app.patch(
+            '/redfish/v1/Systems/xxxx-yyyy-zzzz/BIOS/Settings',
+            json=data)
+
+        self.assertEqual(204, response.status_code)
+        driver_mock.set_bios.assert_called_once_with(
+            'xxxx-yyyy-zzzz', data['Attributes'])
 
     def test_reset_bios(self, driver_mock):
         self.app.driver = driver_mock
         response = self.app.post('/redfish/v1/Systems/xxxx-yyyy-zzzz/'
                                  'BIOS/Actions/Bios.ResetBios')
 
-        self.assertEqual('204 NO CONTENT', response.status)
+        self.assertEqual(204, response.status_code)
         driver_mock.reset_bios.assert_called_once_with('xxxx-yyyy-zzzz')
 
     def test_ethernet_interfaces_collection(self, driver_mock):
@@ -83,7 +203,7 @@ class EmulatorTestCase(base.BaseTestCase):
         response = self.app.get('redfish/v1/Systems/xxx-yyy-zzz/'
                                 'EthernetInterfaces')
 
-        self.assertEqual('200 OK', response.status)
+        self.assertEqual(200, response.status_code)
         self.assertEqual('Ethernet Interface Collection',
                          response.json['Name'])
         self.assertEqual(2, response.json['Members@odata.count'])
@@ -98,7 +218,7 @@ class EmulatorTestCase(base.BaseTestCase):
         response = self.app.get('redfish/v1/Systems/xxx-yyy-zzz/'
                                 'EthernetInterfaces')
 
-        self.assertEqual('200 OK', response.status)
+        self.assertEqual(200, response.status_code)
         self.assertEqual('Ethernet Interface Collection',
                          response.json['Name'])
         self.assertEqual(0, response.json['Members@odata.count'])
@@ -112,7 +232,7 @@ class EmulatorTestCase(base.BaseTestCase):
         response = self.app.get('/redfish/v1/Systems/xxx-yyy-zzz/'
                                 'EthernetInterfaces/nic2')
 
-        self.assertEqual('200 OK', response.status)
+        self.assertEqual(200, response.status_code)
         self.assertEqual('nic2', response.json['Id'])
         self.assertEqual('VNIC nic2', response.json['Name'])
         self.assertEqual('00:11:22:33:44:55',
@@ -131,4 +251,4 @@ class EmulatorTestCase(base.BaseTestCase):
         response = self.app.get('/redfish/v1/Systems/xxx-yyy-zzz/'
                                 'EthernetInterfaces/nic3')
 
-        self.assertEqual('404 NOT FOUND', response.status)
+        self.assertEqual(404, response.status_code)

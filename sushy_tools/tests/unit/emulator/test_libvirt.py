@@ -15,178 +15,193 @@ from oslotest import base
 from six.moves import mock
 
 from sushy_tools.emulator.drivers.libvirtdriver import LibvirtDriver
-from sushy_tools.emulator import main
 from sushy_tools.error import FishyError
 
 
-@mock.patch.object(main, 'driver', None)  # This enables libvirt driver
-class EmulatorTestCase(base.BaseTestCase):
+class LibvirtDriverTestCase(base.BaseTestCase):
 
     def setUp(self):
-        self.app = main.app.test_client()
-
         self.test_driver = LibvirtDriver()
-        super(EmulatorTestCase, self).setUp()
-
-    def test_root_resource(self):
-        response = self.app.get('/redfish/v1/')
-        self.assertEqual(200, response.status_code)
-        self.assertTrue(response.json)
+        super(LibvirtDriverTestCase, self).setUp()
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
-    def test_collection_resource(self, libvirt_mock):
+    def test_uuid(self, libvirt_mock):
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock.UUIDString.return_value = 'zzzz-yyyy-xxxx'
+        uuid = self.test_driver.uuid('name')
+        self.assertEqual('zzzz-yyyy-xxxx', uuid)
+
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_systems(self, libvirt_mock):
         conn_mock = libvirt_mock.return_value
         conn_mock.listDefinedDomains.return_value = ['host0', 'host1']
-
-        response = self.app.get('/redfish/v1/Systems')
-        self.assertEqual(200, response.status_code)
-        self.assertEqual({'@odata.id': '/redfish/v1/Systems/host0'},
-                         response.json['Members'][0])
-        self.assertEqual({'@odata.id': '/redfish/v1/Systems/host1'},
-                         response.json['Members'][1])
+        systems = self.test_driver.systems
+        self.assertEqual(['host0', 'host1'], systems)
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
-    def test_system_resource_get(self, libvirt_mock):
-        with open('sushy_tools/tests/unit/emulator/domain.xml', 'r') as f:
-            data = f.read()
-        domain_mock = mock.Mock()
-        domain_mock.XMLDesc.return_value = data
-        domain_mock.isActive.return_value = True
-        domain_mock.maxMemory.return_value = 1024 * 1024
-        domain_mock.UUIDString.return_value = 'zzzz-yyyy-xxxx'
-        domain_mock.maxVcpus.return_value = 2
-
+    def test_get_power_state_on(self, libvirt_mock):
         conn_mock = libvirt_mock.return_value
-        conn_mock.lookupByName.return_value = domain_mock
-
-        response = self.app.get('/redfish/v1/Systems/xxxx-yyyy-zzzz')
-
-        self.assertEqual(200, response.status_code)
-        self.assertEqual('xxxx-yyyy-zzzz', response.json['Id'])
-        self.assertEqual('zzzz-yyyy-xxxx', response.json['UUID'])
-        self.assertEqual('On', response.json['PowerState'])
-        self.assertEqual(
-            1, response.json['MemorySummary']['TotalSystemMemoryGiB'])
-        self.assertEqual(2, response.json['ProcessorSummary']['Count'])
-        self.assertEqual(
-            'Cd', response.json['Boot']['BootSourceOverrideTarget'])
-        self.assertEqual(
-            'Legacy', response.json['Boot']['BootSourceOverrideMode'])
-
-    @mock.patch('libvirt.open', autospec=True)
-    def test_system_resource_patch(self, libvirt_mock):
-
-        with open('sushy_tools/tests/unit/emulator/domain.xml', 'r') as f:
-            data = f.read()
-        domain_mock = mock.Mock()
-        domain_mock.XMLDesc.return_value = data
-
-        conn_mock = libvirt_mock.return_value
-        conn_mock.lookupByName.return_value = domain_mock
-        conn_mock.defineXML = mock.Mock()
-        data = {'Boot': {'BootSourceOverrideTarget': 'Cd'}}
-        response = self.app.patch('/redfish/v1/Systems/xxxx-yyyy-zzzz',
-                                  json=data)
-        self.assertEqual(204, response.status_code)
-
-    @mock.patch('libvirt.open', autospec=True)
-    def test_system_reset_action_on(self, libvirt_mock):
-        domain_mock = mock.Mock()
+        domain_mock = conn_mock.lookupByName.return_value
         domain_mock.isActive.return_value = True
 
-        conn_mock = libvirt_mock.return_value
-        conn_mock.lookupByName.return_value = domain_mock
+        power_state = self.test_driver.get_power_state('zzzz-yyyy-xxxx')
 
-        data = {'ResetType': 'On'}
-        response = self.app.post(
-            '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
-            json=data)
-        self.assertEqual(204, response.status_code)
-        domain_mock.create.assert_not_called()
+        self.assertEqual('On', power_state)
+
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_get_power_state_off(self, libvirt_mock):
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock.isActive.return_value = False
+
+        power_state = self.test_driver.get_power_state('zzzz-yyyy-xxxx')
+
+        self.assertEqual('Off', power_state)
 
     @mock.patch('libvirt.open', autospec=True)
-    def test_system_reset_action_forceon(self, libvirt_mock):
-        domain_mock = mock.Mock()
-        domain_mock.isActive.return_value = True
-
+    def test_set_power_state_on(self, libvirt_mock):
         conn_mock = libvirt_mock.return_value
-        conn_mock.lookupByName.return_value = domain_mock
-        data = {'ResetType': 'ForceOn'}
-        response = self.app.post(
-            '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
-            json=data)
-        self.assertEqual(204, response.status_code)
-        domain_mock.create.assert_not_called()
+        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock.isActive.return_value = False
+
+        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'On')
+
+        domain_mock.create.assert_called_once_with()
 
     @mock.patch('libvirt.open', autospec=True)
-    def test_system_reset_action_forceoff(self, libvirt_mock):
-        domain_mock = mock.Mock()
+    def test_set_power_state_forceon(self, libvirt_mock):
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock.isActive.return_value = False
+
+        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'ForceOn')
+
+        domain_mock.create.assert_called_once_with()
+
+    @mock.patch('libvirt.open', autospec=True)
+    def test_set_power_state_forceoff(self, libvirt_mock):
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByName.return_value
         domain_mock.isActive.return_value = True
 
-        conn_mock = libvirt_mock.return_value
-        conn_mock.lookupByName.return_value = domain_mock
-        data = {'ResetType': 'ForceOff'}
-        response = self.app.post(
-            '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
-            json=data)
-        self.assertEqual(204, response.status_code)
+        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'ForceOff')
+
         domain_mock.destroy.assert_called_once_with()
 
     @mock.patch('libvirt.open', autospec=True)
-    def test_system_reset_action_shutdown(self, libvirt_mock):
-        domain_mock = mock.Mock()
+    def test_set_power_state_gracefulshutdown(self, libvirt_mock):
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByName.return_value
         domain_mock.isActive.return_value = True
 
-        conn_mock = libvirt_mock.return_value
-        conn_mock.lookupByName.return_value = domain_mock
-        data = {'ResetType': 'GracefulShutdown'}
-        response = self.app.post(
-            '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
-            json=data)
-        self.assertEqual(204, response.status_code)
+        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'GracefulShutdown')
+
         domain_mock.shutdown.assert_called_once_with()
 
     @mock.patch('libvirt.open', autospec=True)
-    def test_system_reset_action_restart(self, libvirt_mock):
-        domain_mock = mock.Mock()
+    def test_set_power_state_gracefulrestart(self, libvirt_mock):
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByName.return_value
         domain_mock.isActive.return_value = True
 
-        conn_mock = libvirt_mock.return_value
-        conn_mock.lookupByName.return_value = domain_mock
-        data = {'ResetType': 'GracefulRestart'}
-        response = self.app.post(
-            '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
-            json=data)
-        self.assertEqual(204, response.status_code)
+        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'GracefulRestart')
+
         domain_mock.reboot.assert_called_once_with()
 
     @mock.patch('libvirt.open', autospec=True)
-    def test_system_reset_action_forcerestart(self, libvirt_mock):
-        domain_mock = mock.Mock()
+    def test_set_power_state_forcerestart(self, libvirt_mock):
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByName.return_value
         domain_mock.isActive.return_value = True
 
-        conn_mock = libvirt_mock.return_value
-        conn_mock.lookupByName.return_value = domain_mock
-        data = {'ResetType': 'ForceRestart'}
-        response = self.app.post(
-            '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
-            json=data)
-        self.assertEqual(204, response.status_code)
+        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'ForceRestart')
+
         domain_mock.reset.assert_called_once_with()
 
     @mock.patch('libvirt.open', autospec=True)
-    def test_system_reset_action_nmi(self, libvirt_mock):
-        domain_mock = mock.Mock()
+    def test_set_power_state_nmi(self, libvirt_mock):
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByName.return_value
         domain_mock.isActive.return_value = True
 
-        conn_mock = libvirt_mock.return_value
-        conn_mock.lookupByName.return_value = domain_mock
-        data = {'ResetType': 'Nmi'}
-        response = self.app.post(
-            '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
-            json=data)
-        self.assertEqual(204, response.status_code)
+        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'Nmi')
+
         domain_mock.injectNMI.assert_called_once_with()
+
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_get_boot_device(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/domain.xml', 'r') as f:
+            data = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock.XMLDesc.return_value = data
+
+        boot_device = self.test_driver.get_boot_device('zzzz-yyyy-xxxx')
+
+        self.assertEqual('Cd', boot_device)
+
+    @mock.patch('libvirt.open', autospec=True)
+    def test_set_boot_device(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/domain.xml', 'r') as f:
+            data = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock.XMLDesc.return_value = data
+
+        self.test_driver.set_boot_device('zzzz-yyyy-xxxx', 'Hdd')
+
+        conn_mock.defineXML.assert_called_once_with(mock.ANY)
+
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_get_boot_mode(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/domain.xml', 'r') as f:
+            data = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock.XMLDesc.return_value = data
+
+        boot_mode = self.test_driver.get_boot_mode('zzzz-yyyy-xxxx')
+
+        self.assertEqual('Legacy', boot_mode)
+
+    @mock.patch('libvirt.open', autospec=True)
+    def test_set_boot_mode(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/domain.xml', 'r') as f:
+            data = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock.XMLDesc.return_value = data
+
+        self.test_driver.set_boot_mode('zzzz-yyyy-xxxx', 'Uefi')
+
+        conn_mock.defineXML.assert_called_once_with(mock.ANY)
+
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_get_total_memory(self, libvirt_mock):
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock.maxMemory.return_value = 1024 * 1024
+
+        memory = self.test_driver.get_total_memory('zzzz-yyyy-xxxx')
+
+        self.assertEqual(1, memory)
+
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_get_total_cpus(self, libvirt_mock):
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock.isActive.return_value = True
+        domain_mock.XMLDesc.return_value = b'<empty/>'
+        domain_mock.maxVcpus.return_value = 2
+
+        cpus = self.test_driver.get_total_cpus('zzzz-yyyy-xxxx')
+
+        self.assertEqual(2, cpus)
 
     @mock.patch('libvirt.open', autospec=True)
     def test_get_bios(self, libvirt_mock):
@@ -200,7 +215,7 @@ class EmulatorTestCase(base.BaseTestCase):
         bios_attributes = self.test_driver.get_bios('xxx-yyy-zzz')
         self.assertEqual(LibvirtDriver.DEFAULT_BIOS_ATTRIBUTES,
                          bios_attributes)
-        self.assertEqual(1, conn_mock.defineXML.call_count)
+        conn_mock.defineXML.assert_called_once_with(mock.ANY)
 
     @mock.patch('libvirt.open', autospec=True)
     def test_get_bios_existing(self, libvirt_mock):
@@ -231,7 +246,7 @@ class EmulatorTestCase(base.BaseTestCase):
         self.test_driver.set_bios('xxx-yyy-zzz',
                                   {"BootMode": "Uefi",
                                    "ProcTurboMode": "Enabled"})
-        self.assertEqual(1, conn_mock.defineXML.call_count)
+        conn_mock.defineXML.assert_called_once_with(mock.ANY)
 
     @mock.patch('libvirt.open', autospec=True)
     def test_reset_bios(self, libvirt_mock):
@@ -243,7 +258,7 @@ class EmulatorTestCase(base.BaseTestCase):
         domain_mock.XMLDesc.return_value = domain_xml
 
         self.test_driver.reset_bios('xxx-yyy-zzz')
-        self.assertEqual(1, conn_mock.defineXML.call_count)
+        conn_mock.defineXML.assert_called_once_with(mock.ANY)
 
     def test__process_bios_attributes_get_default(self):
         with open('sushy_tools/tests/unit/emulator/domain.xml') as f:
