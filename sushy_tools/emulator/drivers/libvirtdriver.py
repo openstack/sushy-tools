@@ -21,6 +21,11 @@ from sushy_tools.error import FishyError
 
 import libvirt
 
+BiosProcessResult = namedtuple('BiosProcessResult',
+                               ['tree',
+                                'attributes_written',
+                                'bios_attributes'])
+
 
 class libvirt_open(object):
 
@@ -396,9 +401,6 @@ class LibvirtDriver(AbstractDriver):
         bios_attributes = {atr.attrib['name']: atr.attrib['value']
                            for atr in tree.find('.//sushy:attributes', ns)}
 
-        BiosProcessResult = namedtuple('BiosProcessResult',
-                                       'tree, attributes_written,'
-                                       'bios_attributes')
         return BiosProcessResult(tree, attributes_written, bios_attributes)
 
     def _process_bios(self, identity,
@@ -409,7 +411,7 @@ class LibvirtDriver(AbstractDriver):
         :param identity: libvirt domain name or ID
         :param bios_attributes: Full list of BIOS attributes to use if
             they are missing or update necessary
-        :param update: Update existing BIOS attributes
+        :param update_existing_attributes: Update existing BIOS attributes
 
         :returns: New or existing dict of BIOS attributes
 
