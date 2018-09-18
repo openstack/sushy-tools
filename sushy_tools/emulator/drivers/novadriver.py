@@ -284,3 +284,26 @@ class OpenStackDriver(AbstractDriver):
     def reset_bios(self, identity):
         """Not supported as Openstack SDK does not expose API for BIOS"""
         raise NotImplementedError
+
+    def get_nics(self, identity):
+        """Get server's network interfaces
+
+        Use MAC address as network interface's id
+
+        :param identity: OpenStack instance name or ID
+
+        :returns: list of dictionaries with NIC attributes (id and mac)
+        """
+        instance = self._get_instance(identity)
+        macs = set()
+        if not instance.addresses:
+            return macs
+
+        for addresses in instance.addresses.values():
+            for adr in addresses:
+                try:
+                    macs.add(adr['OS-EXT-IPS-MAC:mac_addr'])
+                except KeyError:
+                    logger.warning('Could not find MAC address in %s', adr)
+        return [{'id': mac, 'mac': mac}
+                for mac in macs]
