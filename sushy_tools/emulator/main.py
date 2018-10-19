@@ -20,17 +20,8 @@ import os
 import ssl
 import sys
 
-try:
-    from sushy_tools.emulator.drivers import libvirtdriver
-
-except ImportError:
-    libvirtdriver = None
-
-try:
-    from sushy_tools.emulator.drivers import novadriver
-
-except ImportError:
-    novadriver = None
+from sushy_tools.emulator.drivers import libvirtdriver
+from sushy_tools.emulator.drivers import novadriver
 
 import flask
 
@@ -50,14 +41,14 @@ def init_virt_driver(decorated_func):
         if driver is None:
 
             if 'OS_CLOUD' in os.environ:
-                if not novadriver:
+                if not novadriver.is_loaded:
                     app.logger.error('Nova driver not loaded')
                     sys.exit(1)
 
                 driver = novadriver.OpenStackDriver(os.environ['OS_CLOUD'])
 
             else:
-                if not libvirtdriver:
+                if not libvirtdriver.is_loaded:
                     app.logger.error('libvirt driver not loaded')
                     sys.exit(1)
 
@@ -294,14 +285,14 @@ def main():
     args = parse_args()
 
     if args.os_cloud:
-        if not novadriver:
+        if not novadriver.is_loaded:
             app.logger.error('Nova driver not loaded')
             return 1
 
         driver = novadriver.OpenStackDriver(args.os_cloud)
 
     else:
-        if not libvirtdriver:
+        if not libvirtdriver.is_loaded:
             app.logger.error('libvirt driver not loaded')
             return 1
 

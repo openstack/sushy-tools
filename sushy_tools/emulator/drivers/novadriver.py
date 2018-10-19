@@ -19,8 +19,14 @@ import math
 from sushy_tools.emulator.drivers.base import AbstractDriver
 from sushy_tools.error import FishyError
 
-import openstack
+try:
+    import openstack
 
+except ImportError:
+    openstack = None
+
+
+is_loaded = bool(openstack)
 
 logger = logging.getLogger(__name__)
 

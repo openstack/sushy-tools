@@ -11,7 +11,6 @@
 #    under the License.
 
 import libvirt
-
 from oslotest import base
 from six.moves import mock
 
@@ -26,8 +25,6 @@ class EmulatorTestCase(base.BaseTestCase):
     def setUp(self):
         self.app = main.app.test_client()
 
-        # This enables libvirt driver
-        main.driver = None
         self.test_driver = LibvirtDriver()
         super(EmulatorTestCase, self).setUp()
 
