@@ -19,7 +19,14 @@ from collections import namedtuple
 from sushy_tools.emulator.drivers.base import AbstractDriver
 from sushy_tools.error import FishyError
 
-import libvirt
+try:
+    import libvirt
+
+except ImportError:
+    libvirt = None
+
+
+is_loaded = bool(libvirt)
 
 BiosProcessResult = namedtuple('BiosProcessResult',
                                ['tree',

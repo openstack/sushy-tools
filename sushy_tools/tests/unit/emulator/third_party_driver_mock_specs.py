@@ -13,4 +13,12 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from sushy_tools.tests.unit.emulator import third_party_driver_mocks  # noqa
+LIBVIRT_SPEC = (
+    'open',
+    'openReadOnly',
+    'libvirtError',
+)
+
+OPENSTACKSDK_SPEC = (
+    'connect',
+)

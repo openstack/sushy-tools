@@ -1,0 +1,13 @@
+# This file lists all python libraries which are utilized by
+# sushy-emulator drivers, but not listed in the requirements.txt.
+#
+# The intention is to make driver dependencies optional thus
+# allowing sushy-tools to install even if some of these
+# not-always-required dependencies would not otherwise be met
+# failing the entire installation.
+
+# used by libvirt driver
+libvirt-python!=4.1.0,>=3.5.0 # LGPLv2+
+
+# used by nova driver
+openstacksdk>=0.11.2  # Apache-2.0
