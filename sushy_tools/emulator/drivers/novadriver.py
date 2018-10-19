@@ -218,7 +218,7 @@ class OpenStackDriver(AbstractDriver):
         """
         instance = self._get_instance(identity)
 
-        image = self._cc.glance.find_image(instance.image['id'])
+        image = self._cc.image.find_image(instance.image['id'])
 
         hw_firmware_type = getattr(image, 'hw_firmware_type', None)
 

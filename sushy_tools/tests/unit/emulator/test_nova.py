@@ -60,7 +60,7 @@ class EmulatorTestCase(base.BaseTestCase):
         nova_mock.return_value.get_flavor.return_value = flavor
 
         image = mock.Mock(hw_firmware_type='bios')
-        nova_mock.return_value.glance.find_image.return_value = image
+        nova_mock.return_value.image.find_image.return_value = image
 
         response = self.app.get('/redfish/v1/Systems/xxxx-yyyy-zzzz')
 
