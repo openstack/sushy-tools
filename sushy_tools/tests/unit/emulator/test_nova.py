@@ -21,6 +21,7 @@ from sushy_tools.emulator.drivers.novadriver import OpenStackDriver
 from sushy_tools import error
 
 
+@mock.patch.dict(OpenStackDriver.PERMANENT_CACHE)
 class NovaDriverTestCase(base.BaseTestCase):
 
     name = 'QEmu-fedora-i686'
@@ -30,7 +31,8 @@ class NovaDriverTestCase(base.BaseTestCase):
         self.nova_patcher = mock.patch('openstack.connect', autospec=True)
         self.nova_mock = self.nova_patcher.start()
 
-        self.test_driver = OpenStackDriver({}, 'fake-cloud')
+        test_driver_class = OpenStackDriver.initialize({}, 'fake-cloud')
+        self.test_driver = test_driver_class()
 
         super(NovaDriverTestCase, self).setUp()
 
@@ -145,6 +147,7 @@ class NovaDriverTestCase(base.BaseTestCase):
         self.nova_mock.return_value.get_server.return_value = server
 
         image = mock.Mock(hw_firmware_type='bios')
+
         self.nova_mock.return_value.image.find_image.return_value = image
 
         boot_mode = self.test_driver.get_boot_mode(self.uuid)
@@ -216,7 +219,9 @@ class NovaDriverTestCase(base.BaseTestCase):
 
         server = mock.Mock(id=self.uuid, addresses=addresses)
         self.nova_mock.return_value.get_server.return_value = server
+
         nics = self.test_driver.get_nics(self.uuid)
+
         self.assertEqual([{'id': 'fa:16:3e:22:18:31',
                            'mac': 'fa:16:3e:22:18:31'},
                           {'id': 'fa:16:3e:46:e3:ac',
