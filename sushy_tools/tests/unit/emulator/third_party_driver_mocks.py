@@ -62,6 +62,7 @@ if not openstack:
     openstack = mock.MagicMock(spec_set=mock_specs.OPENSTACKSDK_SPEC)
     sys.modules['openstack'] = openstack
 
+'sushy_tools.emulator.drivers.libvirtdriver'
 if 'sushy_tools.emulator.drivers.novadriver' in sys.modules:
     six.moves.reload_module(
         sys.modules['sushy_tools.emulator.drivers.novadriver'])

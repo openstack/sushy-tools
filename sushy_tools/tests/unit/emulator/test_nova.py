@@ -24,7 +24,7 @@ from sushy_tools.emulator import main
 
 
 @mock.patch.object(os, 'environ', dict(OS_CLOUD='fake-cloud', **os.environ))
-@mock.patch.object(main, 'driver', None)  # This enables Nova driver
+@mock.patch.object(main, 'Driver', None)  # This enables Nova driver
 @mock.patch('openstack.connect', autospec=True)
 class EmulatorTestCase(base.BaseTestCase):
 
@@ -164,13 +164,13 @@ class EmulatorTestCase(base.BaseTestCase):
             server.id, reboot_type='HARD')
 
     def test_get_bios(self, nova_mock):
-        test_driver = OpenStackDriver('fake-cloud')
+        test_driver = OpenStackDriver.initialize('fake-cloud')()
         self.assertRaises(
             NotImplementedError,
             test_driver.get_bios, 'xxx-yyy-zzz')
 
     def test_set_bios(self, nova_mock):
-        test_driver = OpenStackDriver('fake-cloud')
+        test_driver = OpenStackDriver.initialize('fake-cloud')()
         self.assertRaises(
             NotImplementedError,
             test_driver.set_bios,
@@ -178,7 +178,7 @@ class EmulatorTestCase(base.BaseTestCase):
             {'attribute 1': 'value 1'})
 
     def test_reset_bios(self, nova_mock):
-        test_driver = OpenStackDriver('fake-cloud')
+        test_driver = OpenStackDriver.initialize('fake-cloud')()
         self.assertRaises(
             NotImplementedError,
             test_driver.reset_bios,
@@ -207,7 +207,7 @@ class EmulatorTestCase(base.BaseTestCase):
         server = mock.Mock(addresses=addresses)
         nova_mock.return_value.get_server.return_value = server
 
-        test_driver = OpenStackDriver('fake-cloud')
+        test_driver = OpenStackDriver.initialize('fake-cloud')()
         nics = test_driver.get_nics('xxxx-yyyy-zzzz')
         self.assertEqual([{'id': 'fa:16:3e:22:18:31',
                            'mac': 'fa:16:3e:22:18:31'},
@@ -218,7 +218,7 @@ class EmulatorTestCase(base.BaseTestCase):
     def test_get_nics_empty(self, nova_mock):
         server = mock.Mock(addresses=None)
         nova_mock.return_value.get_server.return_value = server
-        test_driver = OpenStackDriver('fake-cloud')
+        test_driver = OpenStackDriver.initialize('fake-cloud')()
         nics = test_driver.get_nics('xxxx-yyyy-zzzz')
         self.assertEqual(set(), nics)
 
@@ -240,7 +240,7 @@ class EmulatorTestCase(base.BaseTestCase):
                        u'OS-EXT-IPS:type': u'fixed'})]})
         server = mock.Mock(addresses=addresses)
         nova_mock.return_value.get_server.return_value = server
-        test_driver = OpenStackDriver('fake-cloud')
+        test_driver = OpenStackDriver.initialize('fake-cloud')()
         nics = test_driver.get_nics('xxxx-yyyy-zzzz')
         self.assertEqual([{'id': 'fa:16:3e:22:18:31',
                            'mac': 'fa:16:3e:22:18:31'}],

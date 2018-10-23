@@ -20,15 +20,16 @@ from sushy_tools.emulator import main
 from sushy_tools.error import FishyError
 
 
-@mock.patch.object(main, 'driver', None)  # This enables libvirt driver
+@mock.patch.object(main, 'Driver', None)  # This enables libvirt driver
 class EmulatorTestCase(base.BaseTestCase):
 
     def setUp(self):
         self.app = main.app.test_client()
 
         # This enables libvirt driver
-        main.driver = None
-        self.test_driver = LibvirtDriver()
+        main.Driver = None
+        TestDriver = LibvirtDriver.initialize()
+        self.test_driver = TestDriver()
         super(EmulatorTestCase, self).setUp()
 
     def test_root_resource(self):

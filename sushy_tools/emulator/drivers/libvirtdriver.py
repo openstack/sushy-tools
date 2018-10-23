@@ -17,6 +17,7 @@ import xml.etree.ElementTree as ET
 
 from collections import namedtuple
 from sushy_tools.emulator.drivers.base import AbstractDriver
+from sushy_tools.emulator.drivers.memoize import memoize
 from sushy_tools.error import FishyError
 
 try:
@@ -84,8 +85,15 @@ class LibvirtDriver(AbstractDriver):
                                "NicBoot1": "NetworkBoot",
                                "ProcTurboMode": "Enabled"}
 
-    def __init__(self, uri=None):
-        self._uri = uri or self.LIBVIRT_URI
+    @classmethod
+    def initialize(cls, uri=None):
+        cls._uri = uri or cls.LIBVIRT_URI
+        return cls
+
+    @memoize()
+    def _get_domain(self, identity, readonly=False):
+        with libvirt_open(self._uri, readonly=readonly) as conn:
+            return conn.lookupByName(identity)
 
     @property
     def driver(self):
@@ -114,9 +122,8 @@ class LibvirtDriver(AbstractDriver):
 
         :returns: computer system UUID
         """
-        with libvirt_open(self._uri, readonly=True) as conn:
-            domain = conn.lookupByName(identity)
-            return domain.UUIDString()
+        domain = self._get_domain(identity, readonly=True)
+        return domain.UUIDString()
 
     def get_power_state(self, identity):
         """Get computer system power state
@@ -126,10 +133,8 @@ class LibvirtDriver(AbstractDriver):
         :returns: current power state as *On* or *Off* `str` or `None`
             if power state can't be determined
         """
-        with libvirt_open(self._uri, readonly=True) as conn:
-
-            domain = conn.lookupByName(identity)
-            return 'On' if domain.isActive() else 'Off'
+        domain = self._get_domain(identity, readonly=True)
+        return 'On' if domain.isActive() else 'Off'
 
     def set_power_state(self, identity, state):
         """Set computer system power state
@@ -142,35 +147,33 @@ class LibvirtDriver(AbstractDriver):
 
         :raises: `FishyError` if power state can't be set
         """
-        with libvirt_open(self._uri) as conn:
+        domain = self._get_domain(identity)
 
-            domain = conn.lookupByName(identity)
+        try:
+            if state in ('On', 'ForceOn'):
+                if not domain.isActive():
+                    domain.create()
+            elif state == 'ForceOff':
+                if domain.isActive():
+                    domain.destroy()
+            elif state == 'GracefulShutdown':
+                if domain.isActive():
+                    domain.shutdown()
+            elif state == 'GracefulRestart':
+                if domain.isActive():
+                    domain.reboot()
+            elif state == 'ForceRestart':
+                if domain.isActive():
+                    domain.reset()
+            elif state == 'Nmi':
+                if domain.isActive():
+                    domain.injectNMI()
 
-            try:
-                if state in ('On', 'ForceOn'):
-                    if not domain.isActive():
-                        domain.create()
-                elif state == 'ForceOff':
-                    if domain.isActive():
-                        domain.destroy()
-                elif state == 'GracefulShutdown':
-                    if domain.isActive():
-                        domain.shutdown()
-                elif state == 'GracefulRestart':
-                    if domain.isActive():
-                        domain.reboot()
-                elif state == 'ForceRestart':
-                    if domain.isActive():
-                        domain.reset()
-                elif state == 'Nmi':
-                    if domain.isActive():
-                        domain.injectNMI()
+        except libvirt.libvirtError as e:
+            msg = ('Error changing power state at libvirt URI "%(uri)s": '
+                   '%(error)s' % {'uri': self._uri, 'error': e})
 
-            except libvirt.libvirtError as e:
-                msg = ('Error changing power state at libvirt URI "%(uri)s": '
-                       '%(error)s' % {'uri': self._uri, 'error': e})
-
-                raise FishyError(msg)
+            raise FishyError(msg)
 
     def get_boot_device(self, identity):
         """Get computer system boot device name
@@ -180,19 +183,17 @@ class LibvirtDriver(AbstractDriver):
         :returns: boot device name as `str` or `None` if device name
             can't be determined
         """
-        with libvirt_open(self._uri, readonly=True) as conn:
+        domain = self._get_domain(identity, readonly=True)
 
-            domain = conn.lookupByName(identity)
+        tree = ET.fromstring(domain.XMLDesc())
 
-            tree = ET.fromstring(domain.XMLDesc())
+        boot_element = tree.find('.//boot')
+        if boot_element is not None:
+            boot_source_target = (
+                self.BOOT_DEVICE_MAP_REV.get(boot_element.get('dev'))
+            )
 
-            boot_element = tree.find('.//boot')
-            if boot_element is not None:
-                boot_source_target = (
-                    self.BOOT_DEVICE_MAP_REV.get(boot_element.get('dev'))
-                )
-
-                return boot_source_target
+            return boot_source_target
 
     def set_boot_device(self, identity, boot_source):
         """Get/Set computer system boot device name
@@ -204,39 +205,38 @@ class LibvirtDriver(AbstractDriver):
 
         :raises: `FishyError` if boot device can't be set
         """
-        with libvirt_open(self._uri) as conn:
+        domain = self._get_domain(identity)
 
-            domain = conn.lookupByName(identity)
+        # XML schema: https://libvirt.org/formatdomain.html#elementsOSBIOS
+        tree = ET.fromstring(domain.XMLDesc())
 
-            # XML schema: https://libvirt.org/formatdomain.html#elementsOSBIOS
-            tree = ET.fromstring(domain.XMLDesc())
+        try:
+            target = self.BOOT_DEVICE_MAP[boot_source]
 
-            try:
-                target = self.BOOT_DEVICE_MAP[boot_source]
+        except KeyError:
+            msg = ('Unknown power state requested: '
+                   '%(boot_source)s' % {'boot_source': boot_source})
 
-            except KeyError:
-                msg = ('Unknown power state requested: '
-                       '%(boot_source)s' % {'boot_source': boot_source})
+            raise FishyError(msg)
 
-                raise FishyError(msg)
+        for os_element in tree.findall('os'):
+            # Remove all "boot" elements
+            for boot_element in os_element.findall('boot'):
+                os_element.remove(boot_element)
 
-            for os_element in tree.findall('os'):
-                # Remove all "boot" elements
-                for boot_element in os_element.findall('boot'):
-                    os_element.remove(boot_element)
+            # Add a new boot element with the request boot device
+            boot_element = ET.SubElement(os_element, 'boot')
+            boot_element.set('dev', target)
 
-                # Add a new boot element with the request boot device
-                boot_element = ET.SubElement(os_element, 'boot')
-                boot_element.set('dev', target)
-
-            try:
+        try:
+            with libvirt_open(self._uri) as conn:
                 conn.defineXML(ET.tostring(tree).decode('utf-8'))
 
-            except libvirt.libvirtError as e:
-                msg = ('Error changing boot device at libvirt URI "%(uri)s": '
-                       '%(error)s' % {'uri': self._uri, 'error': e})
+        except libvirt.libvirtError as e:
+            msg = ('Error changing boot device at libvirt URI "%(uri)s": '
+                   '%(error)s' % {'uri': self._uri, 'error': e})
 
-                raise FishyError(msg)
+            raise FishyError(msg)
 
     def get_boot_mode(self, identity):
         """Get computer system boot mode.
@@ -244,21 +244,19 @@ class LibvirtDriver(AbstractDriver):
         :returns: either *Uefi* or *Legacy* as `str` or `None` if
             current boot mode can't be determined
         """
-        with libvirt_open(self._uri, readonly=True) as conn:
+        domain = self._get_domain(identity, readonly=True)
 
-            domain = conn.lookupByName(identity)
+        # XML schema: https://libvirt.org/formatdomain.html#elementsOSBIOS
+        tree = ET.fromstring(domain.XMLDesc())
 
-            # XML schema: https://libvirt.org/formatdomain.html#elementsOSBIOS
-            tree = ET.fromstring(domain.XMLDesc())
+        loader_element = tree.find('.//loader')
 
-            loader_element = tree.find('.//loader')
+        if loader_element is not None:
+            boot_mode = (
+                self.BOOT_MODE_MAP_REV.get(loader_element.get('type'))
+            )
 
-            if loader_element is not None:
-                boot_mode = (
-                    self.BOOT_MODE_MAP_REV.get(loader_element.get('type'))
-                )
-
-                return boot_mode
+            return boot_mode
 
     def set_boot_mode(self, identity, boot_mode):
         """Set computer system boot mode.
@@ -269,39 +267,37 @@ class LibvirtDriver(AbstractDriver):
 
         :raises: `FishyError` if boot mode can't be set
         """
-        with libvirt_open(self._uri) as conn:
+        domain = self._get_domain(identity)
 
-            domain = conn.lookupByName(identity)
+        # XML schema: https://libvirt.org/formatdomain.html#elementsOSBIOS
+        tree = ET.fromstring(domain.XMLDesc())
 
-            # XML schema: https://libvirt.org/formatdomain.html#elementsOSBIOS
-            tree = ET.fromstring(domain.XMLDesc())
+        try:
+            target = self.BOOT_MODE_MAP[boot_mode]
 
-            try:
-                target = self.BOOT_MODE_MAP[boot_mode]
+        except KeyError:
+            msg = ('Unknown boot mode requested: '
+                   '%(boot_mode)s' % {'boot_mode': boot_mode})
 
-            except KeyError:
-                msg = ('Unknown boot mode requested: '
-                       '%(boot_mode)s' % {'boot_mode': boot_mode})
+            raise FishyError(msg)
 
-                raise FishyError(msg)
+        for os_element in tree.findall('os'):
+            # Remove all "boot" elements
+            for loader_element in os_element.findall('loader'):
+                os_element.remove(loader_element)
 
-            for os_element in tree.findall('os'):
-                # Remove all "boot" elements
-                for loader_element in os_element.findall('loader'):
-                    os_element.remove(loader_element)
+            # Add a new loader element with the request boot mode
+            loader_element = ET.SubElement(os_element, 'loader')
+            loader_element.set('type', target)
 
-                # Add a new loader element with the request boot mode
-                loader_element = ET.SubElement(os_element, 'loader')
-                loader_element.set('type', target)
+        try:
+            self._conn.defineXML(ET.tostring(tree).decode('utf-8'))
 
-            try:
-                self._conn.defineXML(ET.tostring(tree).decode('utf-8'))
+        except libvirt.libvirtError as e:
+            msg = ('Error changing boot mode at libvirt URI "%(uri)s": '
+                   '%(error)s' % {'uri': self._uri, 'error': e})
 
-            except libvirt.libvirtError as e:
-                msg = ('Error changing boot mode at libvirt URI "%(uri)s": '
-                       '%(error)s' % {'uri': self._uri, 'error': e})
-
-                raise FishyError(msg)
+            raise FishyError(msg)
 
     def get_total_memory(self, identity):
         """Get computer system total memory
@@ -311,9 +307,8 @@ class LibvirtDriver(AbstractDriver):
         :returns: available RAM in GiB as `int` or `None` if total memory
             count can't be determined
         """
-        with libvirt_open(self._uri, readonly=True) as conn:
-            domain = conn.lookupByName(identity)
-            return int(domain.maxMemory() / 1024 / 1024)
+        domain = self._get_domain(identity, readonly=True)
+        return int(domain.maxMemory() / 1024 / 1024)
 
     def get_total_cpus(self, identity):
         """Get computer system total count of available CPUs
@@ -323,25 +318,23 @@ class LibvirtDriver(AbstractDriver):
         :returns: available CPU count as `int` or `None` if CPU count
             can't be determined
         """
-        with libvirt_open(self._uri, readonly=True) as conn:
+        domain = self._get_domain(identity, readonly=True)
 
-            domain = conn.lookupByName(identity)
+        tree = ET.fromstring(domain.XMLDesc())
 
-            tree = ET.fromstring(domain.XMLDesc())
+        total_cpus = 0
 
-            total_cpus = 0
+        if domain.isActive():
+            total_cpus = domain.maxVcpus()
 
-            if domain.isActive():
-                total_cpus = domain.maxVcpus()
+        # If we can't get it from maxVcpus() try to find it by
+        # inspecting the domain XML
+        if total_cpus <= 0:
+            vcpu_element = tree.find('.//vcpu')
+            if vcpu_element is not None:
+                total_cpus = int(vcpu_element.text)
 
-            # If we can't get it from maxVcpus() try to find it by
-            # inspecting the domain XML
-            if total_cpus <= 0:
-                vcpu_element = tree.find('.//vcpu')
-                if vcpu_element is not None:
-                    total_cpus = int(vcpu_element.text)
-
-            return total_cpus or None
+        return total_cpus or None
 
     def _process_bios_attributes(self,
                                  domain_xml,
@@ -424,21 +417,25 @@ class LibvirtDriver(AbstractDriver):
 
         :raises: `FishyError` if BIOS attributes cannot be saved
         """
-        with libvirt_open(self._uri) as conn:
-            libvirt_domain = conn.lookupByName(identity)
-            result = self._process_bios_attributes(libvirt_domain.XMLDesc(),
-                                                   bios_attributes,
-                                                   update_existing_attributes)
+        domain = self._get_domain(identity)
 
-            if result.attributes_written:
-                try:
+        result = self._process_bios_attributes(domain.XMLDesc(),
+                                               bios_attributes,
+                                               update_existing_attributes)
+
+        if result.attributes_written:
+
+            try:
+                with libvirt_open(self._uri) as conn:
                     conn.defineXML(ET.tostring(result.tree).decode('utf-8'))
-                except libvirt.libvirtError as e:
-                    msg = ('Error updating BIOS attributes'
-                           ' at libvirt URI "%(uri)s": '
-                           '%(error)s' % {'uri': self._uri, 'error': e})
-                    raise FishyError(msg)
-            return result.bios_attributes
+
+            except libvirt.libvirtError as e:
+                msg = ('Error updating BIOS attributes'
+                       ' at libvirt URI "%(uri)s": '
+                       '%(error)s' % {'uri': self._uri, 'error': e})
+                raise FishyError(msg)
+
+        return result.bios_attributes
 
     def get_bios(self, identity):
         """Get BIOS section
@@ -489,9 +486,8 @@ class LibvirtDriver(AbstractDriver):
 
         :returns: list of network interfaces dict with their attributes
         """
-        with libvirt_open(self._uri, readonly=True) as conn:
-            domain = conn.lookupByName(identity)
-            tree = ET.fromstring(domain.XMLDesc())
-            return [{'id': iface.get('address'), 'mac': iface.get('address')}
-                    for iface in tree.findall(
-                    ".//devices/interface[@type='network']/mac")]
+        domain = self._get_domain(identity, readonly=True)
+        tree = ET.fromstring(domain.XMLDesc())
+        return [{'id': iface.get('address'), 'mac': iface.get('address')}
+                for iface in tree.findall(
+                ".//devices/interface[@type='network']/mac")]

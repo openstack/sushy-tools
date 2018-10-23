@@ -21,6 +21,10 @@ import six
 class AbstractDriver(object):
     """Base class for all virtualization drivers"""
 
+    @classmethod
+    def initialize(cls, **kwargs):
+        return cls
+
     @abc.abstractproperty
     def driver(self):
         """Return human-friendly driver information

@@ -17,6 +17,7 @@ import logging
 import math
 
 from sushy_tools.emulator.drivers.base import AbstractDriver
+from sushy_tools.emulator.drivers.memoize import memoize
 from sushy_tools.error import FishyError
 
 try:
@@ -51,10 +52,13 @@ class OpenStackDriver(AbstractDriver):
 
     BOOT_MODE_MAP_REV = {v: k for k, v in BOOT_MODE_MAP.items()}
 
-    def __init__(self, os_cloud, readonly=False):
-        self._cc = openstack.connect(cloud=os_cloud)
-        self._os_cloud = os_cloud
+    @classmethod
+    def initialize(cls, os_cloud, readonly=False):
+        cls._cc = openstack.connect(cloud=os_cloud)
+        cls._os_cloud = os_cloud
+        return cls
 
+    @memoize()
     def _get_instance(self, identity):
         server = self._cc.get_server(identity)
         if server:
@@ -68,10 +72,22 @@ class OpenStackDriver(AbstractDriver):
 
         raise FishyError(msg)
 
+    @memoize(permament_cache={})
     def _get_flavor(self, identity):
         instance = self._get_instance(identity)
-        flavor = self._cc.get_flavor(instance.flavor.id)
-        return flavor
+        return self._cc.get_flavor(instance.flavor.id)
+
+    @memoize(permament_cache={})
+    def _get_image_info(self, identity):
+        return self._cc.image.find_image(identity)
+
+    @memoize()
+    def _get_server_metadata(self, identity):
+        return self._cc.compute.get_server_metadata(identity).to_dict()
+
+    @memoize(purge_cache=_get_server_metadata)
+    def _set_server_metadata(self, identity, metadata):
+        self._cc.compute.set_server_metadata(identity, metadata)
 
     @property
     def driver(self):
@@ -176,7 +192,7 @@ class OpenStackDriver(AbstractDriver):
         except FishyError:
             return
 
-        metadata = self._cc.compute.get_server_metadata(instance.id).to_dict()
+        metadata = self._get_server_metadata(instance.id)
 
         # NOTE(etingof): the following probably only works with
         # libvirt-backed compute nodes
@@ -211,10 +227,9 @@ class OpenStackDriver(AbstractDriver):
         # NOTE(etingof): the following probably only works with
         # libvirt-backed compute nodes
 
-        self._cc.compute.set_server_metadata(
+        self._set_server_metadata(
             instance.id, {'libvirt:pxe-first': '1'
-                          if target == 'network' else ''}
-        )
+                          if target == 'network' else ''})
 
     def get_boot_mode(self, identity):
         """Get computer system boot mode.
@@ -224,7 +239,7 @@ class OpenStackDriver(AbstractDriver):
         """
         instance = self._get_instance(identity)
 
-        image = self._cc.image.find_image(instance.image['id'])
+        image = self._get_image_info(instance.image['id'])
 
         hw_firmware_type = getattr(image, 'hw_firmware_type', None)
 
