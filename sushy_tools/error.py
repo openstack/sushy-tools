@@ -16,3 +16,7 @@
 
 class FishyError(Exception):
     """Create generic sushy-tools exception object"""
+
+
+class AliasAccessError(FishyError):
+    """Node access attempted via an alias, not UUID"""

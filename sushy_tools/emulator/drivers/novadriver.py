@@ -17,7 +17,7 @@ import logging
 import math
 
 from sushy_tools.emulator.drivers.base import AbstractDriver
-from sushy_tools.error import FishyError
+from sushy_tools import error
 
 try:
     import openstack
@@ -56,9 +56,12 @@ class OpenStackDriver(AbstractDriver):
         self._os_cloud = os_cloud
 
     def _get_instance(self, identity):
-        server = self._cc.get_server(identity)
-        if server:
-            return server
+        instance = self._cc.get_server(identity)
+        if instance:
+            if identity != instance.id:
+                raise error.AliasAccessError(instance.id)
+
+            return instance
 
         msg = ('Error finding instance by UUID "%(identity)s" at OS '
                'cloud %(os_cloud)s"' % {'identity': identity,
@@ -66,7 +69,7 @@ class OpenStackDriver(AbstractDriver):
 
         logger.debug(msg)
 
-        raise FishyError(msg)
+        raise error.FishyError(msg)
 
     def _get_flavor(self, identity):
         instance = self._get_instance(identity)
@@ -85,7 +88,7 @@ class OpenStackDriver(AbstractDriver):
     def systems(self):
         """Return available computer systems
 
-        :returns: list of computer systems names.
+        :returns: list of UUIDs representing the systems
         """
         return [server.id for server in self._cc.list_servers()]
 
@@ -99,6 +102,16 @@ class OpenStackDriver(AbstractDriver):
         instance = self._get_instance(identity)
         return instance.id
 
+    def name(self, identity):
+        """Get computer system name by name
+
+        :param identity: OpenStack instance name or ID
+
+        :returns: computer system name
+        """
+        instance = self._get_instance(identity)
+        return instance.name
+
     def get_power_state(self, identity):
         """Get computer system power state
 
@@ -110,7 +123,7 @@ class OpenStackDriver(AbstractDriver):
         try:
             instance = self._get_instance(identity)
 
-        except FishyError:
+        except error.FishyError:
             return
 
         if instance.power_state == self.NOVA_POWER_STATE_ON:
@@ -127,7 +140,7 @@ class OpenStackDriver(AbstractDriver):
             returned. Valid values  are: *On*, *ForceOn*, *ForceOff*,
             *GracefulShutdown*, *GracefulRestart*, *ForceRestart*, *Nmi*.
 
-        :raises: `FishyError` if power state can't be set
+        :raises: `error.FishyError` if power state can't be set
 
         """
         instance = self._get_instance(identity)
@@ -159,8 +172,8 @@ class OpenStackDriver(AbstractDriver):
         # NOTE(etingof) can't support `state == "Nmi"` as
         # openstacksdk does not seem to support that
         else:
-            raise FishyError('Unknown ResetType '
-                             '"%(state)s"' % {'state': state})
+            raise error.FishyError(
+                'Unknown ResetType "%(state)s"' % {'state': state})
 
     def get_boot_device(self, identity):
         """Get computer system boot device name
@@ -173,7 +186,7 @@ class OpenStackDriver(AbstractDriver):
         try:
             instance = self._get_instance(identity)
 
-        except FishyError:
+        except error.FishyError:
             return
 
         metadata = self._cc.compute.get_server_metadata(instance.id).to_dict()
@@ -195,7 +208,7 @@ class OpenStackDriver(AbstractDriver):
             change on the system. If not specified, current boot device is
             returned. Valid values are: *Pxe*, *Hdd*, *Cd*.
 
-        :raises: `FishyError` if boot device can't be set
+        :raises: `error.FishyError` if boot device can't be set
         """
         instance = self._get_instance(identity)
 
@@ -206,7 +219,7 @@ class OpenStackDriver(AbstractDriver):
             msg = ('Unknown power state requested: '
                    '%(boot_source)s' % {'boot_source': boot_source})
 
-            raise FishyError(msg)
+            raise error.FishyError(msg)
 
         # NOTE(etingof): the following probably only works with
         # libvirt-backed compute nodes
@@ -237,7 +250,7 @@ class OpenStackDriver(AbstractDriver):
             change on the system. If not specified, current boot mode is
             returned. Valid values are: *Uefi*, *Legacy*.
 
-        :raises: `FishyError` if boot mode can't be set
+        :raises: `error.FishyError` if boot mode can't be set
         """
         # just to make sure passed identity exists
         self._get_instance(identity)
@@ -245,7 +258,7 @@ class OpenStackDriver(AbstractDriver):
         msg = ('The cloud driver %(driver)s does not allow changing boot '
                'mode through Redfish' % {'driver': self.driver})
 
-        raise FishyError(msg)
+        raise error.FishyError(msg)
 
     def get_total_memory(self, identity):
         """Get computer system total memory
@@ -258,7 +271,7 @@ class OpenStackDriver(AbstractDriver):
         try:
             flavor = self._get_flavor(identity)
 
-        except FishyError:
+        except error.FishyError:
             return
 
         return int(math.ceil(flavor.ram / 1024.))
@@ -274,24 +287,24 @@ class OpenStackDriver(AbstractDriver):
         try:
             flavor = self._get_flavor(identity)
 
-        except FishyError:
+        except error.FishyError:
             return
 
         return flavor.vcpus
 
     def get_bios(self, identity):
         """Not supported as Openstack SDK does not expose API for BIOS"""
-        raise FishyError(
+        raise error.FishyError(
             'Operation not supported by the virtualization driver')
 
     def set_bios(self, identity, attributes):
         """Not supported as Openstack SDK does not expose API for BIOS"""
-        raise FishyError(
+        raise error.FishyError(
             'Operation not supported by the virtualization driver')
 
     def reset_bios(self, identity):
         """Not supported as Openstack SDK does not expose API for BIOS"""
-        raise FishyError(
+        raise error.FishyError(
             'Operation not supported by the virtualization driver')
 
     def get_nics(self, identity):

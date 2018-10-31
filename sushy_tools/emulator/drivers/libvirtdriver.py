@@ -19,7 +19,7 @@ import xml.etree.ElementTree as ET
 
 from collections import namedtuple
 from sushy_tools.emulator.drivers.base import AbstractDriver
-from sushy_tools.error import FishyError
+from sushy_tools import error
 
 try:
     import libvirt
@@ -57,7 +57,7 @@ class libvirt_open(object):
         except libvirt.libvirtError as e:
             msg = ('Error when connecting to the libvirt URI "%(uri)s": '
                    '%(error)s' % {'uri': self._uri, 'error': e})
-            raise FishyError(msg)
+            raise error.FishyError(msg)
 
     def __exit__(self, type, value, traceback):
         self._conn.close()
@@ -108,15 +108,15 @@ class LibvirtDriver(AbstractDriver):
     def _get_domain(self, identity, readonly=False):
         with libvirt_open(self._uri, readonly=readonly) as conn:
             try:
-                return conn.lookupByName(identity)
+                uu_identity = uuid.UUID(identity)
 
-            except libvirt.libvirtError as ex:
+                return conn.lookupByUUID(uu_identity.bytes)
+
+            except (ValueError, libvirt.libvirtError):
                 try:
-                    uu_identity = uuid.UUID(identity)
+                    domain = conn.lookupByName(identity)
 
-                    return conn.lookupByUUID(uu_identity.bytes)
-
-                except (ValueError, libvirt.libvirtError):
+                except libvirt.libvirtError as ex:
                     msg = ('Error finding domain by name/UUID "%(identity)s" '
                            'at libvirt URI %(uri)s": %(err)s' %
                            {'identity': identity,
@@ -124,7 +124,9 @@ class LibvirtDriver(AbstractDriver):
 
                     logger.debug(msg)
 
-                    raise FishyError(msg)
+                    raise error.FishyError(msg)
+
+            raise error.AliasAccessError(domain.UUIDString())
 
     @property
     def driver(self):
@@ -138,10 +140,11 @@ class LibvirtDriver(AbstractDriver):
     def systems(self):
         """Return available computer systems
 
-        :returns: list of computer systems names.
+        :returns: list of UUIDs representing the systems
         """
         with libvirt_open(self._uri, readonly=True) as conn:
-            return conn.listDefinedDomains()
+            return [domain.UUIDString()
+                    for domain in conn.listDefinedDomains()]
 
     def uuid(self, identity):
         """Get computer system UUID
@@ -155,6 +158,16 @@ class LibvirtDriver(AbstractDriver):
         """
         domain = self._get_domain(identity, readonly=True)
         return domain.UUIDString()
+
+    def name(self, identity):
+        """Get computer system name by name
+
+        :param identity: libvirt domain name or UUID
+
+        :returns: computer system name
+        """
+        domain = self._get_domain(identity, readonly=True)
+        return domain.name()
 
     def get_power_state(self, identity):
         """Get computer system power state
@@ -176,7 +189,7 @@ class LibvirtDriver(AbstractDriver):
             Valid values  are: *On*, *ForceOn*, *ForceOff*, *GracefulShutdown*,
             *GracefulRestart*, *ForceRestart*, *Nmi*.
 
-        :raises: `FishyError` if power state can't be set
+        :raises: `error.FishyError` if power state can't be set
         """
         domain = self._get_domain(identity)
 
@@ -204,7 +217,7 @@ class LibvirtDriver(AbstractDriver):
             msg = ('Error changing power state at libvirt URI "%(uri)s": '
                    '%(error)s' % {'uri': self._uri, 'error': e})
 
-            raise FishyError(msg)
+            raise error.FishyError(msg)
 
     def get_boot_device(self, identity):
         """Get computer system boot device name
@@ -234,7 +247,7 @@ class LibvirtDriver(AbstractDriver):
             change on the system. If not specified, current boot device is
             returned. Valid values are: *Pxe*, *Hdd*, *Cd*.
 
-        :raises: `FishyError` if boot device can't be set
+        :raises: `error.FishyError` if boot device can't be set
         """
         domain = self._get_domain(identity)
 
@@ -248,7 +261,7 @@ class LibvirtDriver(AbstractDriver):
             msg = ('Unknown power state requested: '
                    '%(boot_source)s' % {'boot_source': boot_source})
 
-            raise FishyError(msg)
+            raise error.FishyError(msg)
 
         for os_element in tree.findall('os'):
             # Remove all "boot" elements
@@ -267,7 +280,7 @@ class LibvirtDriver(AbstractDriver):
             msg = ('Error changing boot device at libvirt URI "%(uri)s": '
                    '%(error)s' % {'uri': self._uri, 'error': e})
 
-            raise FishyError(msg)
+            raise error.FishyError(msg)
 
     def get_boot_mode(self, identity):
         """Get computer system boot mode.
@@ -296,7 +309,7 @@ class LibvirtDriver(AbstractDriver):
             change on the system. If not specified, current boot mode is
             returned. Valid values are: *Uefi*, *Legacy*.
 
-        :raises: `FishyError` if boot mode can't be set
+        :raises: `error.FishyError` if boot mode can't be set
         """
         domain = self._get_domain(identity, readonly=True)
 
@@ -310,7 +323,7 @@ class LibvirtDriver(AbstractDriver):
             msg = ('Unknown boot mode requested: '
                    '%(boot_mode)s' % {'boot_mode': boot_mode})
 
-            raise FishyError(msg)
+            raise error.FishyError(msg)
 
         for os_element in tree.findall('os'):
             type_element = os_element.find('type')
@@ -346,7 +359,7 @@ class LibvirtDriver(AbstractDriver):
                            '"%(uri)s": %(error)s' % {'uri': self._uri,
                                                      'error': e})
 
-                    raise FishyError(msg)
+                    raise error.FishyError(msg)
 
     def get_total_memory(self, identity):
         """Get computer system total memory
@@ -464,7 +477,7 @@ class LibvirtDriver(AbstractDriver):
 
         :returns: New or existing dict of BIOS attributes
 
-        :raises: `FishyError` if BIOS attributes cannot be saved
+        :raises: `error.FishyError` if BIOS attributes cannot be saved
         """
         domain = self._get_domain(identity)
 
@@ -481,7 +494,7 @@ class LibvirtDriver(AbstractDriver):
                 msg = ('Error updating BIOS attributes'
                        ' at libvirt URI "%(uri)s": '
                        '%(error)s' % {'uri': self._uri, 'error': e})
-                raise FishyError(msg)
+                raise error.FishyError(msg)
 
         return result.bios_attributes
 

@@ -32,7 +32,7 @@ class AbstractDriver(object):
     def systems(self):
         """Return available computer systems
 
-        :returns: list of computer systems names.
+        :returns: list of UUIDs representing the systems
         """
 
     @abc.abstractmethod
@@ -43,9 +43,22 @@ class AbstractDriver(object):
         in place of system name if there are duplicates.
 
         If virtualization backend does not support non-unique system identity,
-        this property may just return the `identity`.
+        this method may just return the `identity`.
 
         :returns: computer system UUID
+        """
+
+    @abc.abstractmethod
+    def name(self, identity):
+        """Get computer system name by UUID
+
+        The universal unique identifier (UUID) for this system. Can be used
+        in place of system name if there are duplicates.
+
+        If virtualization backend does not support system names
+        this method may just return the `identity`.
+
+        :returns: computer system name
         """
 
     @abc.abstractmethod
