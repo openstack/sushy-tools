@@ -255,33 +255,41 @@ def system_reset_bios(identity):
 
 def parse_args():
     parser = argparse.ArgumentParser('sushy-emulator')
+    parser.add_argument('--config',
+                        type=str,
+                        help='Config file path. Can also be set via '
+                             'environment variable SUSHY_EMULATOR_CONFIG.')
     parser.add_argument('-i', '--interface',
                         type=str,
-                        default='',
-                        help='Local interface to listen at')
+                        help='IP address of the local interface to listen '
+                             'at. Can also be set via config variable '
+                             'SUSHY_EMULATOR_LISTEN_IP. Default is all '
+                             'local interfaces.')
     parser.add_argument('-p', '--port',
                         type=int,
-                        default=8000,
-                        help='The port to bind the server to')
+                        help='TCP port to bind the server to.  Can also be '
+                             'set via config variable '
+                             'SUSHY_EMULATOR_LISTEN_PORT. Default is 8000.')
     parser.add_argument('--ssl-certificate',
                         type=str,
-                        help='SSL certificate to use for HTTPS')
+                        help='SSL certificate to use for HTTPS. Can also be '
+                        'set via config variable SUSHY_EMULATOR_SSL_CERT.')
     parser.add_argument('--ssl-key',
                         type=str,
-                        help='SSL key to use for HTTPS')
-
+                        help='SSL key to use for HTTPS. Can also be set'
+                        'via config variable SUSHY_EMULATOR_SSL_KEY.')
     backend_group = parser.add_mutually_exclusive_group()
     backend_group.add_argument('--os-cloud',
                                type=str,
                                help='OpenStack cloud name. Can also be set '
-                                    'via environment variable '
-                                    '$OS_CLOUD')
+                                    'via environment variable OS_CLOUD or '
+                                    'config variable SUSHY_EMULATOR_OS_CLOUD.'
+                               )
     backend_group.add_argument('--libvirt-uri',
                                type=str,
-                               default='',
                                help='The libvirt URI. Can also be set via '
                                     'environment variable '
-                                    '$SUSHY_EMULATOR_LIBVIRT_URI. '
+                                    'SUSHY_EMULATOR_LIBVIRT_URI. '
                                     'Default is qemu:///system')
 
     return parser.parse_args()
@@ -292,28 +300,45 @@ def main():
 
     args = parse_args()
 
-    if args.os_cloud:
-        if not novadriver.is_loaded:
+    config_file = args.config or os.environ.get('SUSHY_EMULATOR_CONFIG')
+    if config_file:
+        app.config.from_pyfile(config_file)
+
+    os_cloud = args.os_cloud or app.config.get('SUSHY_EMULATOR_OS_CLOUD')
+    if os_cloud:
+        if not novadriver:
             app.logger.error('Nova driver not loaded')
             return 1
 
-        driver = novadriver.OpenStackDriver(args.os_cloud)
+        driver = novadriver.OpenStackDriver(os_cloud)
 
     else:
         if not libvirtdriver.is_loaded:
             app.logger.error('libvirt driver not loaded')
             return 1
 
-        driver = libvirtdriver.LibvirtDriver(args.libvirt_uri)
+        driver = libvirtdriver.LibvirtDriver(
+            args.libvirt_uri or
+            app.config.get('SUSHY_EMULATOR_LIBVIRT_URI', '')
+        )
 
     app.logger.debug('Running with %s', driver.driver)
 
     ssl_context = None
-    if args.ssl_certificate and args.ssl_key:
-        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
-        ssl_context.load_cert_chain(args.ssl_certificate, args.ssl_key)
 
-    app.run(host=args.interface, port=args.port, ssl_context=ssl_context)
+    ssl_certificate = (args.ssl_certificate or
+                       app.config.get('SUSHY_EMULATOR_SSL_CERT'))
+    ssl_key = args.ssl_key or app.config.get('SUSHY_EMULATOR_SSL_KEY')
+
+    if ssl_certificate and ssl_key:
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+        ssl_context.load_cert_chain(ssl_certificate, ssl_key)
+
+    app.run(host=(args.interface or
+                  app.config.get('SUSHY_EMULATOR_LISTEN_IP')),
+            port=(args.port or
+                  app.config.get('SUSHY_EMULATOR_LISTEN_PORT', 8000)),
+            ssl_context=ssl_context)
 
     return 0
 
