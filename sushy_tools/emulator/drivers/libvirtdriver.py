@@ -74,10 +74,22 @@ class LibvirtDriver(AbstractDriver):
 
     BOOT_MODE_MAP = {
         'Legacy': 'rom',
-        'Uefi': 'pflash',
+        'Uefi': 'pflash'
     }
 
     BOOT_MODE_MAP_REV = {v: k for k, v in BOOT_MODE_MAP.items()}
+
+    # NOTE(etingof): we have these firmware blobs hardcoded here
+    # which seems to work for CentOS, for instance.
+    # What's not clear is how to adapt to possible different
+    # boot loaders paths dependent on libvirt packaging and custom
+    # domain configuration...
+    BOOT_LOADER_MAP = {
+        'Uefi': {
+            'x86_64': '/usr/share/OVMF/OVMF_CODE.fd',
+            'aarch64': '/usr/share/AAVMF/AAVMF_CODE.fd'
+        }
+    }
 
     DEFAULT_BIOS_ATTRIBUTES = {"BootMode": "Uefi",
                                "EmbeddedSata": "Raid",
@@ -277,7 +289,7 @@ class LibvirtDriver(AbstractDriver):
             tree = ET.fromstring(domain.XMLDesc())
 
             try:
-                target = self.BOOT_MODE_MAP[boot_mode]
+                loader_type = self.BOOT_MODE_MAP[boot_mode]
 
             except KeyError:
                 msg = ('Unknown boot mode requested: '
@@ -286,16 +298,31 @@ class LibvirtDriver(AbstractDriver):
                 raise FishyError(msg)
 
             for os_element in tree.findall('os'):
-                # Remove all "boot" elements
-                for loader_element in os_element.findall('loader'):
-                    os_element.remove(loader_element)
+                type_element = os_element.find('type')
+                if type_element is None:
+                    os_arch = None
+                else:
+                    os_arch = type_element.get('arch')
 
-                # Add a new loader element with the request boot mode
-                loader_element = ET.SubElement(os_element, 'loader')
-                loader_element.set('type', target)
+                try:
+                    loader_path = self.BOOT_LOADER_MAP[boot_mode][os_arch]
+
+                except KeyError:
+                    # NOTE(etingof): assume no specific boot loader
+                    loader_path = ''
+
+                # Update all "loader" elements
+                for loader_element in os_element.findall('loader'):
+                    loader_element.set('type', loader_type)
+                    # NOTE(etingof): here we override previous boot loader for
+                    # for the domain. If it's different than what we have
+                    # hardcoded in the BOOT_LOADER_MAP, we won't be able to
+                    # revert back to the original boor loader should we change
+                    # domain boot mode.
+                    loader_element.text = loader_path
 
             try:
-                self._conn.defineXML(ET.tostring(tree).decode('utf-8'))
+                conn.defineXML(ET.tostring(tree).decode('utf-8'))
 
             except libvirt.libvirtError as e:
                 msg = ('Error changing boot mode at libvirt URI "%(uri)s": '
