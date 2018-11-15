@@ -212,8 +212,8 @@ class OpenStackDriver(AbstractDriver):
         # libvirt-backed compute nodes
 
         self._cc.compute.set_server_metadata(
-            instance.id, {'libvirt:pxe-first': '1'
-                          if target == 'network' else ''}
+            instance.id, **{'libvirt:pxe-first': '1'
+                            if target == 'network' else ''}
         )
 
     def get_boot_mode(self, identity):

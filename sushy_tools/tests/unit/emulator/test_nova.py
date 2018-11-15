@@ -87,7 +87,7 @@ class EmulatorTestCase(base.BaseTestCase):
         self.assertEqual(204, response.status_code)
 
         nova_conn_mock.compute.set_server_metadata.assert_called_once_with(
-            server.id, {'libvirt:pxe-first': ''})
+            server.id, **{'libvirt:pxe-first': ''})
 
     def test_system_reset_action_on(self, nova_mock):
         nova_conn_mock = nova_mock.return_value
