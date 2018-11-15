@@ -82,7 +82,7 @@ def returns_json(decorated_func):
 @app.errorhandler(Exception)
 @returns_json
 def all_exception_handler(message):
-    return flask.render_template('error.json', message=message)
+    return flask.render_template('error.json', message=message), 500
 
 
 @app.route('/redfish/v1/')
