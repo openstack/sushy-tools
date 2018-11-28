@@ -51,9 +51,10 @@ class OpenStackDriver(AbstractDriver):
 
     BOOT_MODE_MAP_REV = {v: k for k, v in BOOT_MODE_MAP.items()}
 
-    def __init__(self, os_cloud, readonly=False):
+    def __init__(self, config, os_cloud, readonly=False):
         self._cc = openstack.connect(cloud=os_cloud)
         self._os_cloud = os_cloud
+        self._config = config
 
     def _get_instance(self, identity):
         instance = self._cc.get_server(identity)

@@ -46,7 +46,8 @@ def init_virt_driver(decorated_func):
                     app.logger.error('Nova driver not loaded')
                     sys.exit(1)
 
-                driver = novadriver.OpenStackDriver(os.environ['OS_CLOUD'])
+                driver = novadriver.OpenStackDriver(
+                    app.config, os.environ['OS_CLOUD'])
 
             else:
                 if not libvirtdriver.is_loaded:
@@ -54,6 +55,7 @@ def init_virt_driver(decorated_func):
                     sys.exit(1)
 
                 driver = libvirtdriver.LibvirtDriver(
+                    app.config,
                     os.environ.get(
                         'SUSHY_EMULATOR_LIBVIRT_URI',
                         # NOTE(etingof): left for backward compatibility
@@ -310,7 +312,7 @@ def main():
             app.logger.error('Nova driver not loaded')
             return 1
 
-        driver = novadriver.OpenStackDriver(os_cloud)
+        driver = novadriver.OpenStackDriver(app.config, os_cloud)
 
     else:
         if not libvirtdriver.is_loaded:
@@ -318,6 +320,7 @@ def main():
             return 1
 
         driver = libvirtdriver.LibvirtDriver(
+            app.config,
             args.libvirt_uri or
             app.config.get('SUSHY_EMULATOR_LIBVIRT_URI', '')
         )
