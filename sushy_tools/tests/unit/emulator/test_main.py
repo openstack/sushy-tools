@@ -27,6 +27,12 @@ class EmulatorTestCase(base.BaseTestCase):
 
         super(EmulatorTestCase, self).setUp()
 
+    def test_error(self, driver_mock):
+        driver_mock.get_power_state.side_effect = Exception('Fish is dead')
+        response = self.app.get('/redfish/v1/Systems/xxxx-yyyy-zzzz')
+
+        self.assertEqual('500 INTERNAL SERVER ERROR', response.status)
+
     def test_bios(self, driver_mock):
         driver_mock.get_bios.return_value = {"attribute 1": "value 1",
                                              "attribute 2": "value 2"}
