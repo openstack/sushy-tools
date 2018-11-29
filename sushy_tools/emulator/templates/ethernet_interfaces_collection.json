@@ -6,12 +6,12 @@
     "Members": [
         {% for nic in nics %}
                 {
-                    "@odata.id": "/redfish/v1/Systems/{{ identity }}/EthernetInterfaces/{{ nic.id }}"
+                    "@odata.id": {{ "/redfish/v1/Systems/%s/EthernetInterfaces/%s"|format(identity, nic.id)|tojson }}
                 }{% if not loop.last %},{% endif %}
         {% endfor %}
     ],
     "Oem": {},
     "@odata.context": "/redfish/v1/$metadata#EthernetInterfaceCollection.EthernetInterfaceCollection",
-    "@odata.id": "/redfish/v1/Systems/{{ identity }}/EthernetInterfaces"
+    "@odata.id": {{ "/redfish/v1/Systems/%s/EthernetInterfaces"|format(identity)|tojson }}
 }
 

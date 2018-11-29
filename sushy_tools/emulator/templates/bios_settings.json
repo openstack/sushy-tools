@@ -5,6 +5,6 @@
     "AttributeRegistry": "BiosAttributeRegistryP89.v1_0_0",
     "Attributes": {{ bios_pending_attributes }},
     "@odata.context": "/redfish/v1/$metadata#Bios.Bios",
-    "@odata.id": "/redfish/v1/Systems/{{ identity }}/BIOS/Settings",
+    "@odata.id": {{ "/redfish/v1/Systems/%s/BIOS/Settings"|format(identity)|tojson }},
     "@Redfish.Copyright": "Copyright 2014-2016 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
 }

@@ -7,17 +7,17 @@
     "@Redfish.Settings": {
         "@odata.type": "#Settings.v1_0_0.Settings",
         "SettingsObject": {
-            "@odata.id": "/redfish/v1/Systems/{{ identity }}/BIOS/Settings"
+            "@odata.id": {{ "/redfish/v1/Systems/%s/BIOS/Settings"|format(identity)|tojson }}
         }
     },
     "Actions": {
         "#Bios.ResetBios": {
-            "target": "/redfish/v1/Systems/{{ identity }}/BIOS/Actions/Bios.ResetBios"
+            "target": {{ "/redfish/v1/Systems/%s/BIOS/Actions/Bios.ResetBios"|format(identity)|tojson }}
         },
         "#Bios.ChangePassword": {
-            "target": "/redfish/v1/Systems/{{ identity }}/BIOS/Actions/Bios.ChangePassword"
+            "target": {{ "/redfish/v1/Systems/%s/BIOS/Actions/Bios.ChangePassword"|format(identity)|tojson }}
         }
     },
     "@odata.context": "/redfish/v1/$metadata#Bios.Bios",
-    "@odata.id": "/redfish/v1/Systems/{{ identity }}/BIOS"
+    "@odata.id": {{ "/redfish/v1/Systems/%s/BIOS"|format(identity)|tojson }}
 }
