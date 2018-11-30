@@ -18,7 +18,7 @@ from oslotest import base
 from six.moves import mock
 
 from sushy_tools.emulator.drivers.novadriver import OpenStackDriver
-from sushy_tools.error import FishyError
+from sushy_tools import error
 
 
 class NovaDriverTestCase(base.BaseTestCase):
@@ -148,7 +148,7 @@ class NovaDriverTestCase(base.BaseTestCase):
 
     def test_set_boot_mode(self):
         self.assertRaises(
-            FishyError, self.test_driver.set_boot_mode,
+            error.FishyError, self.test_driver.set_boot_mode,
             'zzzz-yyyy-xxxx', 'Legacy')
 
     def test_get_total_memory(self):
@@ -168,17 +168,16 @@ class NovaDriverTestCase(base.BaseTestCase):
         self.assertEqual(2, cpus)
 
     def test_get_bios(self):
-        self.assertRaises(
-            NotImplementedError, self.test_driver.get_bios, 'zzzz-yyyy-xxxx')
+        self.assertRaises(error.FishyError, self.test_driver.get_bios,
+                          'xxx-yyy-zzz')
 
     def test_set_bios(self):
-        self.assertRaises(
-            NotImplementedError, self.test_driver.set_bios,
-            'zzzz-yyyy-xxxx', {})
+        self.assertRaises(error.FishyError, self.test_driver.set_bios,
+                          'xxx-yyy-zzz', {'attribute 1': 'value 1'})
 
     def test_reset_bios(self):
-        self.assertRaises(
-            NotImplementedError, self.test_driver.reset_bios, 'zzzz-yyyy-xxxx')
+        self.assertRaises(error.FishyError, self.test_driver.reset_bios,
+                          'xxx-yyy-zzz')
 
     def test_get_nics(self):
         addresses = Munch(

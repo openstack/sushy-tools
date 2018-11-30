@@ -281,15 +281,18 @@ class OpenStackDriver(AbstractDriver):
 
     def get_bios(self, identity):
         """Not supported as Openstack SDK does not expose API for BIOS"""
-        raise NotImplementedError
+        raise FishyError(
+            'Operation not supported by the virtualization driver')
 
     def set_bios(self, identity, attributes):
         """Not supported as Openstack SDK does not expose API for BIOS"""
-        raise NotImplementedError
+        raise FishyError(
+            'Operation not supported by the virtualization driver')
 
     def reset_bios(self, identity):
         """Not supported as Openstack SDK does not expose API for BIOS"""
-        raise NotImplementedError
+        raise FishyError(
+            'Operation not supported by the virtualization driver')
 
     def get_nics(self, identity):
         """Get server's network interfaces
