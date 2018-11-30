@@ -53,7 +53,10 @@ def init_virt_driver(decorated_func):
                     sys.exit(1)
 
                 driver = libvirtdriver.LibvirtDriver(
-                    os.environ.get('SUSHY_EMULATOR_LIBVIRT_URL')
+                    os.environ.get(
+                        'SUSHY_EMULATOR_LIBVIRT_URI',
+                        # NOTE(etingof): left for backward compatibility
+                        os.environ.get('SUSHY_EMULATOR_LIBVIRT_URL'))
                 )
 
                 app.logger.debug('Running with %s', driver.driver)
@@ -273,7 +276,7 @@ def parse_args():
                                default='',
                                help='The libvirt URI. Can also be set via '
                                     'environment variable '
-                                    '$SUSHY_EMULATOR_LIBVIRT_URL. '
+                                    '$SUSHY_EMULATOR_LIBVIRT_URI. '
                                     'Default is qemu:///system')
 
     return parser.parse_args()
