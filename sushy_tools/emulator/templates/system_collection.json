@@ -5,7 +5,7 @@
     "Members": [
         {% for system in systems %}
             {
-                "@odata.id": "/redfish/v1/Systems/{{ system }}"
+                "@odata.id": {{ "/redfish/v1/Systems/%s"|format(system)|tojson }}
             }{% if not loop.last %},{% endif %}
         {% endfor %}
     ],

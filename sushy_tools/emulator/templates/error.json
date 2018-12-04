@@ -1,7 +1,7 @@
 {
   "error": {
     "code": "Base.1.0.GeneralError",
-    "message": "{{ message }}",
+    "message": {{ message|string|tojson }},
     "@Message.ExtendedInfo": [
       {
         "@odata.type": "/redfish/v1/$metadata#Message.1.0.0.Message",
