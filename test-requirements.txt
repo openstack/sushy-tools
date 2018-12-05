@@ -17,3 +17,4 @@ stestr>=1.0.0 # Apache-2.0
 testscenarios>=0.4 # Apache-2.0/BSD
 testtools>=2.2.0 # MIT
 munch>=2.1.0 # MIT
+reno>=2.5.0 # Apache-2.0

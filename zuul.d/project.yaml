@@ -4,6 +4,7 @@
       - openstack-python35-jobs
       - openstack-python36-jobs
       - check-requirements
+      - release-notes-jobs-python3
     check:
       jobs:
         - sushy-tools-tempest-dsvm-ironic-ipa-partition-redfish-src
