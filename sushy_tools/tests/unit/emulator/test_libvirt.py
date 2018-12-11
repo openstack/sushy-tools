@@ -11,6 +11,8 @@
 #    under the License.
 
 import libvirt
+import uuid
+
 from oslotest import base
 from six.moves import mock
 
@@ -23,6 +25,40 @@ class LibvirtDriverTestCase(base.BaseTestCase):
     def setUp(self):
         self.test_driver = LibvirtDriver()
         super(LibvirtDriverTestCase, self).setUp()
+
+    @mock.patch('libvirt.open', autospec=True)
+    def test__get_domain_by_name(self, libvirt_mock):
+        domain_id = 'name'
+        domain_info = 'domain'
+
+        conn_mock = libvirt_mock.return_value
+        lookupByName_mock = conn_mock.lookupByName
+        lookupByName_mock.return_value = domain_info
+        lookupByUUID_mock = conn_mock.lookupByUUID
+
+        domain = self.test_driver._get_domain(domain_id)
+
+        self.assertEqual(domain_info, domain)
+        lookupByName_mock.assert_called_once_with(domain_id)
+        self.assertFalse(lookupByUUID_mock.called)
+
+    @mock.patch('libvirt.open', autospec=True)
+    def test__get_domain_by_uuid(self, libvirt_mock):
+        domain_id = uuid.UUID('b9fbc4f5-2c81-4c80-97ea-272621fb7360')
+        domain_info = 'domain'
+
+        conn_mock = libvirt_mock.return_value
+        lookupByName_mock = conn_mock.lookupByName
+        lookupByName_mock.side_effect = libvirt.libvirtError(
+            'domain not found')
+        lookupByUUID_mock = conn_mock.lookupByUUID
+        lookupByUUID_mock.return_value = domain_info
+
+        domain = self.test_driver._get_domain(str(domain_id))
+
+        self.assertEqual(domain_info, domain)
+        lookupByName_mock.assert_called_once_with(str(domain_id))
+        lookupByUUID_mock.assert_called_once_with(domain_id.bytes)
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
     def test_uuid(self, libvirt_mock):
@@ -169,7 +205,8 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         self.assertEqual('Legacy', boot_mode)
 
     @mock.patch('libvirt.open', autospec=True)
-    def test_set_boot_mode(self, libvirt_mock):
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_set_boot_mode(self, libvirt_mock, libvirt_rw_mock):
         with open('sushy_tools/tests/unit/emulator/domain.xml', 'r') as f:
             data = f.read()
 
@@ -179,6 +216,7 @@ class LibvirtDriverTestCase(base.BaseTestCase):
 
         self.test_driver.set_boot_mode('zzzz-yyyy-xxxx', 'Uefi')
 
+        conn_mock = libvirt_rw_mock.return_value
         conn_mock.defineXML.assert_called_once_with(mock.ANY)
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
