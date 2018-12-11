@@ -22,6 +22,7 @@ import sys
 
 from sushy_tools.emulator.drivers import libvirtdriver
 from sushy_tools.emulator.drivers import novadriver
+from sushy_tools import error
 
 import flask
 
@@ -85,6 +86,9 @@ def returns_json(decorated_func):
 @app.errorhandler(Exception)
 @returns_json
 def all_exception_handler(message):
+    if isinstance(message, error.AliasAccessError):
+        url = flask.url_for(flask.request.endpoint, identity=message.args[0])
+        return flask.redirect(url, Response=flask.Response)
     return flask.render_template('error.json', message=message), 500
 
 
@@ -104,8 +108,7 @@ def system_collection_resource():
     app.logger.debug('Serving systems list')
 
     return flask.render_template(
-        'system_collection.json', system_count=len(systems),
-        systems=systems)
+        'system_collection.json', system_count=len(systems), systems=systems)
 
 
 @app.route('/redfish/v1/Systems/<identity>', methods=['GET', 'PATCH'])
@@ -117,7 +120,9 @@ def system_resource(identity):
         app.logger.debug('Serving resources for system "%s"', identity)
 
         return flask.render_template(
-            'system.json', identity=identity,
+            'system.json',
+            identity=identity,
+            name=driver.name(identity),
             uuid=driver.uuid(identity),
             power_state=driver.get_power_state(identity),
             total_memory_gb=driver.get_total_memory(identity),

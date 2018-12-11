@@ -19,6 +19,9 @@ from sushy_tools.emulator import main
 @mock.patch('sushy_tools.emulator.main.driver', autospec=True)
 class EmulatorTestCase(base.BaseTestCase):
 
+    name = 'QEmu-fedora-i686'
+    uuid = 'c7a5fdbd-cdaf-9455-926a-d65c16db1809'
+
     def setUp(self):
         main.driver = None
         self.app = main.app.test_client()
@@ -27,7 +30,7 @@ class EmulatorTestCase(base.BaseTestCase):
 
     def test_error(self, driver_mock):
         driver_mock.get_power_state.side_effect = Exception('Fish is dead')
-        response = self.app.get('/redfish/v1/Systems/xxxx-yyyy-zzzz')
+        response = self.app.get('/redfish/v1/Systems/' + self.uuid)
 
         self.assertEqual('500 INTERNAL SERVER ERROR', response.status)
 
@@ -145,7 +148,7 @@ class EmulatorTestCase(base.BaseTestCase):
     def test_get_bios(self, driver_mock):
         driver_mock.get_bios.return_value = {"attribute 1": "value 1",
                                              "attribute 2": "value 2"}
-        response = self.app.get('/redfish/v1/Systems/xxxx-yyyy-zzzz/BIOS')
+        response = self.app.get('/redfish/v1/Systems/' + self.uuid + '/BIOS')
 
         self.assertEqual('200 OK', response.status)
         self.assertEqual('BIOS', response.json['Id'])
@@ -157,7 +160,7 @@ class EmulatorTestCase(base.BaseTestCase):
         driver_mock.get_bios.return_value = {"attribute 1": "value 1",
                                              "attribute 2": "value 2"}
         response = self.app.get(
-            '/redfish/v1/Systems/xxxx-yyyy-zzzz/BIOS/Settings')
+            '/redfish/v1/Systems/' + self.uuid + '/BIOS/Settings')
 
         self.assertEqual(200, response.status_code)
         self.assertEqual('Settings', response.json['Id'])
@@ -189,34 +192,34 @@ class EmulatorTestCase(base.BaseTestCase):
 
     def test_reset_bios(self, driver_mock):
         self.app.driver = driver_mock
-        response = self.app.post('/redfish/v1/Systems/xxxx-yyyy-zzzz/'
-                                 'BIOS/Actions/Bios.ResetBios')
+        response = self.app.post('/redfish/v1/Systems/' + self.uuid +
+                                 '/BIOS/Actions/Bios.ResetBios')
 
         self.assertEqual(204, response.status_code)
-        driver_mock.reset_bios.assert_called_once_with('xxxx-yyyy-zzzz')
+        driver_mock.reset_bios.assert_called_once_with(self.uuid)
 
     def test_ethernet_interfaces_collection(self, driver_mock):
         driver_mock.get_nics.return_value = [{'id': 'nic1',
                                               'mac': '52:54:00:4e:5d:37'},
                                              {'id': 'nic2',
                                               'mac': '00:11:22:33:44:55'}]
-        response = self.app.get('redfish/v1/Systems/xxx-yyy-zzz/'
-                                'EthernetInterfaces')
+        response = self.app.get('redfish/v1/Systems/' + self.uuid +
+                                '/EthernetInterfaces')
 
         self.assertEqual(200, response.status_code)
         self.assertEqual('Ethernet Interface Collection',
                          response.json['Name'])
         self.assertEqual(2, response.json['Members@odata.count'])
-        self.assertEqual(['/redfish/v1/Systems/xxx-yyy-zzz/'
-                          'EthernetInterfaces/nic1',
-                          '/redfish/v1/Systems/xxx-yyy-zzz/'
-                          'EthernetInterfaces/nic2'],
+        self.assertEqual(['/redfish/v1/Systems/' + self.uuid +
+                          '/EthernetInterfaces/nic1',
+                          '/redfish/v1/Systems/' + self.uuid +
+                          '/EthernetInterfaces/nic2'],
                          [m['@odata.id'] for m in response.json['Members']])
 
     def test_ethernet_interfaces_collection_empty(self, driver_mock):
         driver_mock.get_nics.return_value = []
-        response = self.app.get('redfish/v1/Systems/xxx-yyy-zzz/'
-                                'EthernetInterfaces')
+        response = self.app.get('redfish/v1/Systems/' + self.uuid +
+                                '/EthernetInterfaces')
 
         self.assertEqual(200, response.status_code)
         self.assertEqual('Ethernet Interface Collection',
@@ -229,8 +232,8 @@ class EmulatorTestCase(base.BaseTestCase):
                                               'mac': '52:54:00:4e:5d:37'},
                                              {'id': 'nic2',
                                               'mac': '00:11:22:33:44:55'}]
-        response = self.app.get('/redfish/v1/Systems/xxx-yyy-zzz/'
-                                'EthernetInterfaces/nic2')
+        response = self.app.get('/redfish/v1/Systems/' + self.uuid +
+                                '/EthernetInterfaces/nic2')
 
         self.assertEqual(200, response.status_code)
         self.assertEqual('nic2', response.json['Id'])
@@ -239,8 +242,8 @@ class EmulatorTestCase(base.BaseTestCase):
                          response.json['PermanentMACAddress'])
         self.assertEqual('00:11:22:33:44:55',
                          response.json['MACAddress'])
-        self.assertEqual('/redfish/v1/Systems/xxx-yyy-zzz/'
-                         'EthernetInterfaces/nic2',
+        self.assertEqual('/redfish/v1/Systems/' + self.uuid +
+                         '/EthernetInterfaces/nic2',
                          response.json['@odata.id'])
 
     def test_ethernet_interface_not_found(self, driver_mock):
@@ -248,7 +251,7 @@ class EmulatorTestCase(base.BaseTestCase):
                                               'mac': '52:54:00:4e:5d:37'},
                                              {'id': 'nic2',
                                              'mac': '00:11:22:33:44:55'}]
-        response = self.app.get('/redfish/v1/Systems/xxx-yyy-zzz/'
-                                'EthernetInterfaces/nic3')
+        response = self.app.get('/redfish/v1/Systems/' + self.uuid +
+                                '/EthernetInterfaces/nic3')
 
         self.assertEqual(404, response.status_code)

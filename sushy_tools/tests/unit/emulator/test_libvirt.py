@@ -9,18 +9,20 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-
-import libvirt
 import uuid
 
+import libvirt
 from oslotest import base
 from six.moves import mock
 
 from sushy_tools.emulator.drivers.libvirtdriver import LibvirtDriver
-from sushy_tools.error import FishyError
+from sushy_tools import error
 
 
 class LibvirtDriverTestCase(base.BaseTestCase):
+
+    name = 'QEmu-fedora-i686'
+    uuid = 'c7a5fdbd-cdaf-9455-926a-d65c16db1809'
 
     def setUp(self):
         self.test_driver = LibvirtDriver()
@@ -28,140 +30,130 @@ class LibvirtDriverTestCase(base.BaseTestCase):
 
     @mock.patch('libvirt.open', autospec=True)
     def test__get_domain_by_name(self, libvirt_mock):
-        domain_id = 'name'
-        domain_info = 'domain'
-
         conn_mock = libvirt_mock.return_value
-        lookupByName_mock = conn_mock.lookupByName
-        lookupByName_mock.return_value = domain_info
         lookupByUUID_mock = conn_mock.lookupByUUID
-
-        domain = self.test_driver._get_domain(domain_id)
-
-        self.assertEqual(domain_info, domain)
-        lookupByName_mock.assert_called_once_with(domain_id)
-        self.assertFalse(lookupByUUID_mock.called)
+        domain_mock = lookupByUUID_mock.return_value
+        domain_mock.UUIDString.return_value = self.uuid
+        self.assertRaises(
+            error.AliasAccessError, self.test_driver._get_domain, self.name)
 
     @mock.patch('libvirt.open', autospec=True)
     def test__get_domain_by_uuid(self, libvirt_mock):
-        domain_id = uuid.UUID('b9fbc4f5-2c81-4c80-97ea-272621fb7360')
-        domain_info = 'domain'
+        domain_id = uuid.UUID(self.uuid)
 
         conn_mock = libvirt_mock.return_value
-        lookupByName_mock = conn_mock.lookupByName
-        lookupByName_mock.side_effect = libvirt.libvirtError(
-            'domain not found')
         lookupByUUID_mock = conn_mock.lookupByUUID
-        lookupByUUID_mock.return_value = domain_info
-
-        domain = self.test_driver._get_domain(str(domain_id))
-
-        self.assertEqual(domain_info, domain)
-        lookupByName_mock.assert_called_once_with(str(domain_id))
+        self.test_driver._get_domain(str(domain_id))
         lookupByUUID_mock.assert_called_once_with(domain_id.bytes)
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
     def test_uuid(self, libvirt_mock):
         conn_mock = libvirt_mock.return_value
         domain_mock = conn_mock.lookupByName.return_value
-        domain_mock.UUIDString.return_value = 'zzzz-yyyy-xxxx'
-        uuid = self.test_driver.uuid('name')
-        self.assertEqual('zzzz-yyyy-xxxx', uuid)
+        domain_mock.UUIDString.return_value = self.uuid
+        self.assertRaises(error.AliasAccessError,
+                          self.test_driver.uuid, 'name')
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
     def test_systems(self, libvirt_mock):
         conn_mock = libvirt_mock.return_value
-        conn_mock.listDefinedDomains.return_value = ['host0', 'host1']
+        domain = mock.MagicMock()
+        domain.UUIDString.return_value = self.uuid
+        conn_mock.listDefinedDomains.return_value = [domain]
         systems = self.test_driver.systems
-        self.assertEqual(['host0', 'host1'], systems)
+        self.assertEqual([self.uuid], systems)
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
     def test_get_power_state_on(self, libvirt_mock):
         conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByName.return_value
-        domain_mock.isActive.return_value = True
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.UUIDString.return_value = self.uuid
 
-        power_state = self.test_driver.get_power_state('zzzz-yyyy-xxxx')
+        domain_mock.isActive.return_value = True
+        domain_mock.maxMemory.return_value = 1024 * 1024
+        domain_mock.maxVcpus.return_value = 2
+
+        power_state = self.test_driver.get_power_state(self.uuid)
 
         self.assertEqual('On', power_state)
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
     def test_get_power_state_off(self, libvirt_mock):
         conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.isActive.return_value = False
 
-        power_state = self.test_driver.get_power_state('zzzz-yyyy-xxxx')
+        power_state = self.test_driver.get_power_state(self.uuid)
 
         self.assertEqual('Off', power_state)
 
     @mock.patch('libvirt.open', autospec=True)
     def test_set_power_state_on(self, libvirt_mock):
         conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.isActive.return_value = False
 
-        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'On')
+        self.test_driver.set_power_state(self.uuid, 'On')
 
         domain_mock.create.assert_called_once_with()
 
     @mock.patch('libvirt.open', autospec=True)
     def test_set_power_state_forceon(self, libvirt_mock):
         conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.isActive.return_value = False
 
-        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'ForceOn')
+        self.test_driver.set_power_state(self.uuid, 'ForceOn')
 
         domain_mock.create.assert_called_once_with()
 
     @mock.patch('libvirt.open', autospec=True)
     def test_set_power_state_forceoff(self, libvirt_mock):
         conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.isActive.return_value = True
 
-        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'ForceOff')
+        self.test_driver.set_power_state(self.uuid, 'ForceOff')
 
         domain_mock.destroy.assert_called_once_with()
 
     @mock.patch('libvirt.open', autospec=True)
     def test_set_power_state_gracefulshutdown(self, libvirt_mock):
         conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.isActive.return_value = True
 
-        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'GracefulShutdown')
+        self.test_driver.set_power_state(self.uuid, 'GracefulShutdown')
 
         domain_mock.shutdown.assert_called_once_with()
 
     @mock.patch('libvirt.open', autospec=True)
     def test_set_power_state_gracefulrestart(self, libvirt_mock):
         conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.isActive.return_value = True
 
-        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'GracefulRestart')
+        self.test_driver.set_power_state(self.uuid, 'GracefulRestart')
 
         domain_mock.reboot.assert_called_once_with()
 
     @mock.patch('libvirt.open', autospec=True)
     def test_set_power_state_forcerestart(self, libvirt_mock):
         conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.isActive.return_value = True
 
-        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'ForceRestart')
+        self.test_driver.set_power_state(self.uuid, 'ForceRestart')
 
         domain_mock.reset.assert_called_once_with()
 
     @mock.patch('libvirt.open', autospec=True)
     def test_set_power_state_nmi(self, libvirt_mock):
         conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.isActive.return_value = True
 
-        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'Nmi')
+        self.test_driver.set_power_state(self.uuid, 'Nmi')
 
         domain_mock.injectNMI.assert_called_once_with()
 
@@ -171,10 +163,10 @@ class LibvirtDriverTestCase(base.BaseTestCase):
             data = f.read()
 
         conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = data
 
-        boot_device = self.test_driver.get_boot_device('zzzz-yyyy-xxxx')
+        boot_device = self.test_driver.get_boot_device(self.uuid)
 
         self.assertEqual('Cd', boot_device)
 
@@ -184,10 +176,10 @@ class LibvirtDriverTestCase(base.BaseTestCase):
             data = f.read()
 
         conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = data
 
-        self.test_driver.set_boot_device('zzzz-yyyy-xxxx', 'Hdd')
+        self.test_driver.set_boot_device(self.uuid, 'Hdd')
 
         conn_mock.defineXML.assert_called_once_with(mock.ANY)
 
@@ -197,10 +189,10 @@ class LibvirtDriverTestCase(base.BaseTestCase):
             data = f.read()
 
         conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = data
 
-        boot_mode = self.test_driver.get_boot_mode('zzzz-yyyy-xxxx')
+        boot_mode = self.test_driver.get_boot_mode(self.uuid)
 
         self.assertEqual('Legacy', boot_mode)
 
@@ -211,10 +203,10 @@ class LibvirtDriverTestCase(base.BaseTestCase):
             data = f.read()
 
         conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = data
 
-        self.test_driver.set_boot_mode('zzzz-yyyy-xxxx', 'Uefi')
+        self.test_driver.set_boot_mode(self.uuid, 'Uefi')
 
         conn_mock = libvirt_rw_mock.return_value
         conn_mock.defineXML.assert_called_once_with(mock.ANY)
@@ -222,22 +214,22 @@ class LibvirtDriverTestCase(base.BaseTestCase):
     @mock.patch('libvirt.openReadOnly', autospec=True)
     def test_get_total_memory(self, libvirt_mock):
         conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.maxMemory.return_value = 1024 * 1024
 
-        memory = self.test_driver.get_total_memory('zzzz-yyyy-xxxx')
+        memory = self.test_driver.get_total_memory(self.uuid)
 
         self.assertEqual(1, memory)
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
     def test_get_total_cpus(self, libvirt_mock):
         conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.isActive.return_value = True
         domain_mock.XMLDesc.return_value = b'<empty/>'
         domain_mock.maxVcpus.return_value = 2
 
-        cpus = self.test_driver.get_total_cpus('zzzz-yyyy-xxxx')
+        cpus = self.test_driver.get_total_cpus(self.uuid)
 
         self.assertEqual(2, cpus)
 
@@ -247,10 +239,10 @@ class LibvirtDriverTestCase(base.BaseTestCase):
             domain_xml = f.read()
 
         conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = domain_xml
 
-        bios_attributes = self.test_driver.get_bios('xxx-yyy-zzz')
+        bios_attributes = self.test_driver.get_bios(self.uuid)
         self.assertEqual(LibvirtDriver.DEFAULT_BIOS_ATTRIBUTES,
                          bios_attributes)
         conn_mock.defineXML.assert_called_once_with(mock.ANY)
@@ -261,10 +253,10 @@ class LibvirtDriverTestCase(base.BaseTestCase):
             domain_xml = f.read()
 
         conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = domain_xml
 
-        bios_attributes = self.test_driver.get_bios('xxx-yyy-zzz')
+        bios_attributes = self.test_driver.get_bios(self.uuid)
         self.assertEqual({"BootMode": "Bios",
                           "EmbeddedSata": "Raid",
                           "NicBoot1": "NetworkBoot",
@@ -278,10 +270,10 @@ class LibvirtDriverTestCase(base.BaseTestCase):
             domain_xml = f.read()
 
         conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = domain_xml
 
-        self.test_driver.set_bios('xxx-yyy-zzz',
+        self.test_driver.set_bios(self.uuid,
                                   {"BootMode": "Uefi",
                                    "ProcTurboMode": "Enabled"})
         conn_mock.defineXML.assert_called_once_with(mock.ANY)
@@ -292,10 +284,10 @@ class LibvirtDriverTestCase(base.BaseTestCase):
             domain_xml = f.read()
 
         conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = domain_xml
 
-        self.test_driver.reset_bios('xxx-yyy-zzz')
+        self.test_driver.reset_bios(self.uuid)
         conn_mock.defineXML.assert_called_once_with(mock.ANY)
 
     def test__process_bios_attributes_get_default(self):
@@ -358,12 +350,12 @@ class LibvirtDriverTestCase(base.BaseTestCase):
             domain_xml = f.read()
 
         conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = domain_xml
         conn_mock.defineXML.side_effect = libvirt.libvirtError(
             'because I can')
 
-        self.assertRaises(FishyError,
+        self.assertRaises(error.FishyError,
                           self.test_driver._process_bios,
                           'xxx-yyy-zzz',
                           {"BootMode": "Uefi",
@@ -375,10 +367,10 @@ class LibvirtDriverTestCase(base.BaseTestCase):
             domain_xml = f.read()
 
         conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = domain_xml
 
-        nics = self.test_driver.get_nics('xxx-yyy-zzz')
+        nics = self.test_driver.get_nics(self.uuid)
         self.assertEqual([{'id': '00:11:22:33:44:55',
                            'mac': '00:11:22:33:44:55'},
                           {'id': '52:54:00:4e:5d:37',
@@ -391,8 +383,8 @@ class LibvirtDriverTestCase(base.BaseTestCase):
             domain_xml = f.read()
 
         conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByName.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = domain_xml
 
-        nics = self.test_driver.get_nics('xxx-yyy-zzz')
+        nics = self.test_driver.get_nics(self.uuid)
         self.assertEqual([], nics)

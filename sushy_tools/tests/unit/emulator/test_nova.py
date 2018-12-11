@@ -23,6 +23,9 @@ from sushy_tools import error
 
 class NovaDriverTestCase(base.BaseTestCase):
 
+    name = 'QEmu-fedora-i686'
+    uuid = 'c7a5fdbd-cdaf-9455-926a-d65c16db1809'
+
     def setUp(self):
         self.nova_patcher = mock.patch('openstack.connect', autospec=True)
         self.nova_mock = self.nova_patcher.start()
@@ -36,89 +39,88 @@ class NovaDriverTestCase(base.BaseTestCase):
         super(NovaDriverTestCase, self).tearDown()
 
     def test_uuid(self):
-        server = mock.Mock(id='zzzz-yyyy-xxxx')
+        server = mock.Mock(id=self.uuid)
         self.nova_mock.return_value.get_server.return_value = server
-        uuid = self.test_driver.uuid('zzzz-yyyy-xxxx')
-        self.assertEqual('zzzz-yyyy-xxxx', uuid)
+        uuid = self.test_driver.uuid(self.uuid)
+        self.assertEqual(self.uuid, uuid)
 
     def test_systems(self):
         server0 = mock.Mock(id='host0')
         server1 = mock.Mock(id='host1')
         self.nova_mock.return_value.list_servers.return_value = [
             server0, server1]
-
         systems = self.test_driver.systems
 
         self.assertEqual(['host0', 'host1'], systems)
 
     def test_get_power_state_on(self,):
-        server = mock.Mock(id='zzzz-yyyy-xxxx',
+        server = mock.Mock(id=self.uuid,
                            power_state=1)
         self.nova_mock.return_value.get_server.return_value = server
 
-        power_state = self.test_driver.get_power_state('zzzz-yyyy-xxxx')
+        power_state = self.test_driver.get_power_state(self.uuid)
 
         self.assertEqual('On', power_state)
 
     def test_get_power_state_off(self):
-        server = mock.Mock(id='zzzz-yyyy-xxxx',
+        server = mock.Mock(id=self.uuid,
                            power_state=0)
         self.nova_mock.return_value.get_server.return_value = server
 
-        power_state = self.test_driver.get_power_state('zzzz-yyyy-xxxx')
+        power_state = self.test_driver.get_power_state(self.uuid)
 
         self.assertEqual('Off', power_state)
 
     def test_set_power_state_on(self):
-        server = mock.Mock(id='zzzz-yyyy-xxxx', power_state=0)
+        server = mock.Mock(id=self.uuid, power_state=0)
         self.nova_mock.return_value.get_server.return_value = server
-        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'On')
+        self.test_driver.set_power_state(self.uuid, 'On')
         compute = self.nova_mock.return_value.compute
-        compute.start_server.assert_called_once_with('zzzz-yyyy-xxxx')
+        compute.start_server.assert_called_once_with(self.uuid)
 
     def test_set_power_state_forceon(self):
-        server = mock.Mock(id='zzzz-yyyy-xxxx', power_state=0)
+        server = mock.Mock(id=self.uuid, power_state=0)
         self.nova_mock.return_value.get_server.return_value = server
-        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'ForceOn')
+        self.test_driver.set_power_state(self.uuid, 'ForceOn')
         compute = self.nova_mock.return_value.compute
-        compute.start_server.assert_called_once_with('zzzz-yyyy-xxxx')
+        compute.start_server.assert_called_once_with(self.uuid)
 
     def test_set_power_state_forceoff(self):
-        server = mock.Mock(id='zzzz-yyyy-xxxx', power_state=1)
+        server = mock.Mock(id=self.uuid, power_state=1)
         self.nova_mock.return_value.get_server.return_value = server
-        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'ForceOff')
+        self.test_driver.set_power_state(self.uuid, 'ForceOff')
         compute = self.nova_mock.return_value.compute
-        compute.stop_server.assert_called_once_with('zzzz-yyyy-xxxx')
+        compute.stop_server.assert_called_once_with(self.uuid)
 
     def test_set_power_state_gracefulshutdown(self):
-        server = mock.Mock(id='zzzz-yyyy-xxxx', power_state=1)
+        server = mock.Mock(id=self.uuid, power_state=1)
         self.nova_mock.return_value.get_server.return_value = server
-        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'GracefulShutdown')
+        self.test_driver.set_power_state(self.uuid, 'GracefulShutdown')
         compute = self.nova_mock.return_value.compute
-        compute.stop_server.assert_called_once_with('zzzz-yyyy-xxxx')
+        compute.stop_server.assert_called_once_with(self.uuid)
 
     def test_set_power_state_gracefulrestart(self):
-        server = mock.Mock(id='zzzz-yyyy-xxxx', power_state=1)
+        server = mock.Mock(id=self.uuid, power_state=1)
         self.nova_mock.return_value.get_server.return_value = server
-        self.test_driver.set_power_state('zzzz-yyyy-xxxx', 'GracefulRestart')
+        self.test_driver.set_power_state(self.uuid, 'GracefulRestart')
         compute = self.nova_mock.return_value.compute
         compute.reboot_server.assert_called_once_with(
-            'zzzz-yyyy-xxxx', reboot_type='SOFT')
+            self.uuid, reboot_type='SOFT')
 
     def test_set_power_state_forcerestart(self):
-        server = mock.Mock(id='zzzz-yyyy-xxxx', power_state=1)
+        server = mock.Mock(id=self.uuid, power_state=1)
         self.nova_mock.return_value.get_server.return_value = server
         self.test_driver.set_power_state(
-            'zzzz-yyyy-xxxx', 'ForceRestart')
+            self.uuid, 'ForceRestart')
         compute = self.nova_mock.return_value.compute
         compute.reboot_server.assert_called_once_with(
-            'zzzz-yyyy-xxxx', reboot_type='HARD')
+            self.uuid, reboot_type='HARD')
 
     def test_get_boot_device(self):
-        server = mock.Mock(id='zzzz-yyyy-xxxx')
+        server = mock.Mock(id=self.uuid)
         self.nova_mock.return_value.get_server.return_value = server
 
-        boot_device = self.test_driver.get_boot_device('zzzz-yyyy-xxxx')
+        boot_device = self.test_driver.get_boot_device(self.uuid)
 
         self.assertEqual('Pxe', boot_device)
         get_server_metadata = (
@@ -126,58 +128,70 @@ class NovaDriverTestCase(base.BaseTestCase):
         get_server_metadata.assert_called_once_with(server.id)
 
     def test_set_boot_device(self):
-        server = mock.Mock(id='zzzz-yyyy-xxxx')
+        server = mock.Mock(id=self.uuid)
         self.nova_mock.return_value.get_server.return_value = server
 
         compute = self.nova_mock.return_value.compute
         set_server_metadata = compute.set_server_metadata
 
-        self.test_driver.set_boot_device('zzzz-yyyy-xxxx', 'Pxe')
+        self.test_driver.set_boot_device(self.uuid, 'Pxe')
 
         set_server_metadata.assert_called_once_with(
-            'zzzz-yyyy-xxxx', **{'libvirt:pxe-first': '1'}
+            self.uuid, **{'libvirt:pxe-first': '1'}
         )
 
     def test_get_boot_mode(self):
+        server = mock.Mock(id=self.uuid, image=dict(id=self.uuid))
+        self.nova_mock.return_value.get_server.return_value = server
+
         image = mock.Mock(hw_firmware_type='bios')
         self.nova_mock.return_value.image.find_image.return_value = image
 
-        boot_mode = self.test_driver.get_boot_mode('zzzz-yyyy-xxxx')
+        boot_mode = self.test_driver.get_boot_mode(self.uuid)
 
         self.assertEqual('Legacy', boot_mode)
 
     def test_set_boot_mode(self):
         self.assertRaises(
             error.FishyError, self.test_driver.set_boot_mode,
-            'zzzz-yyyy-xxxx', 'Legacy')
+            self.uuid, 'Legacy')
 
     def test_get_total_memory(self):
+        server = mock.Mock(id=self.uuid)
+        self.nova_mock.return_value.get_server.return_value = server
+
         flavor = mock.Mock(ram=1024)
         self.nova_mock.return_value.get_flavor.return_value = flavor
 
-        memory = self.test_driver.get_total_memory('zzzz-yyyy-xxxx')
+        memory = self.test_driver.get_total_memory(self.uuid)
 
         self.assertEqual(1, memory)
 
     def test_get_total_cpus(self):
+        server = mock.Mock(id=self.uuid)
+        self.nova_mock.return_value.get_server.return_value = server
+
         flavor = mock.Mock(vcpus=2)
         self.nova_mock.return_value.get_flavor.return_value = flavor
 
-        cpus = self.test_driver.get_total_cpus('zzzz-yyyy-xxxx')
+        cpus = self.test_driver.get_total_cpus(self.uuid)
 
         self.assertEqual(2, cpus)
 
     def test_get_bios(self):
-        self.assertRaises(error.FishyError, self.test_driver.get_bios,
-                          'xxx-yyy-zzz')
+        self.assertRaises(
+            error.FishyError, self.test_driver.get_bios, self.uuid)
 
     def test_set_bios(self):
-        self.assertRaises(error.FishyError, self.test_driver.set_bios,
-                          'xxx-yyy-zzz', {'attribute 1': 'value 1'})
+        self.assertRaises(
+            error.FishyError,
+            self.test_driver.set_bios,
+            self.uuid,
+            {'attribute 1': 'value 1'})
 
     def test_reset_bios(self):
-        self.assertRaises(error.FishyError, self.test_driver.reset_bios,
-                          'xxx-yyy-zzz')
+        self.assertRaises(
+            error.FishyError, self.test_driver.reset_bios, self.uuid)
 
     def test_get_nics(self):
         addresses = Munch(
@@ -199,10 +213,13 @@ class NovaDriverTestCase(base.BaseTestCase):
                        u'version': 4,
                        u'addr': u'10.0.0.10',
                        u'OS-EXT-IPS:type': u'fixed'})]})
-        server = mock.Mock(addresses=addresses)
+
+        server = mock.Mock(id=self.uuid, addresses=addresses)
         self.nova_mock.return_value.get_server.return_value = server
 
-        nics = self.test_driver.get_nics('xxxx-yyyy-zzzz')
+        test_driver = OpenStackDriver('fake-cloud')
+        nics = test_driver.get_nics(self.uuid)
+
         self.assertEqual([{'id': 'fa:16:3e:22:18:31',
                            'mac': 'fa:16:3e:22:18:31'},
                           {'id': 'fa:16:3e:46:e3:ac',
@@ -210,9 +227,10 @@ class NovaDriverTestCase(base.BaseTestCase):
                          sorted(nics, key=lambda k: k['id']))
 
     def test_get_nics_empty(self):
-        server = mock.Mock(addresses=None)
+        server = mock.Mock(id=self.uuid, addresses=None)
         self.nova_mock.return_value.get_server.return_value = server
-        nics = self.test_driver.get_nics('xxxx-yyyy-zzzz')
+        test_driver = OpenStackDriver('fake-cloud')
+        nics = test_driver.get_nics(self.uuid)
         self.assertEqual(set(), nics)
 
     def test_get_nics_error(self):
@@ -231,9 +249,9 @@ class NovaDriverTestCase(base.BaseTestCase):
                        u'version': 4,
                        u'addr': u'10.0.0.10',
                        u'OS-EXT-IPS:type': u'fixed'})]})
-        server = mock.Mock(addresses=addresses)
+
+        server = mock.Mock(id=self.uuid, addresses=addresses)
         self.nova_mock.return_value.get_server.return_value = server
-        nics = self.test_driver.get_nics('xxxx-yyyy-zzzz')
+        nics = self.test_driver.get_nics(self.uuid)
         self.assertEqual([{'id': 'fa:16:3e:22:18:31',
-                           'mac': 'fa:16:3e:22:18:31'}],
-                         nics)
+                           'mac': 'fa:16:3e:22:18:31'}], nics)
