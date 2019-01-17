@@ -144,7 +144,7 @@ class LibvirtDriver(AbstractDriver):
         """
         with libvirt_open(self._uri, readonly=True) as conn:
             return [domain.UUIDString()
-                    for domain in conn.listDefinedDomains()]
+                    for domain in conn.listAllDomains(0)]
 
     def uuid(self, identity):
         """Get computer system UUID
