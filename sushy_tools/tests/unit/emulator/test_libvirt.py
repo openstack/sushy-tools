@@ -25,7 +25,7 @@ class LibvirtDriverTestCase(base.BaseTestCase):
     uuid = 'c7a5fdbd-cdaf-9455-926a-d65c16db1809'
 
     def setUp(self):
-        self.test_driver = LibvirtDriver()
+        self.test_driver = LibvirtDriver({})
         super(LibvirtDriverTestCase, self).setUp()
 
     @mock.patch('libvirt.open', autospec=True)
@@ -210,6 +210,22 @@ class LibvirtDriverTestCase(base.BaseTestCase):
 
         conn_mock = libvirt_rw_mock.return_value
         conn_mock.defineXML.assert_called_once_with(mock.ANY)
+
+    @mock.patch('libvirt.open', autospec=True)
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_set_boot_mode_unknown_path(self, libvirt_mock, libvirt_rw_mock):
+        with open('sushy_tools/tests/unit/emulator/domain.xml', 'r') as f:
+            data = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = data
+
+        with mock.patch.dict(
+                self.test_driver.KNOWN_BOOT_LOADERS, {}, clear=True):
+            self.assertRaises(
+                error.FishyError, self.test_driver.set_boot_mode,
+                self.uuid, 'Uefi')
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
     def test_get_total_memory(self, libvirt_mock):

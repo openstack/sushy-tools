@@ -85,16 +85,16 @@ class LibvirtDriver(AbstractDriver):
 
     BOOT_MODE_MAP_REV = {v: k for k, v in BOOT_MODE_MAP.items()}
 
-    # NOTE(etingof): we have these firmware blobs hardcoded here
-    # which seems to work for CentOS, for instance.
-    # What's not clear is how to adapt to possible different
-    # boot loaders paths dependent on libvirt packaging and custom
-    # domain configuration...
     BOOT_LOADER_MAP = {
         'Uefi': {
             'x86_64': '/usr/share/OVMF/OVMF_CODE.fd',
             'aarch64': '/usr/share/AAVMF/AAVMF_CODE.fd'
+        },
+        'Legacy': {
+            'x86_64': None,
+            'aarch64': None
         }
+
     }
 
     DEFAULT_BIOS_ATTRIBUTES = {"BootMode": "Uefi",
@@ -102,8 +102,14 @@ class LibvirtDriver(AbstractDriver):
                                "NicBoot1": "NetworkBoot",
                                "ProcTurboMode": "Enabled"}
 
-    def __init__(self, uri=None):
+    def __init__(self, config, uri=None):
+        self._config = config
         self._uri = uri or self.LIBVIRT_URI
+        self.BOOT_LOADER_MAP = self._config.get(
+            'SUSHY_EMULATOR_BOOT_LOADER_MAP', self.BOOT_LOADER_MAP)
+        self.KNOWN_BOOT_LOADERS = set(y
+                                      for x in self.BOOT_LOADER_MAP.values()
+                                      for y in x.values())
 
     def _get_domain(self, identity, readonly=False):
         with libvirt_open(self._uri, readonly=readonly) as conn:
@@ -325,6 +331,8 @@ class LibvirtDriver(AbstractDriver):
 
             raise error.FishyError(msg)
 
+        loaders = []
+
         for os_element in tree.findall('os'):
             type_element = os_element.find('type')
             if type_element is None:
@@ -333,33 +341,56 @@ class LibvirtDriver(AbstractDriver):
                 os_arch = type_element.get('arch')
 
             try:
-                loader_path = self.BOOT_LOADER_MAP[boot_mode][os_arch]
+                loader_path = self.BOOT_DEVICE_MAP[boot_mode][os_arch]
 
             except KeyError:
-                # NOTE(etingof): assume no specific boot loader
+                logger.warning('Boot loader is not configured for '
+                               'boot mode %s and OS architecture %s. '
+                               'Assuming no specific boot loader.',
+                               boot_mode, os_arch)
                 loader_path = ''
 
-            # Update all "loader" elements
+            # NOTE(etingof): here we collect all tree nodes to be
+            # updated, but do not update them yet. The reason is to
+            # make sure that previously configured boot loaders are
+            # all present in our configuration, so we won't lose it
+            # when setting ours.
+
             for loader_element in os_element.findall('loader'):
-                loader_element.set('type', loader_type)
-                # NOTE(etingof): here we override previous boot loader for
-                # for the domain. If it's different than what we have
-                # hardcoded in the BOOT_LOADER_MAP, we won't be able to
-                # revert back to the original boor loader should we change
-                # domain boot mode.
-                loader_element.text = loader_path
-
-            with libvirt_open(self._uri) as conn:
-
-                try:
-                    conn.defineXML(ET.tostring(tree).decode('utf-8'))
-
-                except libvirt.libvirtError as e:
-                    msg = ('Error changing boot mode at libvirt URI '
-                           '"%(uri)s": %(error)s' % {'uri': self._uri,
-                                                     'error': e})
-
+                if loader_element.text not in self.KNOWN_BOOT_LOADERS:
+                    msg = ('Unknown boot loader path "%(path)s" in domain '
+                           '"%(identity)s" configuration encountered while '
+                           'setting boot mode "%(mode)s", system architecture '
+                           '"%(arch)s". Consider adding this loader path to '
+                           'emulator config.' % {'identity': identity,
+                                                 'mode': boot_mode,
+                                                 'arch': os_arch,
+                                                 'path': loader_element.text})
                     raise error.FishyError(msg)
+
+                loaders.append((loader_element, loader_path))
+
+        if not loaders:
+            msg = ('Can\'t set boot mode because no "os" elements are present '
+                   'in domain "%(identity)s" or not a single "os" element has '
+                   '"loader" configured.' % {'identity': identity})
+            raise error.FishyError(msg)
+
+        for loader_element, loader_path in loaders:
+            loader_element.set('type', loader_type)
+            loader_element.text = loader_path
+
+        with libvirt_open(self._uri) as conn:
+
+            try:
+                conn.defineXML(ET.tostring(tree).decode('utf-8'))
+
+            except libvirt.libvirtError as e:
+                msg = ('Error changing boot mode at libvirt URI '
+                       '"%(uri)s": %(error)s' % {'uri': self._uri,
+                                                 'error': e})
+
+                raise error.FishyError(msg)
 
     def get_total_memory(self, identity):
         """Get computer system total memory

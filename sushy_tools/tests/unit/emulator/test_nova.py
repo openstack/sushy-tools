@@ -30,7 +30,7 @@ class NovaDriverTestCase(base.BaseTestCase):
         self.nova_patcher = mock.patch('openstack.connect', autospec=True)
         self.nova_mock = self.nova_patcher.start()
 
-        self.test_driver = OpenStackDriver('fake-cloud')
+        self.test_driver = OpenStackDriver({}, 'fake-cloud')
 
         super(NovaDriverTestCase, self).setUp()
 
@@ -216,10 +216,7 @@ class NovaDriverTestCase(base.BaseTestCase):
 
         server = mock.Mock(id=self.uuid, addresses=addresses)
         self.nova_mock.return_value.get_server.return_value = server
-
-        test_driver = OpenStackDriver('fake-cloud')
-        nics = test_driver.get_nics(self.uuid)
-
+        nics = self.test_driver.get_nics(self.uuid)
         self.assertEqual([{'id': 'fa:16:3e:22:18:31',
                            'mac': 'fa:16:3e:22:18:31'},
                           {'id': 'fa:16:3e:46:e3:ac',
@@ -229,8 +226,7 @@ class NovaDriverTestCase(base.BaseTestCase):
     def test_get_nics_empty(self):
         server = mock.Mock(id=self.uuid, addresses=None)
         self.nova_mock.return_value.get_server.return_value = server
-        test_driver = OpenStackDriver('fake-cloud')
-        nics = test_driver.get_nics(self.uuid)
+        nics = self.test_driver.get_nics(self.uuid)
         self.assertEqual(set(), nics)
 
     def test_get_nics_error(self):
