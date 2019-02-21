@@ -9,7 +9,7 @@
       - publish-openstack-docs-pti
     check:
       jobs:
-        - sushy-tools-tempest-dsvm-ironic-ipa-partition-redfish-src
+        - sushy-tools-tempest-ironic-partition-redfish-src
     gate:
       jobs:
-        - sushy-tools-tempest-dsvm-ironic-ipa-partition-redfish-src
+        - sushy-tools-tempest-ironic-partition-redfish-src
