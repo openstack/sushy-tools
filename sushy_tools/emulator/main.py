@@ -14,19 +14,20 @@
 #    under the License.
 
 import argparse
+from datetime import datetime
 import functools
 import json
 import os
 import ssl
 import sys
 
+from sushy_tools.emulator.resources.managers import staticdriver
 from sushy_tools.emulator.resources.systems import libvirtdriver
 from sushy_tools.emulator.resources.systems import novadriver
 from sushy_tools import error
 from sushy_tools.error import FishyError
 
 import flask
-
 
 app = flask.Flask(__name__)
 # Turn off strict_slashes on all routes
@@ -36,6 +37,7 @@ app.url_map.strict_slashes = False
 class Resources(object):
 
     SYSTEMS = None
+    MANAGERS = None
 
     def __new__(cls, *args, **kwargs):
 
@@ -75,14 +77,23 @@ class Resources(object):
                 'Initialized system resource backed by %s '
                 'driver', cls.SYSTEMS().driver)
 
+        if cls.MANAGERS is None:
+            cls.MANAGERS = staticdriver.StaticDriver.initialize(app.config)
+
+            app.logger.debug(
+                'Initialized manager resource backed by %s '
+                'driver', cls.MANAGERS().driver)
+
         return super(Resources, cls).__new__(cls, *args, **kwargs)
 
     def __enter__(self):
         self.systems = self.SYSTEMS()
+        self.managers = self.MANAGERS()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         del self.systems
+        del self.managers
 
 
 def instance_denied(**kwargs):
@@ -145,6 +156,50 @@ def root_resource():
     return flask.render_template('root.json')
 
 
+@app.route('/redfish/v1/Managers')
+@returns_json
+def manager_collection_resource():
+    with Resources() as resources:
+
+        app.logger.debug('Serving managers list')
+
+        return flask.render_template(
+            'manager_collection.json',
+            manager_count=len(resources.managers.managers),
+            managers=resources.managers.managers)
+
+
+@app.route('/redfish/v1/Managers/<identity>', methods=['GET'])
+@returns_json
+def manager_resource(identity):
+    if flask.request.method == 'GET':
+
+        with Resources() as resources:
+
+            app.logger.debug('Serving resources for manager "%s"', identity)
+
+            managers = resources.managers
+
+            uuid = managers.uuid(identity)
+
+            # the first manager gets all resources
+            if uuid == managers.managers[0]:
+                systems = resources.systems.systems
+
+            else:
+                systems = []
+
+            return flask.render_template(
+                'manager.json',
+                dateTime=datetime.now().strftime('%Y-%M-%dT%H:%M:%S+00:00'),
+                identity=identity,
+                name=resources.managers.name(identity),
+                uuid=uuid,
+                serviceEntryPointUUID=resources.managers.uuid(identity),
+                systems=systems
+            )
+
+
 @app.route('/redfish/v1/Systems')
 @returns_json
 def system_collection_resource():
@@ -167,6 +222,7 @@ def system_resource(identity):
         app.logger.debug('Serving resources for system "%s"', identity)
 
         with Resources() as resources:
+
             return flask.render_template(
                 'system.json',
                 identity=identity,
@@ -176,7 +232,8 @@ def system_resource(identity):
                 total_memory_gb=resources.systems.get_total_memory(identity),
                 total_cpus=resources.systems.get_total_cpus(identity),
                 boot_source_target=resources.systems.get_boot_device(identity),
-                boot_source_mode=resources.systems.get_boot_mode(identity)
+                boot_source_mode=resources.systems.get_boot_mode(identity),
+                managers=resources.managers.managers[:1]
             )
 
     elif flask.request.method == 'PATCH':

@@ -40,9 +40,41 @@ class EmulatorTestCase(base.BaseTestCase):
         self.assertEqual(200, response.status_code)
         self.assertEqual('RedvirtService', response.json['Id'])
 
-    def test_collection_resource(self, resources_mock):
+    def test_manager_collection_resource(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        managers_mock = resources_mock.managers
+        type(managers_mock).managers = mock.PropertyMock(
+            return_value=['bmc0', 'bmc1'])
+        response = self.app.get('/redfish/v1/Managers')
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({'@odata.id': '/redfish/v1/Managers/bmc0'},
+                         response.json['Members'][0])
+        self.assertEqual({'@odata.id': '/redfish/v1/Managers/bmc1'},
+                         response.json['Members'][1])
+
+    def test_manager_resource_get(self, resources_mock):
         resources_mock = resources_mock.return_value.__enter__.return_value
         systems_mock = resources_mock.systems
+        systems_mock.systems = ['xxx']
+        managers_mock = resources_mock.managers
+        managers_mock.managers = ['xxxx-yyyy-zzzz']
+        managers_mock.uuid.return_value = 'xxxx-yyyy-zzzz'
+        managers_mock.name.return_value = 'name'
+
+        response = self.app.get('/redfish/v1/Managers/xxxx-yyyy-zzzz')
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('xxxx-yyyy-zzzz', response.json['Id'])
+        self.assertEqual('xxxx-yyyy-zzzz', response.json['UUID'])
+        self.assertEqual('xxxx-yyyy-zzzz',
+                         response.json['ServiceEntryPointUUID'])
+        self.assertEqual([{'@odata.id': '/redfish/v1/Systems/xxx'}],
+                         response.json['Links']['ManagerForServers'])
+
+    def test_system_collection_resource(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
+
         type(systems_mock).systems = mock.PropertyMock(
             return_value=['host0', 'host1'])
         response = self.app.get('/redfish/v1/Systems')
@@ -61,6 +93,8 @@ class EmulatorTestCase(base.BaseTestCase):
         systems_mock.get_total_cpus.return_value = 2
         systems_mock.get_boot_device.return_value = 'Cd'
         systems_mock.get_boot_mode.return_value = 'Legacy'
+        managers_mock = resources_mock.managers
+        managers_mock.managers = ['aaaa-bbbb-cccc']
 
         response = self.app.get('/redfish/v1/Systems/xxxx-yyyy-zzzz')
 
@@ -75,6 +109,9 @@ class EmulatorTestCase(base.BaseTestCase):
             'Cd', response.json['Boot']['BootSourceOverrideTarget'])
         self.assertEqual(
             'Legacy', response.json['Boot']['BootSourceOverrideMode'])
+        self.assertEqual(
+            [{'@odata.id': '/redfish/v1/Managers/aaaa-bbbb-cccc'}],
+            response.json['Links']['ManagedBy'])
 
     def test_system_resource_patch(self, resources_mock):
         resources_mock = resources_mock.return_value.__enter__.return_value

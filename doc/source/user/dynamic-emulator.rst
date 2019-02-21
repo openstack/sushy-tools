@@ -2,14 +2,24 @@
 Virtual Redfish BMC
 ===================
 
-The virtual Redfish BMC is functionally similar to the
+The Virtual Redfish BMC is functionally similar to the
 `Virtual BMC <https://opendev.org/openstack/virtualbmc>`_ tool
 except that the frontend protocol is Redfish rather than IPMI. The Redfish
-commands coming from the client get executed against the virtualization
-backend. That lets you control virtual machine instances over Redfish.
+commands coming from the client are handled by one or more resource-specific
+drivers.
 
-The libvirt backend
--------------------
+Systems resource
+----------------
+
+For *Systems* resource, emulator maintains two drivers relying on
+a virtualization backend to emulate bare metal machines by means of
+virtual machines.
+
+The following sections will explain how to configure and use
+each of these drivers.
+
+Systems resource driver: libvirt
+++++++++++++++++++++++++++++++++
 
 First thing you need is to set up some libvirt-managed virtual machines
 (AKA domains) to manipulate. The following command will create a new
@@ -76,7 +86,7 @@ You can have as many domains as you need. The domains can be concurrently
 managed over Redfish and some other tool like *Virtual BMC*.
 
 UEFI boot
-+++++++++
+~~~~~~~~~
 
 By default, `legacy` or `BIOS` mode is used to boot the instance. However,
 libvirt domain can be configured to boot via UEFI firmware. This process
@@ -140,8 +150,8 @@ Now you can run `sushy-emulator` with the updated configuration file:
 
    The images you will serve to your VMs need to be UEFI-bootable.
 
-The OpenStack backend
----------------------
+Systems resource driver: OpenStack
+++++++++++++++++++++++++++++++++++
 
 You can use an OpenStack cloud instances to simulate Redfish-managed
 baremetal machines. This setup is known under the name of
@@ -203,3 +213,45 @@ And flip its power state via the Redfish call:
 
 You can have as many OpenStack instances as you need. The instances can be
 concurrently managed over Redfish and functionally similar tools.
+
+Managers resource
+-----------------
+
+For emulating *Managers* resource, the user can statically configure
+one or more imaginary Managers. The first configured manager will
+pretend to manage all *Systems* and potentially other resources.
+
+.. code-block:: python
+
+    SUSHY_EMULATOR_MANAGERS = [
+        {
+            "Id": "BMC",
+            "Name": "Manager",
+            "ServiceEntryPointUUID": "92384634-2938-2342-8820-489239905423",
+            "UUID": "58893887-8974-2487-2389-841168418919"
+        }
+    ]
+
+By default a single manager with be configured automatically.
+
+Managers will be revealed when querying the *Managers* resource
+directly, as well as other resources they manage or have some
+other relations.
+
+.. code-block:: bash
+
+    curl http://localhost:8000/redfish/v1/Managers
+    {
+        "@odata.type": "#ManagerCollection.ManagerCollection",
+        "Name": "Manager Collection",
+        "Members@odata.count": 1,
+        "Members": [
+
+              {
+                  "@odata.id": "/redfish/v1/Managers/58893887-8974-2487-2389-841168418919"
+              }
+
+        ],
+        "@odata.context": "/redfish/v1/$metadata#ManagerCollection.ManagerCollection",
+        "@odata.id": "/redfish/v1/Managers",
+        "@Redfish.Copyright": "Copyright 2014-2017 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."

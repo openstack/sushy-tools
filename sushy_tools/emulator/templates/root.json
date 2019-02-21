@@ -7,6 +7,9 @@
     "Systems": {
         "@odata.id": "/redfish/v1/Systems"
     },
+    "Managers": {
+        "@odata.id": "/redfish/v1/Managers"
+    },
     "@odata.id": "/redfish/v1/",
     "@Redfish.Copyright": "Copyright 2014-2016 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
 }

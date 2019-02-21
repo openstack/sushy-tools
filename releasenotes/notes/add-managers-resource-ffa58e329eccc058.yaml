@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    Adds Managers resource emulation to dynamic Redfish emulator. Emulated
+    Computer Systems link up automatically to the first of the configured
+    Managers (just one by default).

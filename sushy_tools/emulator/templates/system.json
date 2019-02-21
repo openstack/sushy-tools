@@ -73,6 +73,11 @@
         "Chassis": [
         ],
         "ManagedBy": [
+            {%- for manager in managers %}
+            {
+                "@odata.id": {{ "/redfish/v1/Managers/%s"|format(manager)|tojson }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor -%}
         ]
     },
     "Actions": {
