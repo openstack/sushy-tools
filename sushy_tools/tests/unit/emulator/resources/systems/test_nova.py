@@ -17,7 +17,7 @@ from munch import Munch
 from oslotest import base
 from six.moves import mock
 
-from sushy_tools.emulator.drivers.novadriver import OpenStackDriver
+from sushy_tools.emulator.resources.systems.novadriver import OpenStackDriver
 from sushy_tools import error
 
 

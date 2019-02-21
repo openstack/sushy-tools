@@ -15,7 +15,7 @@
 
 from oslotest import base
 
-from sushy_tools.emulator.drivers import memoize
+from sushy_tools.emulator import memoize
 
 
 class MemoizeTestCase(base.BaseTestCase):
