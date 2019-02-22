@@ -1,0 +1,12 @@
+---
+features:
+  - |
+    Adds Virtual Media resource.
+
+    As of this release, user can configure a collection of virtual
+    media devices including their types, names and other properies.
+    By default, ``cdrom`` and ``floppy`` devices are configured.
+
+    Each Manager automatically gets its own instance of the above
+    mentioned virtual media device collection. HTTP/S-hosted images
+    can be inserted into and ejected from virtual media devices.

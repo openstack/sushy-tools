@@ -337,3 +337,97 @@ Redfish client can turn *IndicatorLED* into a different state:
    curl -d '{"IndicatorLED": "Blinking"}' \
        -H "Content-Type: application/json" -X PATCH \
         http://localhost:8000/redfish/v1/Chassis/48295861-2522-3561-6729-621118518810
+
+Virtual media resource
+----------------------
+
+Virtual Media resource is emulated as a persistent emulator database
+record, observable and manageable by a Redfish client.
+
+By default, *VirtualMedia* resource includes two emulated removable
+devices: *Cd* and *Floppy*. Each *Manager* resource gets its own collection
+of virtual media devices as a *VirtualMedia* sub-resource.
+
+If currently used *Systems* resource emulation driver supports setting
+boot image, *VirtualMedia* resource will apply inserted image onto
+all the systems being managed by this manager. Setting system boot source
+to *Cd* and boot mode to *Uefi* will cause the system to boot from
+virtual media image.
+
+User can change virtual media devices and their properties through
+emulator configuration:
+
+.. code-block:: python
+
+    SUSHY_EMULATOR_VMEDIA_DEVICES = {
+        "Cd": {
+            "Name": "Virtual CD",
+            "MediaTypes": [
+                "CD",
+                "DVD"
+            ]
+        },
+        "Floppy": {
+            "Name": "Virtual Removable Media",
+            "MediaTypes": [
+                "Floppy",
+                "USBStick"
+            ]
+        }
+    }
+
+Virtual Media resource will be revealed when querying Manager resource:
+
+.. code-block:: bash
+
+    curl -L http://localhost:8000/redfish/v1/Managers/58893887-8974-2487-2389-841168418919/VirtualMedia
+    {
+        "@odata.type": "#VirtualMediaCollection.VirtualMediaCollection",
+        "Name": "Virtual Media Services",
+        "Description": "Redfish-BMC Virtual Media Service Settings",
+        "Members@odata.count": 2,
+        "Members": [
+
+            {
+                "@odata.id": "/redfish/v1/Managers/58893887-8974-2487-2389-841168418919/VirtualMedia/Cd"
+            },
+
+            {
+                "@odata.id": "/redfish/v1/Managers/58893887-8974-2487-2389-841168418919/VirtualMedia/Floppy"
+            }
+
+        ],
+        "@odata.context": "/redfish/v1/$metadata#VirtualMediaCollection.VirtualMediaCollection",
+        "@odata.id": "/redfish/v1/Managers/58893887-8974-2487-2389-841168418919/VirtualMedia",
+        "@Redfish.Copyright": "Copyright 2014-2017 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+    }
+
+Redfish client can insert a HTTP-based image into the virtual device:
+
+.. code-block:: bash
+
+   curl -d '{"Image":"http://localhost.localdomain/mini.iso",\
+             "Inserted": true}' \
+        -H "Content-Type: application/json" \
+        -X POST \
+        http://localhost:8000/redfish/v1/Managers/58893887-8974-2487-2389-841168418919/VirtualMedia/Cd/Actions/VirtualMedia.InsertMedia
+
+.. note::
+
+   All systems being managed by this manager and booting from their
+   corresponding removable media device (e.g. cdrom or fd) will boot the
+   image inserted into manager's virtual media device.
+
+.. warning::
+
+   System boot from virtual media only works if *System* resource emulation
+   driver supports setting boot image.
+
+Redfish client can eject image from virtual media device:
+
+.. code-block:: bash
+
+   curl -d '{}' \
+        -H "Content-Type: application/json" \
+        -X POST \
+        http://localhost:8000/redfish/v1/Managers/58893887-8974-2487-2389-841168418919/VirtualMedia/Cd/Actions/VirtualMedia.EjectMedia

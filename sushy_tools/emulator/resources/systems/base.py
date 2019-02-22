@@ -166,3 +166,29 @@ class AbstractSystemsDriver(DriverBase):
 
         :returns: list of dictionaries of NICs and their attributes
         """
+
+    @abc.abstractmethod
+    def get_boot_image(self, identity, device):
+        """Get backend VM boot image info
+
+        :param identity: node name or ID
+        :param device: device type (from
+            `sushy_tools.emulator.constants`)
+        :returns: a `tuple` of (boot_image, write_protected, inserted)
+        :raises: `error.FishyError` if boot device can't be accessed
+        """
+
+    @abc.abstractmethod
+    def set_boot_image(self, identity, device, boot_image=None,
+                       write_protected=True):
+        """Set backend VM boot image
+
+        :param identity: node name or ID
+        :param device: device type (from
+            `sushy_tools.emulator.constants`)
+        :param boot_image: path to the image file or `None` to remove
+            configured image entirely
+        :param write_protected: expose media as read-only or writable
+
+        :raises: `error.FishyError` if boot device can't be set
+        """

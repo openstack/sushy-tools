@@ -39,6 +39,7 @@ class StaticDriverTestCase(base.BaseTestCase):
         test_driver = StaticDriver.initialize(
             {'SUSHY_EMULATOR_MANAGERS': self.managers})
         self.test_driver = test_driver()
+
         super(StaticDriverTestCase, self).setUp()
 
     def test__get_manager_by_id(self):

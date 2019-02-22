@@ -15,6 +15,9 @@
     },
     "PowerState": "On",
     "FirmwareVersion": "1.00",
+    "VirtualMedia": {
+        "@odata.id": {{ "/redfish/v1/Managers/%s/VirtualMedia"|format(uuid)|string|tojson }}
+    },
     "Links": {
         "ManagerForServers": [
             {% for system in systems %}

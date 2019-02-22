@@ -21,15 +21,16 @@ import os
 import ssl
 import sys
 
+import flask
+
 from sushy_tools.emulator.resources.chassis import staticdriver as chsdriver
 from sushy_tools.emulator.resources.indicators import staticdriver as inddriver
 from sushy_tools.emulator.resources.managers import staticdriver as mgrdriver
 from sushy_tools.emulator.resources.systems import libvirtdriver
 from sushy_tools.emulator.resources.systems import novadriver
+from sushy_tools.emulator.resources.vmedia import staticdriver as vmddriver
 from sushy_tools import error
 from sushy_tools.error import FishyError
-
-import flask
 
 app = flask.Flask(__name__)
 # Turn off strict_slashes on all routes
@@ -42,6 +43,7 @@ class Resources(object):
     MANAGERS = None
     CHASSIS = None
     INDICATORS = None
+    VMEDIA = None
 
     def __new__(cls, *args, **kwargs):
 
@@ -102,6 +104,13 @@ class Resources(object):
                 'Initialized indicators resource backed by %s '
                 'driver', cls.INDICATORS().driver)
 
+        if cls.VMEDIA is None:
+            cls.VMEDIA = vmddriver.StaticDriver.initialize(app.config)
+
+            app.logger.debug(
+                'Initialized virtual media resource backed by %s '
+                'driver', cls.VMEDIA().driver)
+
         return super(Resources, cls).__new__(cls, *args, **kwargs)
 
     def __enter__(self):
@@ -109,6 +118,7 @@ class Resources(object):
         self.managers = self.MANAGERS()
         self.chassis = self.CHASSIS()
         self.indicators = self.INDICATORS()
+        self.vmedia = self.VMEDIA()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -116,6 +126,7 @@ class Resources(object):
         del self.managers
         del self.chassis
         del self.indicators
+        del self.vmedia
 
 
 def instance_denied(**kwargs):
@@ -286,6 +297,121 @@ def manager_resource(identity):
                 systems=systems,
                 chassis=chassis
             )
+
+
+@app.route('/redfish/v1/Managers/<identity>/VirtualMedia', methods=['GET'])
+@returns_json
+def virtual_media_collection_resource(identity):
+    if flask.request.method == 'GET':
+
+        with Resources() as resources:
+
+            app.logger.debug('Serving virtual media resources for '
+                             'manager "%s"', identity)
+
+            return flask.render_template(
+                'virtual_media_collection.json',
+                identity=identity,
+                uuid=resources.managers.uuid(identity),
+                devices=resources.vmedia.devices
+            )
+
+
+@app.route('/redfish/v1/Managers/<identity>/VirtualMedia/<device>',
+           methods=['GET'])
+@returns_json
+def virtual_media_resource(identity, device):
+    if flask.request.method == 'GET':
+
+        with Resources() as resources:
+
+            try:
+                device_name = resources.vmedia.get_device_name(
+                    identity, device)
+
+                media_types = resources.vmedia.get_device_media_types(
+                    identity, device)
+
+                (image_name, image_url, inserted,
+                 write_protected) = resources.vmedia.get_device_image_info(
+                    identity, device)
+
+            except error.FishyError as ex:
+                app.logger.warning(
+                    'Virtual media %s at manager %s error: '
+                    '%s', device, identity, ex)
+                return 'Not found', 404
+
+        app.logger.debug('Serving virtual media %s at '
+                         'manager "%s"', device, identity)
+
+        return flask.render_template(
+            'virtual_media.json',
+            identity=identity,
+            device=device,
+            name=device_name,
+            media_types=media_types,
+            image_url=image_url,
+            image_name=image_name,
+            inserted=inserted,
+            write_protected=write_protected
+        )
+
+
+@app.route('/redfish/v1/Managers/<identity>/VirtualMedia/<device>'
+           '/Actions/VirtualMedia.InsertMedia',
+           methods=['POST'])
+@returns_json
+def virtual_media_insert(identity, device):
+    image = flask.request.json.get('Image')
+    inserted = flask.request.json.get('Inserted', True)
+    write_protected = flask.request.json.get('WriteProtected', False)
+
+    with Resources() as resources:
+
+        image_path = resources.vmedia.insert_image(
+            identity, device, image, inserted, write_protected)
+
+        for system in resources.systems.systems:
+            try:
+                resources.systems.set_boot_image(
+                    system, device, boot_image=image_path,
+                    write_protected=write_protected)
+
+            except error.FishyError as ex:
+                app.logger.warning(
+                    'System %s failed to set boot image %s on device %s: '
+                    '%s', system, image_path, device, ex)
+
+    app.logger.info(
+        'Virtual media placed into device %s manager %s image %s '
+        'inserted %s', device, identity, image or '<empty>', inserted)
+
+    return '', 204
+
+
+@app.route('/redfish/v1/Managers/<identity>/VirtualMedia/<device>'
+           '/Actions/VirtualMedia.EjectMedia',
+           methods=['POST'])
+@returns_json
+def virtual_media_eject(identity, device):
+    with Resources() as resources:
+        resources.vmedia.eject_image(identity, device)
+
+        for system in resources.systems.systems:
+            try:
+                resources.systems.set_boot_image(system, device)
+
+            except error.FishyError as ex:
+                app.logger.warning(
+                    'System %s failed to remove boot image from device %s: '
+                    '%s', system, device, ex)
+
+    app.logger.info(
+        'Virtual media ejected from device %s manager %s '
+        'image ', device, identity)
+
+    return '', 204
 
 
 @app.route('/redfish/v1/Systems')

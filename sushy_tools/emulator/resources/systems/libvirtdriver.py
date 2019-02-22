@@ -18,6 +18,7 @@ import logging
 import uuid
 import xml.etree.ElementTree as ET
 
+from sushy_tools.emulator import constants
 from sushy_tools.emulator import memoize
 from sushy_tools.emulator.resources.systems.base import AbstractSystemsDriver
 from sushy_tools import error
@@ -70,9 +71,10 @@ class LibvirtDriver(AbstractSystemsDriver):
     # XML schema: https://libvirt.org/formatdomain.html#elementsOSBIOS
 
     BOOT_DEVICE_MAP = {
-        'Pxe': 'network',
-        'Hdd': 'hd',
-        'Cd': 'cdrom',
+        constants.DEVICE_TYPE_PXE: 'network',
+        constants.DEVICE_TYPE_HDD: 'hd',
+        constants.DEVICE_TYPE_CD: 'cdrom',
+        constants.DEVICE_TYPE_FLOPPY: 'floppy'
     }
 
     BOOT_DEVICE_MAP_REV = {v: k for k, v in BOOT_DEVICE_MAP.items()}
@@ -599,3 +601,29 @@ class LibvirtDriver(AbstractSystemsDriver):
         return [{'id': iface.get('address'), 'mac': iface.get('address')}
                 for iface in tree.findall(
                 ".//devices/interface[@type='network']/mac")]
+
+    def get_boot_image(self, identity, device):
+        """Get backend VM boot image info
+
+        :param identity: node name or ID
+        :param device: device type (from
+            `sushy_tools.emulator.constants`)
+        :returns: a `tuple` of (boot_image, write_protected, inserted)
+        :raises: `error.FishyError` if boot device can't be accessed
+        """
+        raise error.FishyError('Not implemented')
+
+    def set_boot_image(self, identity, device, boot_image=None,
+                       write_protected=True):
+        """Set backend VM boot image
+
+        :param identity: node name or ID
+        :param device: device type (from
+            `sushy_tools.emulator.constants`)
+        :param boot_image: path to the image file or `None` to remove
+            configured image entirely
+        :param write_protected: expose media as read-only or writable
+
+        :raises: `error.FishyError` if boot device can't be set
+        """
+        raise error.FishyError('Not implemented')

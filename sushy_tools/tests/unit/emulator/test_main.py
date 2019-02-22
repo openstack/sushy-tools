@@ -452,3 +452,97 @@ class EmulatorTestCase(base.BaseTestCase):
                                 '/EthernetInterfaces/nic3')
 
         self.assertEqual(404, response.status_code)
+
+    def test_virtual_media_collection(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        managers_mock = resources_mock.managers
+        managers_mock.managers = [self.uuid]
+        managers_mock.uuid.return_value = self.uuid
+        vmedia_mock = resources_mock.vmedia
+        vmedia_mock.devices = ['CD', 'Floppy']
+
+        response = self.app.get(
+            'redfish/v1/Managers/' + self.uuid + '/VirtualMedia')
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('Virtual Media Services', response.json['Name'])
+        self.assertEqual(2, response.json['Members@odata.count'])
+        self.assertEqual(
+            ['/redfish/v1/Managers/' + self.uuid +
+             '/VirtualMedia/CD',
+             '/redfish/v1/Managers/' + self.uuid +
+             '/VirtualMedia/Floppy'],
+            [m['@odata.id'] for m in response.json['Members']])
+
+    def test_virtual_media_collection_empty(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        vmedia_mock = resources_mock.vmedia
+        vmedia_mock.get_devices.return_value = []
+
+        response = self.app.get(
+            'redfish/v1/Managers/' + self.uuid + '/VirtualMedia')
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('Virtual Media Services', response.json['Name'])
+        self.assertEqual(0, response.json['Members@odata.count'])
+        self.assertEqual([], response.json['Members'])
+
+    def test_virtual_media(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        vmedia_mock = resources_mock.vmedia
+
+        vmedia_mock.get_device_name.return_value = 'CD'
+        vmedia_mock.get_device_media_types.return_value = [
+            'CD', 'DVD']
+        vmedia_mock.get_device_image_info.return_value = [
+            'image-of-a-fish', 'fishy.iso', True, True]
+
+        response = self.app.get(
+            '/redfish/v1/Managers/' + self.uuid +
+            '/VirtualMedia/CD')
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('CD', response.json['Id'])
+        self.assertEqual(['CD', 'DVD'], response.json['MediaTypes'])
+        self.assertEqual('fishy.iso', response.json['Image'])
+        self.assertEqual('image-of-a-fish', response.json['ImageName'])
+        self.assertTrue(response.json['Inserted'])
+        self.assertTrue(response.json['WriteProtected'])
+
+    def test_virtual_media_not_found(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        vmedia_mock = resources_mock.vmedia
+        vmedia_mock.get_device_name.side_effect = error.FishyError
+
+        response = self.app.get(
+            '/redfish/v1/Managers/' + self.uuid +
+            '/VirtualMedia/DVD-ROM')
+
+        self.assertEqual(404, response.status_code)
+
+    def test_virtual_media_insert(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        vmedia_mock = resources_mock.vmedia
+
+        response = self.app.post(
+            '/redfish/v1/Managers/' + self.uuid +
+            '/VirtualMedia/CD/Actions/VirtualMedia.InsertMedia',
+            json={"Image": "http://fish.iso"})
+
+        self.assertEqual(204, response.status_code)
+
+        vmedia_mock.insert_image.called_once_with(
+            'CD', 'http://fish.iso', True, False)
+
+    def test_virtual_media_eject(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        vmedia_mock = resources_mock.vmedia
+
+        response = self.app.post(
+            '/redfish/v1/Managers/' + self.uuid +
+            '/VirtualMedia/CD/Actions/VirtualMedia.EjectMedia',
+            json={})
+
+        self.assertEqual(204, response.status_code)
+
+        vmedia_mock.eject_image.called_once_with('CD')
