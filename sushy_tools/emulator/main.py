@@ -23,6 +23,7 @@ import sys
 from sushy_tools.emulator.drivers import libvirtdriver
 from sushy_tools.emulator.drivers import novadriver
 from sushy_tools import error
+from sushy_tools.error import FishyError
 
 import flask
 
@@ -69,6 +70,35 @@ def init_virt_driver(decorated_func):
     return decorator
 
 
+def instance_denied(**kwargs):
+    deny = True
+
+    try:
+        deny = (kwargs['identity'] not in
+                app.config['SUSHY_EMULATOR_ALLOWED_INSTANCES'])
+
+    except KeyError:
+        deny = False
+
+    finally:
+        if deny:
+            app.logger.warning('Instance %s access denied',
+                               kwargs.get('identity'))
+
+        return deny
+
+
+def ensure_instance_access(decorated_func):
+    @functools.wraps(decorated_func)
+    def decorator(*args, **kwargs):
+        if instance_denied(**kwargs):
+            raise FishyError('Error finding instance')
+
+        return decorated_func(*args, **kwargs)
+
+    return decorator
+
+
 def returns_json(decorated_func):
     @functools.wraps(decorated_func)
     def decorator(*args, **kwargs):
@@ -105,7 +135,8 @@ def root_resource():
 @init_virt_driver
 @returns_json
 def system_collection_resource():
-    systems = driver.systems
+    systems = [system for system in driver.systems
+               if not instance_denied(identity=system)]
 
     app.logger.debug('Serving systems list')
 
@@ -115,6 +146,7 @@ def system_collection_resource():
 
 @app.route('/redfish/v1/Systems/<identity>', methods=['GET', 'PATCH'])
 @init_virt_driver
+@ensure_instance_access
 @returns_json
 def system_resource(identity):
     if flask.request.method == 'GET':
@@ -168,6 +200,7 @@ def system_resource(identity):
 @app.route('/redfish/v1/Systems/<identity>/EthernetInterfaces',
            methods=['GET'])
 @init_virt_driver
+@ensure_instance_access
 @returns_json
 def ethernet_interfaces_collection(identity):
     nics = driver.get_nics(identity)
@@ -179,6 +212,7 @@ def ethernet_interfaces_collection(identity):
 @app.route('/redfish/v1/Systems/<identity>/EthernetInterfaces/<nic_id>',
            methods=['GET'])
 @init_virt_driver
+@ensure_instance_access
 @returns_json
 def ethernet_interface(identity, nic_id):
     nics = driver.get_nics(identity)
@@ -193,6 +227,7 @@ def ethernet_interface(identity, nic_id):
 @app.route('/redfish/v1/Systems/<identity>/Actions/ComputerSystem.Reset',
            methods=['POST'])
 @init_virt_driver
+@ensure_instance_access
 @returns_json
 def system_reset_action(identity):
     reset_type = flask.request.json.get('ResetType')
@@ -207,6 +242,7 @@ def system_reset_action(identity):
 
 @app.route('/redfish/v1/Systems/<identity>/BIOS', methods=['GET'])
 @init_virt_driver
+@ensure_instance_access
 @returns_json
 def bios(identity):
     bios = driver.get_bios(identity)
@@ -222,6 +258,7 @@ def bios(identity):
 @app.route('/redfish/v1/Systems/<identity>/BIOS/Settings',
            methods=['GET', 'PATCH'])
 @init_virt_driver
+@ensure_instance_access
 @returns_json
 def bios_settings(identity):
 
@@ -247,6 +284,7 @@ def bios_settings(identity):
 @app.route('/redfish/v1/Systems/<identity>/BIOS/Actions/Bios.ResetBios',
            methods=['POST'])
 @init_virt_driver
+@ensure_instance_access
 @returns_json
 def system_reset_bios(identity):
 

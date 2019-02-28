@@ -145,6 +145,30 @@ class EmulatorTestCase(base.BaseTestCase):
         set_power_state = driver_mock.set_power_state
         set_power_state.assert_called_once_with('xxxx-yyyy-zzzz', 'Nmi')
 
+    @mock.patch.dict(main.app.config, {}, clear=True)
+    def test_instance_denied_allow_all(self, driver_mock):
+        self.assertFalse(main.instance_denied(identity='x'))
+
+    @mock.patch.dict(
+        main.app.config, {'SUSHY_EMULATOR_ALLOWED_INSTANCES': {}})
+    def test_instance_denied_disallow_all(self, driver_mock):
+        self.assertTrue(main.instance_denied(identity='a'))
+
+    def test_instance_denied_undefined_option(self, driver_mock):
+        with mock.patch.dict(main.app.config):
+            main.app.config.pop('SUSHY_EMULATOR_ALLOWED_INSTANCES', None)
+            self.assertFalse(main.instance_denied(identity='a'))
+
+    @mock.patch.dict(
+        main.app.config, {'SUSHY_EMULATOR_ALLOWED_INSTANCES': {'a'}})
+    def test_instance_denied_allow_some(self, driver_mock):
+        self.assertFalse(main.instance_denied(identity='a'))
+
+    @mock.patch.dict(
+        main.app.config, {'SUSHY_EMULATOR_ALLOWED_INSTANCES': {'a'}})
+    def test_instance_denied_disallow_some(self, driver_mock):
+        self.assertTrue(main.instance_denied(identity='b'))
+
     def test_get_bios(self, driver_mock):
         driver_mock.get_bios.return_value = {"attribute 1": "value 1",
                                              "attribute 2": "value 2"}
