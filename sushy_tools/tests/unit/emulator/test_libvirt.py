@@ -230,17 +230,18 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         conn_mock = libvirt_rw_mock.return_value
         xml_document = conn_mock.defineXML.call_args[0][0]
         tree = ET.fromstring(xml_document)
-        for os_element in tree.findall('os'):
-            loader_element = os_element.find('loader')
-            self.assertEqual(
-                'pflash', loader_element.get('type'))
-            self.assertEqual(
-                '/usr/share/OVMF/OVMF_CODE.fd',
-                loader_element.text)
+        os_element = tree.find('os')
+        loader_element = os_element.find('loader')
+        self.assertEqual(
+            'pflash', loader_element.get('type'))
+        self.assertEqual(
+            '/usr/share/OVMF/OVMF_CODE.fd',
+            loader_element.text)
 
     @mock.patch('libvirt.open', autospec=True)
     @mock.patch('libvirt.openReadOnly', autospec=True)
-    def test_set_boot_mode_unknown_loader(self, libvirt_mock, libvirt_rw_mock):
+    def test_set_boot_mode_unknown_loader_path(
+            self, libvirt_mock, libvirt_rw_mock):
         with open('sushy_tools/tests/unit/emulator/domain.xml', 'r') as f:
             data = f.read()
 
@@ -261,8 +262,48 @@ class LibvirtDriverTestCase(base.BaseTestCase):
             data = f.read()
 
         tree = ET.fromstring(data)
-        for os_element in tree.findall('os'):
-            tree.remove(os_element)
+        os_element = tree.find('os')
+        tree.remove(os_element)
+
+        data = ET.tostring(tree)
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = data
+
+        self.assertRaises(
+            error.FishyError, self.test_driver.set_boot_mode,
+            self.uuid, 'Uefi')
+
+    @mock.patch('libvirt.open', autospec=True)
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_set_boot_mode_many_loaders(self, libvirt_mock, libvirt_rw_mock):
+        with open('sushy_tools/tests/unit/emulator/domain.xml', 'r') as f:
+            data = f.read()
+
+        tree = ET.fromstring(data)
+        os_element = tree.find('os')
+        ET.SubElement(os_element, 'loader')
+
+        data = ET.tostring(tree)
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = data
+
+        self.assertRaises(
+            error.FishyError, self.test_driver.set_boot_mode,
+            self.uuid, 'Uefi')
+
+    @mock.patch('libvirt.open', autospec=True)
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_set_boot_mode_many_os(self, libvirt_mock, libvirt_rw_mock):
+        with open('sushy_tools/tests/unit/emulator/domain.xml', 'r') as f:
+            data = f.read()
+
+        tree = ET.fromstring(data)
+        ET.SubElement(tree, 'os')
+        ET.SubElement(tree, 'os')
 
         data = ET.tostring(tree)
 
@@ -281,9 +322,9 @@ class LibvirtDriverTestCase(base.BaseTestCase):
             data = f.read()
 
         tree = ET.fromstring(data)
-        for os_element in tree.findall('os'):
-            type_element = os_element.find('type')
-            os_element.remove(type_element)
+        os_element = tree.find('os')
+        type_element = os_element.find('type')
+        os_element.remove(type_element)
 
         data = ET.tostring(tree)
 
@@ -296,9 +337,9 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         conn_mock = libvirt_rw_mock.return_value
         xml_document = conn_mock.defineXML.call_args[0][0]
         tree = ET.fromstring(xml_document)
-        for os_element in tree.findall('os'):
-            # NOTE(etingof): should enforce default loader
-            self.assertIsNone(os_element.find('loader'))
+        os_element = tree.find('os')
+        # NOTE(etingof): should enforce default loader
+        self.assertIsNone(os_element.find('loader'))
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
     def test_get_total_memory(self, libvirt_mock):

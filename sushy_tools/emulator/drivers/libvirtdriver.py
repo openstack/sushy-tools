@@ -359,7 +359,16 @@ class LibvirtDriver(AbstractDriver):
                            boot_mode, os_arch)
             loader_path = None
 
-        for loader_element in os_element.findall('loader'):
+        loader_elements = os_element.findall('loader')
+        if len(loader_elements) > 1:
+            msg = ('Can\'t set boot mode because "loader" element must be '
+                   'present exactly once in domain "%(identity)s" '
+                   'configuration' % {'identity': identity})
+            raise error.FishyError(msg)
+
+        if loader_elements:
+            loader_element = loader_elements[0]
+
             if loader_element.text not in self.KNOWN_BOOT_LOADERS:
                 msg = ('Unknown boot loader path "%(path)s" in domain '
                        '"%(identity)s" configuration encountered while '
@@ -373,11 +382,18 @@ class LibvirtDriver(AbstractDriver):
 
             if loader_path:
                 loader_element.set('type', loader_type)
+                loader_element.set('readonly', 'yes')
                 loader_element.text = loader_path
 
             else:
                 # NOTE(etingof): path must be present or element must be absent
                 os_element.remove(loader_element)
+
+        elif loader_path:
+            loader_element = ET.SubElement(os_element, 'loader')
+            loader_element.set('type', loader_type)
+            loader_element.set('readonly', 'yes')
+            loader_element.text = loader_path
 
         with libvirt_open(self._uri) as conn:
 
