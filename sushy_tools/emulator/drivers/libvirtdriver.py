@@ -13,12 +13,13 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from collections import namedtuple
 import logging
 import uuid
 import xml.etree.ElementTree as ET
 
-from collections import namedtuple
 from sushy_tools.emulator.drivers.base import AbstractDriver
+from sushy_tools.emulator.drivers import memoize
 from sushy_tools import error
 
 try:
@@ -102,15 +103,17 @@ class LibvirtDriver(AbstractDriver):
                                "NicBoot1": "NetworkBoot",
                                "ProcTurboMode": "Enabled"}
 
-    def __init__(self, config, uri=None):
-        self._config = config
-        self._uri = uri or self.LIBVIRT_URI
-        self.BOOT_LOADER_MAP = self._config.get(
-            'SUSHY_EMULATOR_BOOT_LOADER_MAP', self.BOOT_LOADER_MAP)
-        self.KNOWN_BOOT_LOADERS = set(y
-                                      for x in self.BOOT_LOADER_MAP.values()
-                                      for y in x.values())
+    @classmethod
+    def initialize(cls, config, uri=None):
+        cls._config = config
+        cls._uri = uri or cls.LIBVIRT_URI
+        cls.BOOT_LOADER_MAP = cls._config.get(
+            'SUSHY_EMULATOR_BOOT_LOADER_MAP', cls.BOOT_LOADER_MAP)
+        cls.KNOWN_BOOT_LOADERS = set(y for x in cls.BOOT_LOADER_MAP.values()
+                                     for y in x.values())
+        return cls
 
+    @memoize.memoize()
     def _get_domain(self, identity, readonly=False):
         with libvirt_open(self._uri, readonly=readonly) as conn:
             try:
@@ -517,6 +520,7 @@ class LibvirtDriver(AbstractDriver):
                                                update_existing_attributes)
 
         if result.attributes_written:
+
             try:
                 with libvirt_open(self._uri) as conn:
                     conn.defineXML(ET.tostring(result.tree).decode('utf-8'))
