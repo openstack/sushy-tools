@@ -18,7 +18,7 @@ iso8601==0.1.11
 itsdangerous==0.24
 Jinja2==2.10
 keystoneauth1==3.4.0
-libvirt-python==3.5.0
+libvirt-python==3.7.0
 linecache2==1.0.0
 MarkupSafe==1.0
 mock==2.0.0
