@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Fixes libvirt domains listing so that both active and inactive domains
+    are rendered as available Systems resource. Before this fix, only inactive
+    domains were listed.

@@ -152,8 +152,7 @@ class LibvirtDriver(AbstractDriver):
         :returns: list of UUIDs representing the systems
         """
         with libvirt_open(self._uri, readonly=True) as conn:
-            return [conn.lookupByName(domain).UUIDString()
-                    for domain in conn.listDefinedDomains()]
+            return [domain.UUIDString() for domain in conn.listAllDomains()]
 
     def uuid(self, identity):
         """Get computer system UUID

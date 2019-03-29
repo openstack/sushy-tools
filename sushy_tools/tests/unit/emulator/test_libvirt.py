@@ -60,7 +60,7 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         conn_mock = libvirt_mock.return_value
         domain = mock.MagicMock()
         domain.UUIDString.return_value = self.uuid
-        conn_mock.listDefinedDomains.return_value = [domain]
+        conn_mock.listAllDomains.return_value = [domain]
         uuidstring_mock = conn_mock.lookupByName.return_value.UUIDString
         uuidstring_mock.return_value = self.uuid
         systems = self.test_driver.systems
