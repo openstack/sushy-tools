@@ -126,7 +126,7 @@ def returns_json(decorated_func):
 def all_exception_handler(message):
     if isinstance(message, error.AliasAccessError):
         url = flask.url_for(flask.request.endpoint, identity=message.args[0])
-        return flask.redirect(url, Response=flask.Response)
+        return flask.redirect(url, code=307, Response=flask.Response)
     return flask.render_template('error.json', message=message), 500
 
 

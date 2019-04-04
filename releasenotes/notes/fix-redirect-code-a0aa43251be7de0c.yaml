@@ -1,0 +1,7 @@
+---
+fixes:
+  - |
+    Changed HTTP redirect code from 302 to 307 to ensure the
+    original HTTP method is left intact. Otherwise some clients
+    may change PUT/POST to GET on redirect and effectively fail
+    to perform the change they intended.
