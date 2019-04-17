@@ -219,7 +219,8 @@ Managers resource
 
 For emulating *Managers* resource, the user can statically configure
 one or more imaginary Managers. The first configured manager will
-pretend to manage all *Systems* and potentially other resources.
+pretend to manage all *Systems*, *Chassis* and potentially other
+resources.
 
 .. code-block:: python
 
@@ -254,4 +255,43 @@ other relations.
         ],
         "@odata.context": "/redfish/v1/$metadata#ManagerCollection.ManagerCollection",
         "@odata.id": "/redfish/v1/Managers",
+        "@Redfish.Copyright": "Copyright 2014-2017 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+
+Chassis resource
+----------------
+
+For emulating *Chassis* resource, the user can statically configure
+one or more imaginary chassis. All existing resources (e.g. *Systems*,
+*Managers*) will pretend to reside in the first chassis.
+
+.. code-block:: python
+
+    SUSHY_EMULATOR_CHASSIS = [
+        {
+            "Id": "Chassis",
+            "Name": "Chassis",
+            "UUID": "48295861-2522-3561-6729-621118518810"
+        }
+    ]
+
+By default a single chassis with be configured automatically.
+
+Chassis will be revealed when querying the *Chassis* resource
+directly, as well as other resources they manage or have some
+other relations.
+
+.. code-block:: bash
+
+    curl http://localhost:8000/redfish/v1/Chassis
+    {
+        "@odata.type": "#ChassisCollection.ChassisCollection",
+        "Name": "Chassis Collection",
+        "Members@odata.count": 1,
+        "Members": [
+              {
+                  "@odata.id": "/redfish/v1/Chassis/48295861-2522-3561-6729-621118518810"
+              }
+        ],
+        "@odata.context": "/redfish/v1/$metadata#ChassisCollection.ChassisCollection",
+        "@odata.id": "/redfish/v1/Chassis",
         "@Redfish.Copyright": "Copyright 2014-2017 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."

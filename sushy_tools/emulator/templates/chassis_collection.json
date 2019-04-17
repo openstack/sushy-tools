@@ -1,0 +1,15 @@
+{
+    "@odata.type": "#ChassisCollection.ChassisCollection",
+    "Name": "Chassis Collection",
+    "Members@odata.count": {{ chassis|length }},
+    "Members": [
+      {% for ch in chassis %}
+          {
+              "@odata.id": {{ "/redfish/v1/Chassis/%s"|format(ch)|tojson }}
+          }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ],
+    "@odata.context": "/redfish/v1/$metadata#ChassisCollection.ChassisCollection",
+    "@odata.id": "/redfish/v1/Chassis",
+    "@Redfish.Copyright": "Copyright 2014-2017 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+}

@@ -40,6 +40,40 @@ class EmulatorTestCase(base.BaseTestCase):
         self.assertEqual(200, response.status_code)
         self.assertEqual('RedvirtService', response.json['Id'])
 
+    def test_chassis_collection_resource(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        chassis_mock = resources_mock.chassis
+        chassis_mock.chassis = ['chassis0', 'chassis1']
+        response = self.app.get('/redfish/v1/Chassis')
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({'@odata.id': '/redfish/v1/Chassis/chassis0'},
+                         response.json['Members'][0])
+        self.assertEqual({'@odata.id': '/redfish/v1/Chassis/chassis1'},
+                         response.json['Members'][1])
+
+    def test_chassis_resource_get(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        chassis_mock = resources_mock.chassis
+        chassis_mock.chassis = ['xxxx-yyyy-zzzz']
+        chassis_mock.uuid.return_value = 'xxxx-yyyy-zzzz'
+        chassis_mock.name.return_value = 'name'
+        managers_mock = resources_mock.managers
+        managers_mock.managers = ['man1']
+        systems_mock = resources_mock.systems
+        systems_mock.systems = ['sys1']
+
+        response = self.app.get('/redfish/v1/Chassis/xxxx-yyyy-zzzz')
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('xxxx-yyyy-zzzz', response.json['Id'])
+        self.assertEqual('xxxx-yyyy-zzzz', response.json['UUID'])
+        self.assertEqual([{'@odata.id': '/redfish/v1/Systems/sys1'}],
+                         response.json['Links']['ComputerSystems'])
+        self.assertEqual([{'@odata.id': '/redfish/v1/Managers/man1'}],
+                         response.json['Links']['ManagedBy'])
+        self.assertEqual([{'@odata.id': '/redfish/v1/Managers/man1'}],
+                         response.json['Links']['ManagersInChassis'])
+
     def test_manager_collection_resource(self, resources_mock):
         resources_mock = resources_mock.return_value.__enter__.return_value
         managers_mock = resources_mock.managers
@@ -60,6 +94,8 @@ class EmulatorTestCase(base.BaseTestCase):
         managers_mock.managers = ['xxxx-yyyy-zzzz']
         managers_mock.uuid.return_value = 'xxxx-yyyy-zzzz'
         managers_mock.name.return_value = 'name'
+        chassis_mock = resources_mock.chassis
+        chassis_mock.chassis = ['chassis0']
 
         response = self.app.get('/redfish/v1/Managers/xxxx-yyyy-zzzz')
 
@@ -70,6 +106,8 @@ class EmulatorTestCase(base.BaseTestCase):
                          response.json['ServiceEntryPointUUID'])
         self.assertEqual([{'@odata.id': '/redfish/v1/Systems/xxx'}],
                          response.json['Links']['ManagerForServers'])
+        self.assertEqual([{'@odata.id': '/redfish/v1/Chassis/chassis0'}],
+                         response.json['Links']['ManagerForChassis'])
 
     def test_system_collection_resource(self, resources_mock):
         resources_mock = resources_mock.return_value.__enter__.return_value
@@ -95,6 +133,8 @@ class EmulatorTestCase(base.BaseTestCase):
         systems_mock.get_boot_mode.return_value = 'Legacy'
         managers_mock = resources_mock.managers
         managers_mock.managers = ['aaaa-bbbb-cccc']
+        chassis_mock = resources_mock.chassis
+        chassis_mock.chassis = ['chassis0']
 
         response = self.app.get('/redfish/v1/Systems/xxxx-yyyy-zzzz')
 
@@ -112,6 +152,9 @@ class EmulatorTestCase(base.BaseTestCase):
         self.assertEqual(
             [{'@odata.id': '/redfish/v1/Managers/aaaa-bbbb-cccc'}],
             response.json['Links']['ManagedBy'])
+        self.assertEqual(
+            [{'@odata.id': '/redfish/v1/Chassis/chassis0'}],
+            response.json['Links']['Chassis'])
 
     def test_system_resource_patch(self, resources_mock):
         resources_mock = resources_mock.return_value.__enter__.return_value

@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    Adds Chassis resource emulation to dynamic Redfish emulator. All emulated
+    Computer Systems and Managers get linked up to the first of the configured
+    Chassis (just one by default).

@@ -69,8 +69,16 @@
     "SimpleStorage": {
         "@odata.id": {{ "/redfish/v1/Systems/%s/SimpleStorage"|format(identity)|tojson }}
     },
+    {%- if indicator_led %}
+    "IndicatorLED": {{ indicator_led|string|tojson }},
+    {%- endif %}
     "Links": {
         "Chassis": [
+            {%- for chassis_ in chassis %}
+            {
+                "@odata.id": {{ "/redfish/v1/Chassis/%s"|format(chassis_)|tojson }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor -%}
         ],
         "ManagedBy": [
             {%- for manager in managers %}

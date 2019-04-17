@@ -1,0 +1,78 @@
+{
+    "@odata.type": "#Chassis.v1_5_0.Chassis",
+    "Id": {{ identity|string|tojson }},
+    "Name": {{ name|string|tojson }},
+    "UUID": {{ uuid|string|tojson }},
+    "AssetTag": "Chicago-45Z-2381",
+    "ChassisType": "Enclosure",
+    "Manufacturer": "Contoso",
+    "Model": "3500RX",
+    "SKU": "8675309",
+    "SerialNumber": "437XR1138R2",
+    "PartNumber": "224071-J23",
+    "PowerState": "On",
+    "IndicatorLED": "Lit",
+    "HeightMm": 44.45,
+    "WidthMm": 431.8,
+    "DepthMm": 711,
+    "WeightKg": 15.31,
+    "Location": {
+        "PostalAddress": {
+            "Country": "US",
+            "Territory": "OR",
+            "City": "Portland",
+            "Street": "1001 SW 5th Avenue",
+            "HouseNumber": 1100,
+            "Name": "Distributed Management Task Force, Inc.",
+            "PostalCode": "97204"
+        },
+        "Placement": {
+            "Row": "North",
+            "Rack": "WEB43",
+            "RackOffsetUnits": "EIA_310",
+            "RackOffset": 12
+        }
+    },
+    "Status": {
+        "State": "Enabled",
+        "Health": "OK"
+    },
+    "Links": {
+        "ComputerSystems": [
+            {%- for system in contained_systems %}
+            {
+                "@odata.id": {{ "/redfish/v1/Systems/%s"|format(system)|tojson }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor -%}
+        ],
+        {% if contained_by %}
+        "ContainedBy": {{ contained_by|string|tojson }},
+        {% endif -%}
+        {% if contained_chassis %}
+        "Contains": [
+            {%- for chassis in contained_chassis %}
+            {
+                "@odata.id": {{ "/redfish/v1/Chassis/%s"|format(chassis)|tojson }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor -%}
+        ],
+        {% endif -%}
+        "ManagedBy": [
+            {%- for manager in managers %}
+            {
+                "@odata.id": {{ "/redfish/v1/Managers/%s"|format(manager)|tojson }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor -%}
+        ],
+        "ManagersInChassis": [
+            {%- for manager in contained_managers %}
+            {
+                "@odata.id": {{ "/redfish/v1/Managers/%s"|format(manager)|tojson }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor -%}
+        ]
+    },
+    "@odata.context": "/redfish/v1/$metadata#Chassis.Chassis",
+    "@odata.id": {{ "/redfish/v1/Chassis/%s"|format(identity)|string|tojson }},
+    "@Redfish.Copyright": "Copyright 2014-2017 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+}

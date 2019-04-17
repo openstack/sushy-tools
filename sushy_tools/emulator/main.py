@@ -21,7 +21,8 @@ import os
 import ssl
 import sys
 
-from sushy_tools.emulator.resources.managers import staticdriver
+from sushy_tools.emulator.resources.chassis import staticdriver as chsdriver
+from sushy_tools.emulator.resources.managers import staticdriver as mgrdriver
 from sushy_tools.emulator.resources.systems import libvirtdriver
 from sushy_tools.emulator.resources.systems import novadriver
 from sushy_tools import error
@@ -38,6 +39,7 @@ class Resources(object):
 
     SYSTEMS = None
     MANAGERS = None
+    CHASSIS = None
 
     def __new__(cls, *args, **kwargs):
 
@@ -78,22 +80,31 @@ class Resources(object):
                 'driver', cls.SYSTEMS().driver)
 
         if cls.MANAGERS is None:
-            cls.MANAGERS = staticdriver.StaticDriver.initialize(app.config)
+            cls.MANAGERS = mgrdriver.StaticDriver.initialize(app.config)
 
             app.logger.debug(
                 'Initialized manager resource backed by %s '
                 'driver', cls.MANAGERS().driver)
+
+        if cls.CHASSIS is None:
+            cls.CHASSIS = chsdriver.StaticDriver.initialize(app.config)
+
+            app.logger.debug(
+                'Initialized chassis resource backed by %s '
+                'driver', cls.CHASSIS().driver)
 
         return super(Resources, cls).__new__(cls, *args, **kwargs)
 
     def __enter__(self):
         self.systems = self.SYSTEMS()
         self.managers = self.MANAGERS()
+        self.chassis = self.CHASSIS()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         del self.systems
         del self.managers
+        del self.chassis
 
 
 def instance_denied(**kwargs):
@@ -156,6 +167,53 @@ def root_resource():
     return flask.render_template('root.json')
 
 
+@app.route('/redfish/v1/Chassis')
+@returns_json
+def chassis_collection_resource():
+    with Resources() as resources:
+
+        app.logger.debug('Serving chassis list')
+
+        return flask.render_template(
+            'chassis_collection.json',
+            manager_count=len(resources.chassis.chassis),
+            chassis=resources.chassis.chassis)
+
+
+@app.route('/redfish/v1/Chassis/<identity>', methods=['GET'])
+@returns_json
+def chassis_resource(identity):
+    if flask.request.method == 'GET':
+        with Resources() as resources:
+
+            app.logger.debug('Serving resources for chassis "%s"', identity)
+
+            chassis = resources.chassis
+
+            uuid = chassis.uuid(identity)
+
+            # the first chassis gets all resources
+            if uuid == chassis.chassis[0]:
+                systems = resources.systems.systems
+                managers = resources.managers.managers
+
+            else:
+                systems = []
+                managers = []
+
+            return flask.render_template(
+                'chassis.json',
+                identity=identity,
+                name=chassis.name(identity),
+                uuid=uuid,
+                contained_by=None,
+                contained_systems=systems,
+                contained_managers=managers,
+                contained_chassis=[],
+                managers=managers[:1]
+            )
+
+
 @app.route('/redfish/v1/Managers')
 @returns_json
 def manager_collection_resource():
@@ -185,9 +243,11 @@ def manager_resource(identity):
             # the first manager gets all resources
             if uuid == managers.managers[0]:
                 systems = resources.systems.systems
+                chassis = resources.chassis.chassis
 
             else:
                 systems = []
+                chassis = []
 
             return flask.render_template(
                 'manager.json',
@@ -196,7 +256,8 @@ def manager_resource(identity):
                 name=resources.managers.name(identity),
                 uuid=uuid,
                 serviceEntryPointUUID=resources.managers.uuid(identity),
-                systems=systems
+                systems=systems,
+                chassis=chassis
             )
 
 
@@ -233,7 +294,8 @@ def system_resource(identity):
                 total_cpus=resources.systems.get_total_cpus(identity),
                 boot_source_target=resources.systems.get_boot_device(identity),
                 boot_source_mode=resources.systems.get_boot_mode(identity),
-                managers=resources.managers.managers[:1]
+                managers=resources.managers.managers[:1],
+                chassis=resources.chassis.chassis[:1]
             )
 
     elif flask.request.method == 'PATCH':
