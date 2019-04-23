@@ -333,54 +333,51 @@ class LibvirtDriver(AbstractDriver):
 
             raise error.FishyError(msg)
 
-        loaders = []
-
-        for os_element in tree.findall('os'):
-            type_element = os_element.find('type')
-            if type_element is None:
-                os_arch = None
-            else:
-                os_arch = type_element.get('arch')
-
-            try:
-                loader_path = self.BOOT_DEVICE_MAP[boot_mode][os_arch]
-
-            except KeyError:
-                logger.warning('Boot loader is not configured for '
-                               'boot mode %s and OS architecture %s. '
-                               'Assuming no specific boot loader.',
-                               boot_mode, os_arch)
-                loader_path = ''
-
-            # NOTE(etingof): here we collect all tree nodes to be
-            # updated, but do not update them yet. The reason is to
-            # make sure that previously configured boot loaders are
-            # all present in our configuration, so we won't lose it
-            # when setting ours.
-
-            for loader_element in os_element.findall('loader'):
-                if loader_element.text not in self.KNOWN_BOOT_LOADERS:
-                    msg = ('Unknown boot loader path "%(path)s" in domain '
-                           '"%(identity)s" configuration encountered while '
-                           'setting boot mode "%(mode)s", system architecture '
-                           '"%(arch)s". Consider adding this loader path to '
-                           'emulator config.' % {'identity': identity,
-                                                 'mode': boot_mode,
-                                                 'arch': os_arch,
-                                                 'path': loader_element.text})
-                    raise error.FishyError(msg)
-
-                loaders.append((loader_element, loader_path))
-
-        if not loaders:
-            msg = ('Can\'t set boot mode because no "os" elements are present '
-                   'in domain "%(identity)s" or not a single "os" element has '
-                   '"loader" configured.' % {'identity': identity})
+        os_elements = tree.findall('os')
+        if len(os_elements) != 1:
+            msg = ('Can\'t set boot mode because "os" element must be present '
+                   'exactly once in domain "%(identity)s" '
+                   'configuration' % {'identity': identity})
             raise error.FishyError(msg)
 
-        for loader_element, loader_path in loaders:
-            loader_element.set('type', loader_type)
-            loader_element.text = loader_path
+        os_element = os_elements[0]
+
+        type_element = os_element.find('type')
+        if type_element is None:
+            os_arch = None
+
+        else:
+            os_arch = type_element.get('arch')
+
+        try:
+            loader_path = self.BOOT_LOADER_MAP[boot_mode][os_arch]
+
+        except KeyError:
+            logger.warning('Boot loader binary is not configured for '
+                           'boot mode %s and OS architecture %s. '
+                           'Assuming default boot loader for the domain.',
+                           boot_mode, os_arch)
+            loader_path = None
+
+        for loader_element in os_element.findall('loader'):
+            if loader_element.text not in self.KNOWN_BOOT_LOADERS:
+                msg = ('Unknown boot loader path "%(path)s" in domain '
+                       '"%(identity)s" configuration encountered while '
+                       'setting boot mode "%(mode)s", system architecture '
+                       '"%(arch)s". Consider adding this loader path to '
+                       'emulator config.' % {'identity': identity,
+                                             'mode': boot_mode,
+                                             'arch': os_arch,
+                                             'path': loader_element.text})
+                raise error.FishyError(msg)
+
+            if loader_path:
+                loader_element.set('type', loader_type)
+                loader_element.text = loader_path
+
+            else:
+                # NOTE(etingof): path must be present or element must be absent
+                os_element.remove(loader_element)
 
         with libvirt_open(self._uri) as conn:
 
