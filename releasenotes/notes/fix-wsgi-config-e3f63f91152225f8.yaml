@@ -1,0 +1,7 @@
+---
+fixes:
+  - |
+    Fixes Flask config file load as pointed by the ``SUSHY_EMULATOR_CONFIG``
+    environment variable when running under WSGI server. Before this fix,
+    the above mentioned environment variable was ignored and user config
+    file not loaded.

@@ -16,32 +16,33 @@ from six.moves import mock
 from sushy_tools.emulator import main
 
 
-@mock.patch('sushy_tools.emulator.main.SYSTEMS')
+@mock.patch('sushy_tools.emulator.main.Resources')
 class EmulatorTestCase(base.BaseTestCase):
 
     name = 'QEmu-fedora-i686'
     uuid = 'c7a5fdbd-cdaf-9455-926a-d65c16db1809'
 
     def setUp(self):
-        main.SYSTEMS = None
         self.app = main.app.test_client()
 
         super(EmulatorTestCase, self).setUp()
 
-    def test_error(self, systems_mock):
-        systems_mock = systems_mock.return_value
+    def test_error(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
         systems_mock.get_power_state.side_effect = Exception('Fish is dead')
         response = self.app.get('/redfish/v1/Systems/' + self.uuid)
 
         self.assertEqual(500, response.status_code)
 
-    def test_root_resource(self, systems_mock):
+    def test_root_resource(self, resources_mock):
         response = self.app.get('/redfish/v1/')
         self.assertEqual(200, response.status_code)
         self.assertEqual('RedvirtService', response.json['Id'])
 
-    def test_collection_resource(self, systems_mock):
-        systems_mock = systems_mock.return_value
+    def test_collection_resource(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
         type(systems_mock).systems = mock.PropertyMock(
             return_value=['host0', 'host1'])
         response = self.app.get('/redfish/v1/Systems')
@@ -51,8 +52,9 @@ class EmulatorTestCase(base.BaseTestCase):
         self.assertEqual({'@odata.id': '/redfish/v1/Systems/host1'},
                          response.json['Members'][1])
 
-    def test_system_resource_get(self, systems_mock):
-        systems_mock = systems_mock.return_value
+    def test_system_resource_get(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
         systems_mock.uuid.return_value = 'zzzz-yyyy-xxxx'
         systems_mock.get_power_state.return_value = 'On'
         systems_mock.get_total_memory.return_value = 1
@@ -74,8 +76,9 @@ class EmulatorTestCase(base.BaseTestCase):
         self.assertEqual(
             'Legacy', response.json['Boot']['BootSourceOverrideMode'])
 
-    def test_system_resource_patch(self, systems_mock):
-        systems_mock = systems_mock.return_value
+    def test_system_resource_patch(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
         data = {'Boot': {'BootSourceOverrideTarget': 'Cd'}}
         response = self.app.patch('/redfish/v1/Systems/xxxx-yyyy-zzzz',
                                   json=data)
@@ -83,8 +86,9 @@ class EmulatorTestCase(base.BaseTestCase):
         set_boot_device = systems_mock.set_boot_device
         set_boot_device.assert_called_once_with('xxxx-yyyy-zzzz', 'Cd')
 
-    def test_system_reset_action_on(self, systems_mock):
-        systems_mock = systems_mock.return_value
+    def test_system_reset_action_on(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
         data = {'ResetType': 'On'}
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
@@ -93,8 +97,9 @@ class EmulatorTestCase(base.BaseTestCase):
         set_power_state = systems_mock.set_power_state
         set_power_state.assert_called_once_with('xxxx-yyyy-zzzz', 'On')
 
-    def test_system_reset_action_forceon(self, systems_mock):
-        systems_mock = systems_mock.return_value
+    def test_system_reset_action_forceon(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
         data = {'ResetType': 'ForceOn'}
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
@@ -103,8 +108,9 @@ class EmulatorTestCase(base.BaseTestCase):
         set_power_state = systems_mock.set_power_state
         set_power_state.assert_called_once_with('xxxx-yyyy-zzzz', 'ForceOn')
 
-    def test_system_reset_action_forceoff(self, systems_mock):
-        systems_mock = systems_mock.return_value
+    def test_system_reset_action_forceoff(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
         data = {'ResetType': 'ForceOff'}
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
@@ -113,8 +119,9 @@ class EmulatorTestCase(base.BaseTestCase):
         set_power_state = systems_mock.set_power_state
         set_power_state.assert_called_once_with('xxxx-yyyy-zzzz', 'ForceOff')
 
-    def test_system_reset_action_shutdown(self, systems_mock):
-        systems_mock = systems_mock.return_value
+    def test_system_reset_action_shutdown(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
         data = {'ResetType': 'GracefulShutdown'}
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
@@ -124,8 +131,9 @@ class EmulatorTestCase(base.BaseTestCase):
         set_power_state.assert_called_once_with(
             'xxxx-yyyy-zzzz', 'GracefulShutdown')
 
-    def test_system_reset_action_restart(self, systems_mock):
-        systems_mock = systems_mock.return_value
+    def test_system_reset_action_restart(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
         data = {'ResetType': 'GracefulRestart'}
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
@@ -135,8 +143,9 @@ class EmulatorTestCase(base.BaseTestCase):
         set_power_state.assert_called_once_with(
             'xxxx-yyyy-zzzz', 'GracefulRestart')
 
-    def test_system_reset_action_forcerestart(self, systems_mock):
-        systems_mock = systems_mock.return_value
+    def test_system_reset_action_forcerestart(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
         data = {'ResetType': 'ForceRestart'}
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
@@ -146,8 +155,9 @@ class EmulatorTestCase(base.BaseTestCase):
         set_power_state.assert_called_once_with(
             'xxxx-yyyy-zzzz', 'ForceRestart')
 
-    def test_system_reset_action_nmi(self, systems_mock):
-        systems_mock = systems_mock.return_value
+    def test_system_reset_action_nmi(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
         data = {'ResetType': 'Nmi'}
         response = self.app.post(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/ComputerSystem.Reset',
@@ -157,33 +167,36 @@ class EmulatorTestCase(base.BaseTestCase):
         set_power_state.assert_called_once_with('xxxx-yyyy-zzzz', 'Nmi')
 
     @mock.patch.dict(main.app.config, {}, clear=True)
-    def test_instance_denied_allow_all(self, systems_mock):
+    def test_instance_denied_allow_all(self, resources_mock):
         self.assertFalse(main.instance_denied(identity='x'))
 
     @mock.patch.dict(
         main.app.config, {'SUSHY_EMULATOR_ALLOWED_INSTANCES': {}})
-    def test_instance_denied_disallow_all(self, systems_mock):
+    def test_instance_denied_disallow_all(self, resources_mock):
         self.assertTrue(main.instance_denied(identity='a'))
 
-    def test_instance_denied_undefined_option(self, systems_mock):
+    def test_instance_denied_undefined_option(self, resources_mock):
         with mock.patch.dict(main.app.config):
             main.app.config.pop('SUSHY_EMULATOR_ALLOWED_INSTANCES', None)
             self.assertFalse(main.instance_denied(identity='a'))
 
     @mock.patch.dict(
         main.app.config, {'SUSHY_EMULATOR_ALLOWED_INSTANCES': {'a'}})
-    def test_instance_denied_allow_some(self, systems_mock):
+    def test_instance_denied_allow_some(self, resources_mock):
         self.assertFalse(main.instance_denied(identity='a'))
 
     @mock.patch.dict(
         main.app.config, {'SUSHY_EMULATOR_ALLOWED_INSTANCES': {'a'}})
-    def test_instance_denied_disallow_some(self, systems_mock):
+    def test_instance_denied_disallow_some(self, resources_mock):
         self.assertTrue(main.instance_denied(identity='b'))
 
-    def test_get_bios(self, systems_mock):
-        systems_mock = systems_mock.return_value
-        systems_mock.get_bios.return_value = {"attribute 1": "value 1",
-                                              "attribute 2": "value 2"}
+    def test_get_bios(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
+        systems_mock.get_bios.return_value = {
+            "attribute 1": "value 1",
+            "attribute 2": "value 2"
+        }
         response = self.app.get('/redfish/v1/Systems/' + self.uuid + '/BIOS')
 
         self.assertEqual(200, response.status_code)
@@ -192,32 +205,38 @@ class EmulatorTestCase(base.BaseTestCase):
                           "attribute 2": "value 2"},
                          response.json['Attributes'])
 
-    def test_get_bios_existing(self, systems_mock):
-        systems_mock = systems_mock.return_value
-        systems_mock.get_bios.return_value = {"attribute 1": "value 1",
-                                              "attribute 2": "value 2"}
+    def test_get_bios_existing(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
+        systems_mock.get_bios.return_value = {
+            "attribute 1": "value 1",
+            "attribute 2": "value 2"
+        }
         response = self.app.get(
             '/redfish/v1/Systems/' + self.uuid + '/BIOS/Settings')
 
         self.assertEqual(200, response.status_code)
         self.assertEqual('Settings', response.json['Id'])
-        self.assertEqual({"attribute 1": "value 1",
-                          "attribute 2": "value 2"},
-                         response.json['Attributes'])
+        self.assertEqual(
+            {"attribute 1": "value 1",
+             "attribute 2": "value 2"},
+            response.json['Attributes'])
 
-    def test_bios_settings_patch(self, systems_mock):
-        systems_mock = systems_mock.return_value
+    def test_bios_settings_patch(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
         data = {'Attributes': {'key': 'value'}}
         self.app.driver = systems_mock
         response = self.app.patch(
             '/redfish/v1/Systems/xxxx-yyyy-zzzz/BIOS/Settings',
             json=data)
         self.assertEqual(204, response.status_code)
-        systems_mock.set_bios.assert_called_once_with('xxxx-yyyy-zzzz',
-                                                      {'key': 'value'})
+        systems_mock.set_bios.assert_called_once_with(
+            'xxxx-yyyy-zzzz', {'key': 'value'})
 
-    def test_set_bios(self, systems_mock):
-        systems_mock = systems_mock.return_value
+    def test_set_bios(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
         data = {'Attributes': {'key': 'value'}}
         self.app.driver = systems_mock
         response = self.app.patch(
@@ -228,20 +247,21 @@ class EmulatorTestCase(base.BaseTestCase):
         systems_mock.set_bios.assert_called_once_with(
             'xxxx-yyyy-zzzz', data['Attributes'])
 
-    def test_reset_bios(self, systems_mock):
-        systems_mock = systems_mock.return_value
+    def test_reset_bios(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
         self.app.driver = systems_mock
         response = self.app.post('/redfish/v1/Systems/' + self.uuid +
                                  '/BIOS/Actions/Bios.ResetBios')
         self.assertEqual(204, response.status_code)
         systems_mock.reset_bios.assert_called_once_with(self.uuid)
 
-    def test_ethernet_interfaces_collection(self, systems_mock):
-        systems_mock = systems_mock.return_value
-        systems_mock.get_nics.return_value = [{'id': 'nic1',
-                                              'mac': '52:54:00:4e:5d:37'},
-                                              {'id': 'nic2',
-                                               'mac': '00:11:22:33:44:55'}]
+    def test_ethernet_interfaces_collection(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
+        systems_mock.get_nics.return_value = [
+            {'id': 'nic1', 'mac': '52:54:00:4e:5d:37'},
+            {'id': 'nic2', 'mac': '00:11:22:33:44:55'}]
         response = self.app.get('redfish/v1/Systems/' + self.uuid +
                                 '/EthernetInterfaces')
 
@@ -255,8 +275,9 @@ class EmulatorTestCase(base.BaseTestCase):
                           '/EthernetInterfaces/nic2'],
                          [m['@odata.id'] for m in response.json['Members']])
 
-    def test_ethernet_interfaces_collection_empty(self, systems_mock):
-        systems_mock = systems_mock.return_value
+    def test_ethernet_interfaces_collection_empty(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
         systems_mock.get_nics.return_value = []
         response = self.app.get('redfish/v1/Systems/' + self.uuid +
                                 '/EthernetInterfaces')
@@ -267,12 +288,12 @@ class EmulatorTestCase(base.BaseTestCase):
         self.assertEqual(0, response.json['Members@odata.count'])
         self.assertEqual([], response.json['Members'])
 
-    def test_ethernet_interface(self, systems_mock):
-        systems_mock = systems_mock.return_value
-        systems_mock.get_nics.return_value = [{'id': 'nic1',
-                                              'mac': '52:54:00:4e:5d:37'},
-                                              {'id': 'nic2',
-                                               'mac': '00:11:22:33:44:55'}]
+    def test_ethernet_interface(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
+        systems_mock.get_nics.return_value = [
+            {'id': 'nic1', 'mac': '52:54:00:4e:5d:37'},
+            {'id': 'nic2', 'mac': '00:11:22:33:44:55'}]
         response = self.app.get('/redfish/v1/Systems/' + self.uuid +
                                 '/EthernetInterfaces/nic2')
 
@@ -287,12 +308,13 @@ class EmulatorTestCase(base.BaseTestCase):
                          '/EthernetInterfaces/nic2',
                          response.json['@odata.id'])
 
-    def test_ethernet_interface_not_found(self, systems_mock):
-        systems_mock = systems_mock.return_value
-        systems_mock.get_nics.return_value = [{'id': 'nic1',
-                                              'mac': '52:54:00:4e:5d:37'},
-                                              {'id': 'nic2',
-                                              'mac': '00:11:22:33:44:55'}]
+    def test_ethernet_interface_not_found(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
+        systems_mock.get_nics.return_value = [
+            {'id': 'nic1', 'mac': '52:54:00:4e:5d:37'},
+            {'id': 'nic2', 'mac': '00:11:22:33:44:55'}
+        ]
         response = self.app.get('/redfish/v1/Systems/' + self.uuid +
                                 '/EthernetInterfaces/nic3')
 

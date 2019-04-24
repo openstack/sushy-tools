@@ -14,7 +14,6 @@
 #    under the License.
 
 import argparse
-import contextlib
 import functools
 import json
 import os
@@ -33,47 +32,57 @@ app = flask.Flask(__name__)
 # Turn off strict_slashes on all routes
 app.url_map.strict_slashes = False
 
-SYSTEMS = None
 
+class Resources(object):
 
-def init_systems(decorated_func):
-    @functools.wraps(decorated_func)
-    def decorator(*args, **kwargs):
-        global SYSTEMS
+    SYSTEMS = None
 
-        if SYSTEMS is None:
+    def __new__(cls, *args, **kwargs):
 
-            if 'OS_CLOUD' in os.environ:
+        config_file = os.environ.pop('SUSHY_EMULATOR_CONFIG', None)
+        if config_file:
+            app.config.from_pyfile(config_file)
+
+        if not cls.SYSTEMS:
+
+            os_cloud = (os.environ.get('OS_CLOUD') or
+                        app.config.get('SUSHY_EMULATOR_OS_CLOUD'))
+
+            if os_cloud:
                 if not novadriver.is_loaded:
                     app.logger.error('Nova driver not loaded')
                     sys.exit(1)
 
-                SYSTEMS = novadriver.OpenStackDriver.initialize(
-                    app.config, os.environ['OS_CLOUD'])
+                cls.SYSTEMS = novadriver.OpenStackDriver.initialize(
+                    app.config, os_cloud)
 
             else:
                 if not libvirtdriver.is_loaded:
                     app.logger.error('libvirt driver not loaded')
                     sys.exit(1)
 
-                SYSTEMS = libvirtdriver.LibvirtDriver.initialize(
-                    app.config,
-                    os.environ.get(
-                        'SUSHY_EMULATOR_LIBVIRT_URI',
-                        # NOTE(etingof): left for backward compatibility
-                        os.environ.get('SUSHY_EMULATOR_LIBVIRT_URL'))
-                )
+                libvirt_uri = (
+                    os.environ.get('SUSHY_EMULATOR_LIBVIRT_URI') or
+                    # NOTE(etingof): left for backward compatibility
+                    os.environ.get('SUSHY_EMULATOR_LIBVIRT_URL') or
+                    app.config.get('SUSHY_EMULATOR_LIBVIRT_URI') or
+                    '')
 
-            app.logger.debug('Running with %s', SYSTEMS.driver)
+                cls.SYSTEMS = libvirtdriver.LibvirtDriver.initialize(
+                    app.config, libvirt_uri)
 
-        return decorated_func(*args, **kwargs)
+            app.logger.debug(
+                'Initialized system resource backed by %s '
+                'driver', cls.SYSTEMS().driver)
 
-    return decorator
+        return super(Resources, cls).__new__(cls, *args, **kwargs)
 
+    def __enter__(self):
+        self.systems = self.SYSTEMS()
+        return self
 
-@contextlib.contextmanager
-def systems_driver():
-    yield SYSTEMS()
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        del self.systems
 
 
 def instance_denied(**kwargs):
@@ -131,18 +140,16 @@ def all_exception_handler(message):
 
 
 @app.route('/redfish/v1/')
-@init_systems
 @returns_json
 def root_resource():
     return flask.render_template('root.json')
 
 
 @app.route('/redfish/v1/Systems')
-@init_systems
 @returns_json
 def system_collection_resource():
-    with systems_driver() as systems:
-        systems = [system for system in systems.systems
+    with Resources() as resources:
+        systems = [system for system in resources.systems.systems
                    if not instance_denied(identity=system)]
 
     app.logger.debug('Serving systems list')
@@ -152,7 +159,6 @@ def system_collection_resource():
 
 
 @app.route('/redfish/v1/Systems/<identity>', methods=['GET', 'PATCH'])
-@init_systems
 @ensure_instance_access
 @returns_json
 def system_resource(identity):
@@ -160,17 +166,17 @@ def system_resource(identity):
 
         app.logger.debug('Serving resources for system "%s"', identity)
 
-        with systems_driver() as systems:
+        with Resources() as resources:
             return flask.render_template(
                 'system.json',
                 identity=identity,
-                name=systems.name(identity),
-                uuid=systems.uuid(identity),
-                power_state=systems.get_power_state(identity),
-                total_memory_gb=systems.get_total_memory(identity),
-                total_cpus=systems.get_total_cpus(identity),
-                boot_source_target=systems.get_boot_device(identity),
-                boot_source_mode=systems.get_boot_mode(identity)
+                name=resources.systems.name(identity),
+                uuid=resources.systems.uuid(identity),
+                power_state=resources.systems.get_power_state(identity),
+                total_memory_gb=resources.systems.get_total_memory(identity),
+                total_cpus=resources.systems.get_total_cpus(identity),
+                boot_source_target=resources.systems.get_boot_device(identity),
+                boot_source_mode=resources.systems.get_boot_mode(identity)
             )
 
     elif flask.request.method == 'PATCH':
@@ -178,7 +184,7 @@ def system_resource(identity):
         if not boot:
             return 'PATCH only works for the Boot element', 400
 
-        with systems_driver() as systems:
+        with Resources() as resources:
 
             target = boot.get('BootSourceOverrideTarget')
 
@@ -187,7 +193,7 @@ def system_resource(identity):
                 # device frequency to "continuous" so, we are ignoring the
                 # BootSourceOverrideEnabled element here
 
-                systems.set_boot_device(identity, target)
+                resources.systems.set_boot_device(identity, target)
 
                 app.logger.info('Set boot device to "%s" for system "%s"',
                                 target, identity)
@@ -195,7 +201,7 @@ def system_resource(identity):
             mode = boot.get('BootSourceOverrideMode')
 
             if mode:
-                systems.set_boot_mode(identity, mode)
+                resources.systems.set_boot_mode(identity, mode)
 
                 app.logger.info('Set boot mode to "%s" for system "%s"',
                                 mode, identity)
@@ -209,13 +215,11 @@ def system_resource(identity):
 
 @app.route('/redfish/v1/Systems/<identity>/EthernetInterfaces',
            methods=['GET'])
-@init_systems
 @ensure_instance_access
 @returns_json
 def ethernet_interfaces_collection(identity):
-    with systems_driver() as systems:
-
-        nics = systems.get_nics(identity)
+    with Resources() as resources:
+        nics = resources.systems.get_nics(identity)
 
         return flask.render_template(
             'ethernet_interfaces_collection.json', identity=identity,
@@ -224,12 +228,11 @@ def ethernet_interfaces_collection(identity):
 
 @app.route('/redfish/v1/Systems/<identity>/EthernetInterfaces/<nic_id>',
            methods=['GET'])
-@init_systems
 @ensure_instance_access
 @returns_json
 def ethernet_interface(identity, nic_id):
-    with systems_driver() as systems:
-        nics = systems.get_nics(identity)
+    with Resources() as resources:
+        nics = resources.systems.get_nics(identity)
 
     for nic in nics:
         if nic['id'] == nic_id:
@@ -241,14 +244,13 @@ def ethernet_interface(identity, nic_id):
 
 @app.route('/redfish/v1/Systems/<identity>/Actions/ComputerSystem.Reset',
            methods=['POST'])
-@init_systems
 @ensure_instance_access
 @returns_json
 def system_reset_action(identity):
     reset_type = flask.request.json.get('ResetType')
 
-    with systems_driver() as systems:
-        systems.set_power_state(identity, reset_type)
+    with Resources() as resources:
+        resources.systems.set_power_state(identity, reset_type)
 
     app.logger.info('System "%s" power state set to "%s"',
                     identity, reset_type)
@@ -257,12 +259,11 @@ def system_reset_action(identity):
 
 
 @app.route('/redfish/v1/Systems/<identity>/BIOS', methods=['GET'])
-@init_systems
 @ensure_instance_access
 @returns_json
 def bios(identity):
-    with systems_driver() as systems:
-        bios = systems.get_bios(identity)
+    with Resources() as resources:
+        bios = resources.systems.get_bios(identity)
 
     app.logger.debug('Serving BIOS for system "%s"', identity)
 
@@ -274,14 +275,13 @@ def bios(identity):
 
 @app.route('/redfish/v1/Systems/<identity>/BIOS/Settings',
            methods=['GET', 'PATCH'])
-@init_systems
 @ensure_instance_access
 @returns_json
 def bios_settings(identity):
 
     if flask.request.method == 'GET':
-        with systems_driver() as systems:
-            bios = systems.get_bios(identity)
+        with Resources() as resources:
+            bios = resources.systems.get_bios(identity)
 
         app.logger.debug('Serving BIOS Settings for system "%s"', identity)
 
@@ -293,8 +293,8 @@ def bios_settings(identity):
     elif flask.request.method == 'PATCH':
         attributes = flask.request.json.get('Attributes')
 
-        with systems_driver() as systems:
-            systems.set_bios(identity, attributes)
+        with Resources() as resources:
+            resources.systems.set_bios(identity, attributes)
 
         app.logger.info('System "%s" BIOS attributes "%s" updated',
                         identity, attributes)
@@ -303,13 +303,11 @@ def bios_settings(identity):
 
 @app.route('/redfish/v1/Systems/<identity>/BIOS/Actions/Bios.ResetBios',
            methods=['POST'])
-@init_systems
 @ensure_instance_access
 @returns_json
 def system_reset_bios(identity):
-
-    with systems_driver() as systems:
-        systems.reset_bios(identity)
+    with Resources() as resources:
+        resources.systems.reset_bios(identity)
 
     app.logger.info('BIOS for system "%s" reset', identity)
 
@@ -359,35 +357,17 @@ def parse_args():
 
 
 def main():
-    global SYSTEMS
 
     args = parse_args()
 
-    config_file = args.config or os.environ.get('SUSHY_EMULATOR_CONFIG')
-    if config_file:
-        app.config.from_pyfile(config_file)
+    if args.config:
+        os.environ['SUSHY_EMULATOR_CONFIG'] = args.config
 
-    os_cloud = args.os_cloud or app.config.get('SUSHY_EMULATOR_OS_CLOUD')
-    if os_cloud:
-        if not novadriver:
-            app.logger.error('Nova driver not loaded')
-            return 1
+    if args.os_cloud:
+        os.environ['OS_CLOUD'] = args.os_cloud
 
-        SYSTEMS = novadriver.OpenStackDriver.initialize(
-            app.config, os_cloud)
-
-    else:
-        if not libvirtdriver.is_loaded:
-            app.logger.error('libvirt driver not loaded')
-            return 1
-
-        SYSTEMS = libvirtdriver.LibvirtDriver.initialize(
-            app.config,
-            args.libvirt_uri or
-            app.config.get('SUSHY_EMULATOR_LIBVIRT_URI', '')
-        )
-
-    app.logger.debug('Running with %s', SYSTEMS.driver)
+    if args.libvirt_uri:
+        os.environ['SUSHY_EMULATOR_LIBVIRT_URI'] = args.libvirt_uri
 
     ssl_context = None
 
