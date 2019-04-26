@@ -295,3 +295,45 @@ other relations.
         "@odata.context": "/redfish/v1/$metadata#ChassisCollection.ChassisCollection",
         "@odata.id": "/redfish/v1/Chassis",
         "@Redfish.Copyright": "Copyright 2014-2017 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+
+Indicator resource
+------------------
+
+*IndicatorLED* resource is emulated as a persistent emulator database
+record, observable and manageable by a Redfish client.
+
+By default, *Chassis* and *Systems* resources have emulated *IndicatorLED*
+sub-resource attached and *Lit*.
+
+Non-default initial indicator state can optionally be configured
+on a per-resource basis:
+
+.. code-block:: python
+
+    SUSHY_EMULATOR_INDICATOR_LEDS = {
+        "48295861-2522-3561-6729-621118518810": "Blinking"
+    }
+
+Indicator LEDs will be revealed when querying any resource having
+*IndicatorLED*:
+
+.. code-block:: bash
+
+    $ curl http://localhost:8000/redfish/v1/Chassis/48295861-2522-3561-6729-621118518810
+    {
+        "@odata.type": "#Chassis.v1_5_0.Chassis",
+        "Id": "48295861-2522-3561-6729-621118518810",
+        "Name": "Chassis",
+        "UUID": "48295861-2522-3561-6729-621118518810",
+        ...
+        "IndicatorLED": "Lit",
+        ...
+    }
+
+Redfish client can turn *IndicatorLED* into a different state:
+
+.. code-block:: bash
+
+   curl -d '{"IndicatorLED": "Blinking"}' \
+       -H "Content-Type: application/json" -X PATCH \
+        http://localhost:8000/redfish/v1/Chassis/48295861-2522-3561-6729-621118518810

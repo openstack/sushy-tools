@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    Adds generic Indicator LED resource emulation based on static user
+    configuration. Adds ``IndicatorLED`` property to Chassis and System
+    resources.

@@ -12,7 +12,13 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-import collections
+
+try:
+    from collections import abc as collections
+
+except ImportError:
+    import collections
+
 from functools import wraps
 import os
 import pickle

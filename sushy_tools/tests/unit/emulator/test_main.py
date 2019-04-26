@@ -14,6 +14,7 @@ from oslotest import base
 from six.moves import mock
 
 from sushy_tools.emulator import main
+from sushy_tools import error
 
 
 @mock.patch('sushy_tools.emulator.main.Resources')
@@ -61,18 +62,44 @@ class EmulatorTestCase(base.BaseTestCase):
         managers_mock.managers = ['man1']
         systems_mock = resources_mock.systems
         systems_mock.systems = ['sys1']
+        indicators_mock = resources_mock.indicators
+        indicators_mock.get_indicator_state.return_value = 'Off'
 
         response = self.app.get('/redfish/v1/Chassis/xxxx-yyyy-zzzz')
 
         self.assertEqual(200, response.status_code)
         self.assertEqual('xxxx-yyyy-zzzz', response.json['Id'])
         self.assertEqual('xxxx-yyyy-zzzz', response.json['UUID'])
+        self.assertEqual('Off', response.json['IndicatorLED'])
         self.assertEqual([{'@odata.id': '/redfish/v1/Systems/sys1'}],
                          response.json['Links']['ComputerSystems'])
         self.assertEqual([{'@odata.id': '/redfish/v1/Managers/man1'}],
                          response.json['Links']['ManagedBy'])
         self.assertEqual([{'@odata.id': '/redfish/v1/Managers/man1'}],
                          response.json['Links']['ManagersInChassis'])
+
+    def test_chassis_indicator_set_ok(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        indicators_mock = resources_mock.indicators
+        chassis_mock = resources_mock.chassis
+        chassis_mock.uuid.return_value = self.uuid
+
+        data = {'IndicatorLED': 'Off'}
+        response = self.app.patch('/redfish/v1/Chassis/xxxx-yyyy-zzzz',
+                                  json=data)
+        self.assertEqual(204, response.status_code)
+        set_indicator_state = indicators_mock.set_indicator_state
+        set_indicator_state.assert_called_once_with(self.uuid, 'Off')
+
+    def test_chassis_indicator_set_fail(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        indicators_mock = resources_mock.indicators
+        set_indicator_state = indicators_mock.set_indicator_state
+        set_indicator_state.side_effect = error.FishyError
+        data = {'IndicatorLED': 'Blah'}
+        response = self.app.patch('/redfish/v1/Chassis/xxxx-yyyy-zzzz',
+                                  json=data)
+        self.assertEqual(500, response.status_code)
 
     def test_manager_collection_resource(self, resources_mock):
         resources_mock = resources_mock.return_value.__enter__.return_value
@@ -135,6 +162,8 @@ class EmulatorTestCase(base.BaseTestCase):
         managers_mock.managers = ['aaaa-bbbb-cccc']
         chassis_mock = resources_mock.chassis
         chassis_mock.chassis = ['chassis0']
+        indicators_mock = resources_mock.indicators
+        indicators_mock.get_indicator_state.return_value = 'Off'
 
         response = self.app.get('/redfish/v1/Systems/xxxx-yyyy-zzzz')
 
@@ -142,6 +171,7 @@ class EmulatorTestCase(base.BaseTestCase):
         self.assertEqual('xxxx-yyyy-zzzz', response.json['Id'])
         self.assertEqual('zzzz-yyyy-xxxx', response.json['UUID'])
         self.assertEqual('On', response.json['PowerState'])
+        self.assertEqual('Off', response.json['IndicatorLED'])
         self.assertEqual(
             1, response.json['MemorySummary']['TotalSystemMemoryGiB'])
         self.assertEqual(2, response.json['ProcessorSummary']['Count'])
@@ -245,6 +275,29 @@ class EmulatorTestCase(base.BaseTestCase):
         self.assertEqual(204, response.status_code)
         set_power_state = systems_mock.set_power_state
         set_power_state.assert_called_once_with('xxxx-yyyy-zzzz', 'Nmi')
+
+    def test_system_indicator_set_ok(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        indicators_mock = resources_mock.indicators
+        systems_mock = resources_mock.systems
+        systems_mock.uuid.return_value = self.uuid
+
+        data = {'IndicatorLED': 'Off'}
+        response = self.app.patch('/redfish/v1/Systems/xxxx-yyyy-zzzz',
+                                  json=data)
+        self.assertEqual(204, response.status_code)
+        set_indicator_state = indicators_mock.set_indicator_state
+        set_indicator_state.assert_called_once_with(self.uuid, 'Off')
+
+    def test_system_indicator_set_fail(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        indicators_mock = resources_mock.indicators
+        set_indicator_state = indicators_mock.set_indicator_state
+        set_indicator_state.side_effect = error.FishyError
+        data = {'IndicatorLED': 'Blah'}
+        response = self.app.patch('/redfish/v1/Systems/xxxx-yyyy-zzzz',
+                                  json=data)
+        self.assertEqual(500, response.status_code)
 
     @mock.patch.dict(main.app.config, {}, clear=True)
     def test_instance_denied_allow_all(self, resources_mock):

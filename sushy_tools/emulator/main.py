@@ -22,6 +22,7 @@ import ssl
 import sys
 
 from sushy_tools.emulator.resources.chassis import staticdriver as chsdriver
+from sushy_tools.emulator.resources.indicators import staticdriver as inddriver
 from sushy_tools.emulator.resources.managers import staticdriver as mgrdriver
 from sushy_tools.emulator.resources.systems import libvirtdriver
 from sushy_tools.emulator.resources.systems import novadriver
@@ -40,6 +41,7 @@ class Resources(object):
     SYSTEMS = None
     MANAGERS = None
     CHASSIS = None
+    INDICATORS = None
 
     def __new__(cls, *args, **kwargs):
 
@@ -93,18 +95,27 @@ class Resources(object):
                 'Initialized chassis resource backed by %s '
                 'driver', cls.CHASSIS().driver)
 
+        if cls.INDICATORS is None:
+            cls.INDICATORS = inddriver.StaticDriver.initialize(app.config)
+
+            app.logger.debug(
+                'Initialized indicators resource backed by %s '
+                'driver', cls.INDICATORS().driver)
+
         return super(Resources, cls).__new__(cls, *args, **kwargs)
 
     def __enter__(self):
         self.systems = self.SYSTEMS()
         self.managers = self.MANAGERS()
         self.chassis = self.CHASSIS()
+        self.indicators = self.INDICATORS()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         del self.systems
         del self.managers
         del self.chassis
+        del self.indicators
 
 
 def instance_denied(**kwargs):
@@ -180,17 +191,18 @@ def chassis_collection_resource():
             chassis=resources.chassis.chassis)
 
 
-@app.route('/redfish/v1/Chassis/<identity>', methods=['GET'])
+@app.route('/redfish/v1/Chassis/<identity>', methods=['GET', 'PATCH'])
 @returns_json
 def chassis_resource(identity):
-    if flask.request.method == 'GET':
-        with Resources() as resources:
+    with Resources() as resources:
+
+        chassis = resources.chassis
+
+        uuid = chassis.uuid(identity)
+
+        if flask.request.method == 'GET':
 
             app.logger.debug('Serving resources for chassis "%s"', identity)
-
-            chassis = resources.chassis
-
-            uuid = chassis.uuid(identity)
 
             # the first chassis gets all resources
             if uuid == chassis.chassis[0]:
@@ -210,8 +222,23 @@ def chassis_resource(identity):
                 contained_systems=systems,
                 contained_managers=managers,
                 contained_chassis=[],
-                managers=managers[:1]
+                managers=managers[:1],
+                indicator_led=resources.indicators.get_indicator_state(
+                    uuid)
             )
+
+        elif flask.request.method == 'PATCH':
+            indicator_led_state = flask.request.json.get('IndicatorLED')
+            if not indicator_led_state:
+                return 'PATCH only works for IndicatorLED element', 400
+
+            resources.indicators.set_indicator_state(
+                uuid, indicator_led_state)
+
+            app.logger.info('Set indicator LED to "%s" for chassis "%s"',
+                            indicator_led_state, identity)
+
+            return '', 204
 
 
 @app.route('/redfish/v1/Managers')
@@ -278,11 +305,12 @@ def system_collection_resource():
 @ensure_instance_access
 @returns_json
 def system_resource(identity):
-    if flask.request.method == 'GET':
 
-        app.logger.debug('Serving resources for system "%s"', identity)
+    with Resources() as resources:
 
-        with Resources() as resources:
+        if flask.request.method == 'GET':
+
+            app.logger.debug('Serving resources for system "%s"', identity)
 
             return flask.render_template(
                 'system.json',
@@ -295,39 +323,49 @@ def system_resource(identity):
                 boot_source_target=resources.systems.get_boot_device(identity),
                 boot_source_mode=resources.systems.get_boot_mode(identity),
                 managers=resources.managers.managers[:1],
-                chassis=resources.chassis.chassis[:1]
+                chassis=resources.chassis.chassis[:1],
+                indicator_led=resources.indicators.get_indicator_state(
+                    resources.systems.uuid(identity))
             )
 
-    elif flask.request.method == 'PATCH':
-        boot = flask.request.json.get('Boot')
-        if not boot:
-            return 'PATCH only works for the Boot element', 400
+        elif flask.request.method == 'PATCH':
+            boot = flask.request.json.get('Boot')
+            indicator_led_state = flask.request.json.get('IndicatorLED')
+            if not boot and not indicator_led_state:
+                return ('PATCH only works for Boot and '
+                        'IndicatorLED elements'), 400
 
-        with Resources() as resources:
+            if boot:
+                target = boot.get('BootSourceOverrideTarget')
 
-            target = boot.get('BootSourceOverrideTarget')
+                if target:
+                    # NOTE(lucasagomes): In libvirt we always set the boot
+                    # device frequency to "continuous" so, we are ignoring the
+                    # BootSourceOverrideEnabled element here
 
-            if target:
-                # NOTE(lucasagomes): In libvirt we always set the boot
-                # device frequency to "continuous" so, we are ignoring the
-                # BootSourceOverrideEnabled element here
+                    resources.systems.set_boot_device(identity, target)
 
-                resources.systems.set_boot_device(identity, target)
+                    app.logger.info('Set boot device to "%s" for system "%s"',
+                                    target, identity)
 
-                app.logger.info('Set boot device to "%s" for system "%s"',
-                                target, identity)
+                mode = boot.get('BootSourceOverrideMode')
 
-            mode = boot.get('BootSourceOverrideMode')
+                if mode:
+                    resources.systems.set_boot_mode(identity, mode)
 
-            if mode:
-                resources.systems.set_boot_mode(identity, mode)
+                    app.logger.info('Set boot mode to "%s" for system "%s"',
+                                    mode, identity)
 
-                app.logger.info('Set boot mode to "%s" for system "%s"',
-                                mode, identity)
+                if not target and not mode:
+                    return ('Missing the BootSourceOverrideTarget and/or '
+                            'BootSourceOverrideMode element', 400)
 
-            if not target and not mode:
-                return ('Missing the BootSourceOverrideTarget and/or '
-                        'BootSourceOverrideMode element', 400)
+            if indicator_led_state:
+                resources.indicators.set_indicator_state(
+                    resources.systems.uuid(identity), indicator_led_state)
+
+                app.logger.info('Set indicator LED to "%s" for system "%s"',
+                                indicator_led_state, identity)
 
             return '', 204
 
