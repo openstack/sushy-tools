@@ -22,5 +22,5 @@ to the static Redfish responser.
 
 * Free software: Apache license
 * Documentation: https://docs.openstack.org/sushy/
-* Source: http://git.openstack.org/cgit/openstack/sushy-tools
+* Source: http://opendev.org/openstack/sushy-tools
 * Bugs: https://storyboard.openstack.org/#!/project/openstack/sushy-tools

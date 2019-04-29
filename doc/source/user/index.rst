@@ -52,7 +52,7 @@ Virtual Redfish BMC
 -------------------
 
 The virtual Redfish BMC is functionally similar to the
-`Virtual BMC <https://git.openstack.org/cgit/openstack/virtualbmc>`_ tool
+`Virtual BMC <https://opendev.org/openstack/virtualbmc>`_ tool
 except that the frontend protocol is Redfish rather than IPMI. The Redfish
 commands coming from the client get executed against the virtualization
 backend. That lets you control virtual machine instances over Redfish.
@@ -119,7 +119,7 @@ You should be able to flip its power state via the Redfish call:
 
 You can have as many domains as you need. The domains can be concurrently
 managed over Redfish and some other tool like
-`Virtual BMC <https://git.openstack.org/cgit/openstack/virtualbmc>`_.
+`Virtual BMC <https://opendev.org/openstack/virtualbmc>`_.
 
 The OpenStack backend
 +++++++++++++++++++++
@@ -184,4 +184,4 @@ And flip its power state via the Redfish call:
 
 You can have as many OpenStack instances as you need. The instances can be
 concurrently managed over Redfish and functionally similar tools like
-`Virtual BMC <https://git.openstack.org/cgit/openstack/virtualbmc>`_.
+`Virtual BMC <https://opendev.org/openstack/virtualbmc>`_.
