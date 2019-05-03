@@ -342,6 +342,55 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         self.assertIsNone(os_element.find('loader'))
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_get_boot_image(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/domain.xml', 'r') as f:
+            data = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = data
+
+        image_info = self.test_driver.get_boot_image(self.uuid, 'Cd')
+
+        expected = '/home/user/boot.iso', False, False
+
+        self.assertEqual(expected, image_info)
+
+    @mock.patch('sushy_tools.emulator.resources.systems.libvirtdriver'
+                '.os.stat', autospec=True)
+    @mock.patch('sushy_tools.emulator.resources.systems.libvirtdriver'
+                '.open')
+    @mock.patch('libvirt.open', autospec=True)
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_set_boot_image(self, libvirt_mock, libvirt_rw_mock,
+                            open_mock, stat_mock):
+        with open('sushy_tools/tests/unit/emulator/domain.xml', 'r') as f:
+            data = f.read()
+
+        conn_mock = libvirt_rw_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = data
+
+        pool_mock = conn_mock.storagePoolLookupByName.return_value
+
+        with open('sushy_tools/tests/unit/emulator/pool.xml', 'r') as f:
+            data = f.read()
+
+        pool_mock.XMLDesc.return_value = data
+
+        self.test_driver.set_boot_image(self.uuid, 'Cd', '/tmp/image.iso')
+
+        conn_mock = libvirt_rw_mock.return_value
+        pool_mock.listAllVolumes.assert_called_once_with()
+        stat_mock.assert_called_once_with('/tmp/image.iso')
+        pool_mock.createXML.assert_called_once_with(mock.ANY)
+
+        volume_mock = pool_mock.createXML.return_value
+        volume_mock.upload.assert_called_once_with(mock.ANY, 0, mock.ANY)
+
+        conn_mock.defineXML.assert_called_once_with(mock.ANY)
+
+    @mock.patch('libvirt.openReadOnly', autospec=True)
     def test_get_total_memory(self, libvirt_mock):
         conn_mock = libvirt_mock.return_value
         domain_mock = conn_mock.lookupByUUID.return_value

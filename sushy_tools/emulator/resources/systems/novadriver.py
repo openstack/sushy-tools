@@ -355,7 +355,7 @@ class OpenStackDriver(AbstractSystemsDriver):
         :returns: a `tuple` of (boot_image, write_protected, inserted)
         :raises: `error.FishyError` if boot device can't be accessed
         """
-        raise error.FishyError('Not implemented')
+        raise error.NotSupportedError('Not implemented')
 
     def set_boot_image(self, identity, device, boot_image=None,
                        write_protected=True):
@@ -370,4 +370,4 @@ class OpenStackDriver(AbstractSystemsDriver):
 
         :raises: `error.FishyError` if boot device can't be set
         """
-        raise error.FishyError('Not implemented')
+        raise error.NotSupportedError('Not implemented')

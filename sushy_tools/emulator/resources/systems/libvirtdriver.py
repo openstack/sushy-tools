@@ -15,6 +15,7 @@
 
 from collections import namedtuple
 import logging
+import os
 import uuid
 import xml.etree.ElementTree as ET
 
@@ -100,10 +101,38 @@ class LibvirtDriver(AbstractSystemsDriver):
 
     }
 
+    DEVICE_TYPE_MAP = {
+        constants.DEVICE_TYPE_CD: 'cdrom',
+        constants.DEVICE_TYPE_FLOPPY: 'floppy',
+    }
+
+    DEVICE_TYPE_MAP_REV = {v: k for k, v in DEVICE_TYPE_MAP.items()}
+
+    # target device, controller ID, controller unit number
+    DEVICE_TARGET_MAP = {
+        constants.DEVICE_TYPE_FLOPPY: ('fda', 'fdc', '0'),
+        constants.DEVICE_TYPE_CD: ('hdc', 'ide', '1')
+    }
+
     DEFAULT_BIOS_ATTRIBUTES = {"BootMode": "Uefi",
                                "EmbeddedSata": "Raid",
                                "NicBoot1": "NetworkBoot",
                                "ProcTurboMode": "Enabled"}
+
+    STORAGE_POOL = 'default'
+
+    STORAGE_POOL_XML = """
+<volume type='file'>
+  <name>%(name)s</name>
+  <key>%(name)s</key>
+  <capacity unit='bytes'>%(size)i</capacity>
+  <physical unit='bytes'>%(size)i</physical>
+  <target>
+    <path>%(path)s</path>
+    <format type='raw'/>
+  </target>
+</volume>
+"""
 
     @classmethod
     def initialize(cls, config, uri=None):
@@ -611,7 +640,174 @@ class LibvirtDriver(AbstractSystemsDriver):
         :returns: a `tuple` of (boot_image, write_protected, inserted)
         :raises: `error.FishyError` if boot device can't be accessed
         """
-        raise error.FishyError('Not implemented')
+        domain = self._get_domain(identity, readonly=True)
+
+        tree = ET.fromstring(domain.XMLDesc())
+
+        device_element = tree.find('devices')
+        if device_element is None:
+            msg = ('Missing "devices" tag in the libvirt domain '
+                   '"%(identity)s" configuration' % {'identity': identity})
+            raise error.FishyError(msg)
+
+        for disk_element in device_element.findall('disk'):
+            dev_type = disk_element.attrib.get('device')
+            if (dev_type not in self.DEVICE_TYPE_MAP_REV or
+                    dev_type != self.DEVICE_TYPE_MAP.get(device)):
+                continue
+
+            source_element = disk_element.find('source')
+            if source_element is None:
+                continue
+
+            boot_image = source_element.attrib.get('file')
+            if boot_image is None:
+                continue
+
+            read_only = disk_element.find('readonly') or False
+
+            inserted = (self.get_boot_device(identity) ==
+                        constants.DEVICE_TYPE_CD)
+            if inserted:
+                inserted = self.get_boot_mode(identity) == 'Uefi'
+
+            return boot_image, read_only, inserted
+
+        return '', False, False
+
+    def _upload_image(self, domain, conn, boot_image):
+        pool = conn.storagePoolLookupByName(self.STORAGE_POOL)
+
+        pool_tree = ET.fromstring(pool.XMLDesc())
+
+        # Find out path to images
+        pool_path_element = pool_tree.find('target/path')
+        if pool_path_element is None:
+            msg = ('Missing "target/path" tag in the libvirt '
+                   'storage pool "%(pool)s"'
+                   '' % {'pool': self.STORAGE_POOL})
+            raise error.FishyError(msg)
+
+        image_name = '%s-%s.img' % (
+            os.path.basename(boot_image).replace('.', '-'),
+            domain.UUIDString())
+
+        image_path = os.path.join(
+            pool_path_element.text, image_name)
+
+        image_size = os.stat(boot_image).st_size
+
+        # Remove already existing volume
+
+        volumes_names = [v.name() for v in pool.listAllVolumes()]
+        if image_name in volumes_names:
+            volume = pool.storageVolLookupByName(image_name)
+            volume.delete()
+
+        # Create new volume
+
+        volume = pool.createXML(
+            self.STORAGE_POOL_XML % {
+                'name': image_name, 'path': image_path,
+                'size': image_size})
+
+        # Upload image to hypervisor
+
+        stream = conn.newStream()
+        volume.upload(stream, 0, image_size)
+
+        def read_file(stream, nbytes, fl):
+            return fl.read(nbytes)
+
+        stream.sendAll(read_file, open(boot_image, 'rb'))
+
+        stream.finish()
+
+        return image_path
+
+    def _add_boot_image(self, domain, domain_tree, device,
+                        boot_image, write_protected):
+
+        identity = domain.UUIDString()
+
+        device_element = domain_tree.find('devices')
+        if device_element is None:
+            msg = ('Missing "devices" tag in the libvirt domain '
+                   '"%(identity)s" configuration' % {'identity': identity})
+            raise error.FishyError(msg)
+
+        with libvirt_open(self._uri) as conn:
+
+            image_path = self._upload_image(domain, conn, boot_image)
+
+            try:
+                lv_device = self.BOOT_DEVICE_MAP[device]
+
+            except KeyError:
+                raise error.FishyError(
+                    'Unknown device %s at %s' % (device, identity))
+
+            # Add disk element pointing to the boot image
+
+            disk_element = ET.SubElement(device_element, 'disk')
+            disk_element.set('type', 'file')
+            disk_element.set('device', lv_device)
+
+            tgt_dev, tgt_bus, tgt_unit = self.DEVICE_TARGET_MAP[device]
+
+            target_element = ET.SubElement(disk_element, 'target')
+            target_element.set('dev', tgt_dev)
+            target_element.set('bus', tgt_bus)
+
+            driver_element = ET.SubElement(disk_element, 'driver')
+            driver_element.set('name', 'qemu')
+            driver_element.set('type', 'raw')
+
+            address_element = ET.SubElement(disk_element, 'address')
+            address_element.set('type', 'drive')
+            address_element.set('controller', '0')
+            address_element.set('bus', '0')
+            address_element.set('target', '0')
+            address_element.set('unit', tgt_unit)
+
+            source_element = ET.SubElement(disk_element, 'source')
+            source_element.set('file', image_path)
+
+            if write_protected:
+                ET.SubElement(disk_element, 'readonly')
+
+            conn.defineXML(ET.tostring(domain_tree).decode('utf-8'))
+
+    def _remove_boot_images(self, domain, domain_tree, device):
+
+        identity = domain.UUIDString()
+
+        device_element = domain_tree.find('devices')
+        if device_element is None:
+            msg = ('Missing "devices" tag in the libvirt domain '
+                   '"%(identity)s" configuration' % {'identity': identity})
+            raise error.FishyError(msg)
+
+        try:
+            lv_device = self.BOOT_DEVICE_MAP[device]
+
+        except KeyError:
+            raise error.FishyError(
+                'Unknown device %s at %s' % (device, identity))
+
+        device_element = domain_tree.find('devices')
+        if device_element is None:
+            msg = ('Missing "devices" tag in the libvirt domain '
+                   '"%(identity)s" configuration' % {'identity': identity})
+            raise error.FishyError(msg)
+
+        # First, remove all existing devices
+        disk_elements = device_element.findall('disk')
+
+        for disk_element in disk_elements:
+            dev_type = disk_element.attrib.get('device')
+            if dev_type == lv_device:
+                device_element.remove(disk_element)
 
     def set_boot_image(self, identity, device, boot_image=None,
                        write_protected=True):
@@ -626,4 +822,20 @@ class LibvirtDriver(AbstractSystemsDriver):
 
         :raises: `error.FishyError` if boot device can't be set
         """
-        raise error.FishyError('Not implemented')
+        domain = self._get_domain(identity)
+
+        domain_tree = ET.fromstring(domain.XMLDesc())
+
+        self._remove_boot_images(domain, domain_tree, device)
+
+        if boot_image:
+
+            try:
+                self._add_boot_image(domain, domain_tree, device,
+                                     boot_image, write_protected)
+
+            except libvirt.libvirtError as e:
+                msg = ('Error changing boot image at libvirt URI "%(uri)s": '
+                       '%(error)s' % {'uri': self._uri, 'error': e})
+
+                raise error.FishyError(msg)

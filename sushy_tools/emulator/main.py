@@ -378,7 +378,7 @@ def virtual_media_insert(identity, device):
                     system, device, boot_image=image_path,
                     write_protected=write_protected)
 
-            except error.FishyError as ex:
+            except error.NotSupportedError as ex:
                 app.logger.warning(
                     'System %s failed to set boot image %s on device %s: '
                     '%s', system, image_path, device, ex)
@@ -402,7 +402,7 @@ def virtual_media_eject(identity, device):
             try:
                 resources.systems.set_boot_image(system, device)
 
-            except error.FishyError as ex:
+            except error.NotSupportedError as ex:
                 app.logger.warning(
                     'System %s failed to remove boot image from device %s: '
                     '%s', system, device, ex)

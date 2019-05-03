@@ -150,6 +150,23 @@ Now you can run `sushy-emulator` with the updated configuration file:
 
    The images you will serve to your VMs need to be UEFI-bootable.
 
+Settable boot image
+~~~~~~~~~~~~~~~~~~~
+
+The `libvirt` system emulation backend supports setting custom boot images,
+so that libvirt domains (representing bare metal nodes) can boot from user
+images.
+
+This feature enables system boot from virtual media device.
+
+The limitations:
+
+* Only ISO images are supported
+* Remote libvirt hypervisor is not supported
+
+See *VirtualMedia* resource section for more information on how to perform
+virtual media boot.
+
 Systems resource driver: OpenStack
 ++++++++++++++++++++++++++++++++++
 
@@ -431,3 +448,116 @@ Redfish client can eject image from virtual media device:
         -H "Content-Type: application/json" \
         -X POST \
         http://localhost:8000/redfish/v1/Managers/58893887-8974-2487-2389-841168418919/VirtualMedia/Cd/Actions/VirtualMedia.EjectMedia
+
+Virtual media boot
+++++++++++++++++++
+
+To boot a system from a virtual media device the client first needs to figure
+out which manager is responsible for the system of interest:
+
+.. code-block:: bash
+
+    $ curl http://localhost:8000/redfish/v1/Systems/281c2fc3-dd34-439a-9f0f-63df45e2c998
+    {
+    ...
+    "Links": {
+        "Chassis": [
+        ],
+        "ManagedBy": [
+            {
+                "@odata.id": "/redfish/v1/Managers/58893887-8974-2487-2389-841168418919"
+            }
+        ]
+    },
+    ...
+
+Exploring the Redfish API links, the client can learn the virtual media devices
+being offered:
+
+.. code-block:: bash
+
+    $ curl http://localhost:8000/redfish/v1/Managers/58893887-894-2487-2389-841168418919/VirtualMedia
+    ...
+    "Members": [
+    {
+        "@odata.id": "/redfish/v1/Managers/58893887-8974-2487-2389-841168418919/VirtualMedia/Cd"
+    },
+    ...
+
+Knowing virtual media device name, the client can check out its present state:
+
+.. code-block:: bash
+
+    $ curl http://localhost:8000/redfish/v1/Managers/58893887-8974-2487-2389-841168418919/VirtualMedia/Cd
+    {
+        ...
+        "Name": "Virtual CD",
+        "MediaTypes": [
+            "CD",
+            "DVD"
+        ],
+        "Image": "",
+        "ImageName": "",
+        "ConnectedVia": "URI",
+        "Inserted": false,
+        "WriteProtected": false,
+        ...
+
+Assuming `http://localhost/var/tmp/mini.iso` URL points to a bootable UEFI or
+hybrid ISO, the following Redfish REST API call will insert the image into the
+virtual CD drive:
+
+.. code-block:: bash
+
+    $ curl -d \
+        '{"Image":"http:://localhost/var/tmp/mini.iso", "Inserted": true}' \
+         -H "Content-Type: application/json" \
+         -X POST \
+         http://localhost:8000/redfish/v1/Managers/58893887-8974-2487-2389-841168418919/VirtualMedia/Cd/Actions/VirtualMedia.InsertMedia
+
+Querying again, the emulator should have it in the drive:
+
+.. code-block:: bash
+
+    $ curl http://localhost:8000/redfish/v1/Managers/58893887-8974-2487-2389-841168418919/VirtualMedia/Cd
+    {
+        ...
+        "Name": "Virtual CD",
+        "MediaTypes": [
+            "CD",
+            "DVD"
+        ],
+        "Image": "http://localhost/var/tmp/mini.iso",
+        "ImageName": "mini.iso",
+        "ConnectedVia": "URI",
+        "Inserted": true,
+        "WriteProtected": true,
+        ...
+
+Next, the node needs to be configured to boot from its local CD drive
+over UEFI:
+
+.. code-block:: bash
+
+   $ curl -X PATCH -H 'Content-Type: application/json' \
+       -d '{
+         "Boot": {
+             "BootSourceOverrideTarget": "Cd",
+             "BootSourceOverrideMode": "Uefi",
+             "BootSourceOverrideEnabled": "Continuous"
+         }
+       }' \
+       http://localhost:8000/redfish/v1/Systems/281c2fc3-dd34-439a-9f0f-63df45e2c998
+
+By this point the system will boot off the virtual CD drive when powering it on:
+
+.. code-block:: bash
+
+   curl -d '{"ResetType":"On"}' \
+       -H "Content-Type: application/json" -X POST \
+        http://localhost:8000/redfish/v1/Systems/281c2fc3-dd34-439a-9f0f-63df45e2c998/Actions/ComputerSystem.Reset
+
+.. note::
+
+   ISO files to boot from must be UEFI-bootable, libvirtd should be running on the same
+   machine with sushy-emulator.

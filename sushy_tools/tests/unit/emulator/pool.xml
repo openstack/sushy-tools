@@ -1,0 +1,17 @@
+<pool type='dir'>
+  <name>default</name>
+  <uuid>267e1242-d53f-46dd-adb3-9f3992c55f6f</uuid>
+  <capacity unit='bytes'>166318571520</capacity>
+  <allocation unit='bytes'>13143412736</allocation>
+  <available unit='bytes'>153175158784</available>
+  <source>
+  </source>
+  <target>
+    <path>/var/lib/libvirt/images</path>
+    <permissions>
+      <mode>0711</mode>
+      <owner>0</owner>
+      <group>0</group>
+    </permissions>
+  </target>
+</pool>

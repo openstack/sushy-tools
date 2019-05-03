@@ -20,3 +20,7 @@ class FishyError(Exception):
 
 class AliasAccessError(FishyError):
     """Node access attempted via an alias, not UUID"""
+
+
+class NotSupportedError(FishyError):
+    """Feature not supported by resource driver"""

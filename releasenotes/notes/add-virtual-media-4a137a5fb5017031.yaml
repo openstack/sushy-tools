@@ -10,3 +10,10 @@ features:
     Each Manager automatically gets its own instance of the above
     mentioned virtual media device collection. HTTP/S-hosted images
     can be inserted into and ejected from virtual media devices.
+
+    If libvirt virtualization backend is being used, once ISO image
+    is inserted into the respective Manager, any System under that
+    Manager can boot from that image by booting from its local ``cdrom``
+    over UEFI.
+
+    The ISO images must be UEFI-bootable or hybrid.
