@@ -163,6 +163,7 @@ def system_resource(identity):
         with virt_driver() as driver:
             return flask.render_template(
                 'system.json', identity=identity,
+                name=driver.name(identity),
                 uuid=driver.uuid(identity),
                 power_state=driver.get_power_state(identity),
                 total_memory_gb=driver.get_total_memory(identity),
