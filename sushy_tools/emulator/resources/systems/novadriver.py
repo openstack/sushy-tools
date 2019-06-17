@@ -16,8 +16,8 @@
 import logging
 import math
 
-from sushy_tools.emulator.drivers.base import AbstractDriver
-from sushy_tools.emulator.drivers import memoize
+from sushy_tools.emulator import memoize
+from sushy_tools.emulator.resources.systems.base import AbstractSystemsDriver
 from sushy_tools import error
 
 try:
@@ -32,7 +32,7 @@ is_loaded = bool(openstack)
 logger = logging.getLogger(__name__)
 
 
-class OpenStackDriver(AbstractDriver):
+class OpenStackDriver(AbstractSystemsDriver):
     """OpenStack driver"""
 
     NOVA_POWER_STATE_ON = 1

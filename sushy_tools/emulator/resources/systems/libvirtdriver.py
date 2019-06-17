@@ -18,8 +18,8 @@ import logging
 import uuid
 import xml.etree.ElementTree as ET
 
-from sushy_tools.emulator.drivers.base import AbstractDriver
-from sushy_tools.emulator.drivers import memoize
+from sushy_tools.emulator import memoize
+from sushy_tools.emulator.resources.systems.base import AbstractSystemsDriver
 from sushy_tools import error
 
 try:
@@ -64,7 +64,7 @@ class libvirt_open(object):
         self._conn.close()
 
 
-class LibvirtDriver(AbstractDriver):
+class LibvirtDriver(AbstractSystemsDriver):
     """Libvirt driver"""
 
     # XML schema: https://libvirt.org/formatdomain.html#elementsOSBIOS
