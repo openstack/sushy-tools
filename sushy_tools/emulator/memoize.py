@@ -12,7 +12,15 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+import collections
 from functools import wraps
+import os
+import pickle
+import sqlite3
+import tempfile
+
+# Python 3.8
+MutableMapping = getattr(collections, 'abc', collections).MutableMapping
 
 
 def memoize(permanent_cache=None):
@@ -54,3 +62,96 @@ def memoize(permanent_cache=None):
         return wrapped
 
     return decorator
+
+
+class PersistentDict(MutableMapping):
+    DBPATH = os.path.join(tempfile.gettempdir(), 'sushy-emulator')
+
+    def make_permanent(self, dbpath, dbfile):
+        dbpath = dbpath or self.DBPATH
+        if not os.path.exists(dbpath):
+            os.makedirs(dbpath)
+        self.dbpath = os.path.join(dbpath, dbfile) + '.sqlite'
+
+        with self.get_connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                'create table if not exists cache '
+                '(key blob primary key not null, value blob not null)'
+            )
+
+        self.update(dict(self))
+
+    def encode(self, obj):
+        return pickle.dumps(obj)
+
+    def decode(self, blob):
+        return pickle.loads(blob)
+
+    def get_connection(self):
+        return sqlite3.connect(self.dbpath)
+
+    def __getitem__(self, key):
+        key = self.encode(key)
+
+        with self.get_connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                'select value from cache where key=?',
+                (key,)
+            )
+            value = cursor.fetchone()
+
+        if value is None:
+            raise KeyError(key)
+
+        return self.decode(value[0])
+
+    def __setitem__(self, key, value):
+        key = self.encode(key)
+        value = self.encode(value)
+
+        with self.get_connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                'insert or replace into cache values (?, ?)',
+                (key, value)
+            )
+
+    def __delitem__(self, key):
+        key = self.encode(key)
+
+        with self.get_connection() as connection:
+            cursor = connection.cursor()
+
+            cursor.execute(
+                'select count(*) from cache where key=?',
+                (key,)
+            )
+
+            if cursor.fetchone()[0] == 0:
+                raise KeyError(key)
+
+            cursor.execute(
+                'delete from cache where key=?',
+                (key,)
+            )
+
+    def __iter__(self):
+        with self.get_connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                'select key from cache'
+            )
+            records = cursor.fetchall()
+
+        for r in records:
+            yield self.decode(r[0])
+
+    def __len__(self):
+        with self.get_connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                'select count(*) from cache'
+            )
+            return cursor.fetchone()[0]

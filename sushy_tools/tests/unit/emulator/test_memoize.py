@@ -14,6 +14,7 @@
 #    under the License.
 
 from oslotest import base
+from six.moves import mock
 
 from sushy_tools.emulator import memoize
 
@@ -79,3 +80,83 @@ class MemoizeTestCase(base.BaseTestCase):
 
         # Due to permanent cache, expect no more calls
         self.assertEqual(0, driver.call_count)
+
+
+class PersistentDictTestCase(base.BaseTestCase):
+
+    @mock.patch.object(memoize, 'sqlite3', autospec=True)
+    def test_make_permanent(self, mock_sqlite3):
+        pd = memoize.PersistentDict()
+
+        pd.make_permanent('/', 'file')
+
+        mock_sqlite3.connect.assert_called_with('/file.sqlite')
+
+    @mock.patch.object(memoize, 'pickle', autospec=True)
+    def test_encode(self, mock_pickle):
+        pd = memoize.PersistentDict()
+
+        pd.encode({1: '2'})
+
+        mock_pickle.dumps.assert_called_once_with({1: '2'})
+
+    @mock.patch.object(memoize, 'pickle', autospec=True)
+    def test_decode(self, mock_pickle):
+        pd = memoize.PersistentDict()
+
+        pd.decode('blob')
+
+        mock_pickle.loads.assert_called_once_with('blob')
+
+    @mock.patch.object(memoize, 'pickle', autospec=True)
+    @mock.patch.object(memoize, 'sqlite3', autospec=True)
+    def test___getitem__(self, mock_sqlite3, mock_pickle):
+        pd = memoize.PersistentDict()
+        pd.make_permanent('/', 'file')
+
+        mock_pickle.dumps.return_value = 'pickled-key'
+        mock_connection = mock_sqlite3.connect.return_value
+        mock_connection = mock_connection.__enter__.return_value
+        mock_cursor = mock_connection.cursor.return_value
+        mock_cursor.fetchone.return_value = ['pickled-value']
+
+        pd[1]
+
+        mock_cursor.execute.assert_called_with(
+            'select value from cache where key=?', ('pickled-key',))
+        mock_pickle.loads.assert_called_once_with('pickled-value')
+
+    @mock.patch.object(memoize, 'pickle', autospec=True)
+    @mock.patch.object(memoize, 'sqlite3', autospec=True)
+    def test___setitem__(self, mock_sqlite3, mock_pickle):
+        pd = memoize.PersistentDict()
+        pd.make_permanent('/', 'file')
+
+        mock_pickle.dumps.side_effect = [
+            'pickled-key', 'pickled-value']
+
+        mock_connection = mock_sqlite3.connect.return_value
+        mock_connection = mock_connection.__enter__.return_value
+        mock_cursor = mock_connection.cursor.return_value
+
+        pd[1] = 2
+
+        mock_cursor.execute.assert_called_with(
+            'insert or replace into cache values (?, ?)',
+            ('pickled-key', 'pickled-value'))
+
+    @mock.patch.object(memoize, 'pickle', autospec=True)
+    @mock.patch.object(memoize, 'sqlite3', autospec=True)
+    def test___delitem__(self, mock_sqlite3, mock_pickle):
+        pd = memoize.PersistentDict()
+        pd.make_permanent('/', 'file')
+
+        mock_pickle.dumps.return_value = 'pickled-key'
+        mock_connection = mock_sqlite3.connect.return_value
+        mock_connection = mock_connection.__enter__.return_value
+        mock_cursor = mock_connection.cursor.return_value
+
+        del pd[1]
+
+        mock_cursor.execute.assert_called_with(
+            'delete from cache where key=?', ('pickled-key',))
