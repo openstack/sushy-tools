@@ -1,0 +1,7 @@
+---
+features:
+  - |
+    Adds basic ``Thermal`` resource emulation under Chassis resource. The
+    ``Thermal`` resource is not user-configurable, its contents is mostly
+    static and depends on Jinja2 template. All references between resources
+    are dynamically rendered though.

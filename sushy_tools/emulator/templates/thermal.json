@@ -1,0 +1,126 @@
+{
+    "@odata.type": "#Thermal.v1_3_0.Thermal",
+    "Id": "Thermal",
+    "Name": "Thermal",
+    "Temperatures": [
+        {%- for system in systems %}
+        {
+            "@odata.id": {{ "/redfish/v1/Chassis/%s/Thermal#/Temperatures/%d"|format(chassis, loop.index0)|tojson }},
+            "MemberId": {{ loop.index0|string|tojson }},
+            "Name": "CPU Temp",
+            "SensorNumber": {{ loop.index0|string|tojson }},
+            "Status": {
+                "State": "Enabled",
+                "Health": "OK"
+            },
+            "ReadingCelsius": 41,
+            "UpperThresholdNonCritical": 42,
+            "UpperThresholdCritical": 45,
+            "UpperThresholdFatal": 48,
+            "MinReadingRangeTemp": 0,
+            "MaxReadingRangeTemp": 60,
+            "PhysicalContext": "CPU",
+            "RelatedItem": [
+                {
+                    "@odata.id": {{ "/redfish/v1/Systems/%s/Processors/CPU"|format(system)|tojson }}
+                }
+            ]
+        },
+        {% endfor -%}
+        {
+            "@odata.id": {{ "/redfish/v1/Chassis/%s/Thermal#/Temperatures/%d"|format(chassis, systems|length)|tojson }},
+            "MemberId": {{ systems|length|string|tojson }},
+            "Name": "Chassis Intake Temp",
+            "SensorNumber": {{ systems|length|string|tojson }},
+            "Status": {
+                "State": "Enabled",
+                "Health": "OK"
+            },
+            "ReadingCelsius": 25,
+            "UpperThresholdNonCritical": 30,
+            "UpperThresholdCritical": 40,
+            "UpperThresholdFatal": 50,
+            "LowerThresholdNonCritical": 10,
+            "LowerThresholdCritical": 5,
+            "LowerThresholdFatal": 0,
+            "MinReadingRangeTemp": 0,
+            "MaxReadingRangeTemp": 60,
+            "PhysicalContext": "Intake",
+            "RelatedItem": [
+                {
+                    "@odata.id": {{ "/redfish/v1/Chassis/%s"|format(chassis)|tojson  }}
+                }{% if systems %},{% endif %}
+                {%- for system in systems %}
+                {
+                    "@odata.id": {{ "/redfish/v1/Systems/%s"|format(system)|tojson  }}
+                }{% if not loop.last %},{% endif %}
+                {% endfor -%}
+            ]
+        }
+    ],
+    "Fans": [
+        {
+            "@odata.id": {{ "/redfish/v1/Chassis/%s/Thermal#/Fans/0"|format(chassis)|tojson }},
+            "MemberId": "0",
+            "Name": "BaseBoard System Fan",
+            "PhysicalContext": "Backplane",
+            "Status": {
+                "State": "Enabled",
+                "Health": "OK"
+            },
+            "Reading": 2100,
+            "ReadingUnits": "RPM",
+            "LowerThresholdFatal": 0,
+            "MinReadingRange": 0,
+            "MaxReadingRange": 5000,
+            "Redundancy": [
+                {
+                    "@odata.id": {{ "/redfish/v1/Chassis/%s/Thermal#/Redundancy/0"|format(chassis)|tojson }}
+                }
+            ],
+            "RelatedItem": [
+                {
+                    "@odata.id": {{ "/redfish/v1/Chassis/%s"|format(chassis)|tojson  }}
+                }{% if systems %},{% endif %}
+                {%- for system in systems %}
+                {
+                    "@odata.id": {{ "/redfish/v1/Systems/%s"|format(system)|tojson  }}
+                }{% if not loop.last %},{% endif %}
+                {% endfor -%}
+            ]
+        },
+        {
+            "@odata.id": {{ "/redfish/v1/Chassis/%s/Thermal#/Fans/1"|format(chassis)|tojson }},
+            "MemberId": "1",
+            "Name": "BaseBoard System Fan Backup",
+            "PhysicalContext": "Backplane",
+            "Status": {
+                "State": "Enabled",
+                "Health": "OK"
+            },
+            "Reading": 2050,
+            "ReadingUnits": "RPM",
+            "LowerThresholdFatal": 0,
+            "MinReadingRange": 0,
+            "MaxReadingRange": 5000,
+            "Redundancy": [
+                {
+                    "@odata.id": {{ "/redfish/v1/Chassis/%s/Thermal#/Redundancy/0"|format(chassis)|tojson }}
+                }
+            ],
+            "RelatedItem": [
+                {
+                    "@odata.id": {{ "/redfish/v1/Chassis/%s"|format(chassis)|tojson  }}
+                }{% if systems %},{% endif %}
+                {%- for system in systems %}
+                {
+                    "@odata.id": {{ "/redfish/v1/Systems/%s"|format(system)|tojson  }}
+                }{% if not loop.last %},{% endif %}
+                {% endfor -%}
+            ]
+        }
+    ],
+    "@odata.context": "/redfish/v1/$metadata#Thermal.Thermal",
+    "@odata.id": {{ "/redfish/v1/Chassis/%s/Thermal"|format(chassis)|tojson }},
+    "@Redfish.Copyright": "Copyright 2014-2017 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+}

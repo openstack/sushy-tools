@@ -18,6 +18,9 @@
     "WidthMm": 431.8,
     "DepthMm": 711,
     "WeightKg": 15.31,
+    "Thermal": {
+        "@odata.id": {{ "/redfish/v1/Chassis/%s/Thermal"|format(identity)|tojson }}
+    },
     "Location": {
         "PostalAddress": {
             "Country": "US",

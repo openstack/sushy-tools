@@ -71,12 +71,40 @@ class EmulatorTestCase(base.BaseTestCase):
         self.assertEqual('xxxx-yyyy-zzzz', response.json['Id'])
         self.assertEqual('xxxx-yyyy-zzzz', response.json['UUID'])
         self.assertEqual('Off', response.json['IndicatorLED'])
+        self.assertEqual(
+            {'@odata.id': '/redfish/v1/Chassis/xxxx-yyyy-zzzz/Thermal'},
+            response.json['Thermal'])
         self.assertEqual([{'@odata.id': '/redfish/v1/Systems/sys1'}],
                          response.json['Links']['ComputerSystems'])
         self.assertEqual([{'@odata.id': '/redfish/v1/Managers/man1'}],
                          response.json['Links']['ManagedBy'])
         self.assertEqual([{'@odata.id': '/redfish/v1/Managers/man1'}],
                          response.json['Links']['ManagersInChassis'])
+
+    def test_chassis_thermal(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        chassis_mock = resources_mock.chassis
+        chassis_mock.chassis = [self.uuid]
+        chassis_mock.uuid.return_value = self.uuid
+        systems_mock = resources_mock.systems
+        systems_mock.systems = ['sys1']
+
+        response = self.app.get('/redfish/v1/Chassis/xxxx-yyyy-zzzz/Thermal')
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('Thermal', response.json['Id'])
+        self.assertEqual(
+            '/redfish/v1/Chassis/xxxx-yyyy-zzzz/Thermal#/Temperatures/0',
+            response.json['Temperatures'][0]['@odata.id'])
+        self.assertEqual(
+            {'@odata.id': '/redfish/v1/Systems/sys1/Processors/CPU'},
+            response.json['Temperatures'][0]['RelatedItem'][0])
+        self.assertEqual(
+            '/redfish/v1/Chassis/xxxx-yyyy-zzzz/Thermal#/Fans/0',
+            response.json['Fans'][0]['@odata.id'])
+        self.assertEqual(
+            {'@odata.id': '/redfish/v1/Chassis/xxxx-yyyy-zzzz'},
+            response.json['Fans'][0]['RelatedItem'][0])
 
     def test_chassis_indicator_set_ok(self, resources_mock):
         resources_mock = resources_mock.return_value.__enter__.return_value

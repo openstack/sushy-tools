@@ -252,6 +252,35 @@ def chassis_resource(identity):
             return '', 204
 
 
+@app.route('/redfish/v1/Chassis/<identity>/Thermal', methods=['GET'])
+@returns_json
+def thermal_resource(identity):
+    with Resources() as resources:
+
+        chassis = resources.chassis
+
+        uuid = chassis.uuid(identity)
+
+        if flask.request.method != 'GET':
+            return
+
+        app.logger.debug(
+            'Serving thermal resources for chassis "%s"', identity)
+
+        # the first chassis gets all resources
+        if uuid == chassis.chassis[0]:
+            systems = resources.systems.systems
+
+        else:
+            systems = []
+
+        return flask.render_template(
+            'thermal.json',
+            chassis=identity,
+            systems=systems
+        )
+
+
 @app.route('/redfish/v1/Managers')
 @returns_json
 def manager_collection_resource():
