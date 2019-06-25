@@ -371,3 +371,6 @@ class OpenStackDriver(AbstractSystemsDriver):
         :raises: `error.FishyError` if boot device can't be set
         """
         raise error.NotSupportedError('Not implemented')
+
+    def get_simple_storage_collection(self, identity):
+        raise error.NotSupportedError('Not implemented')

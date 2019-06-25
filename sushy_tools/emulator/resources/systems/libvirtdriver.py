@@ -13,6 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from collections import defaultdict
 from collections import namedtuple
 import logging
 import os
@@ -839,3 +840,96 @@ class LibvirtDriver(AbstractSystemsDriver):
                        '%(error)s' % {'uri': self._uri, 'error': e})
 
                 raise error.FishyError(msg)
+
+    def _find_device_by_path(self, vol_path):
+        """Get device attributes using path
+
+        :param vol_path: path for the libvirt volume
+        :returns: a dict (or None) of the corresponding device attributes
+        """
+        with libvirt_open(self._uri, readonly=True) as conn:
+            try:
+                vol = conn.storageVolLookupByPath(vol_path)
+            except libvirt.libvirtError as e:
+                msg = ('Could not find storage volume by path '
+                       '"%(path)s" at libvirt URI "%(uri)s": '
+                       '%(err)s' %
+                       {'path': vol_path, 'uri': self._uri,
+                        'err': e})
+                logger.debug(msg)
+                return
+            disk_device = {
+                'Name': vol.name(),
+                'CapacityBytes': vol.info()[1]
+            }
+            return disk_device
+
+    def _find_device_from_pool(self, pool_name, vol_name):
+        """Get device attributes from pool
+
+        :param pool_name: libvirt pool name
+        :param vol_name: libvirt volume name
+        :returns: a dict (or None) of the corresponding device attributes
+        """
+        with libvirt_open(self._uri, readonly=True) as conn:
+            try:
+                pool = conn.storagePoolLookupByName(pool_name)
+            except libvirt.libvirtError as e:
+                msg = ('Error finding Storage Pool by name "%(name)s" at'
+                       'libvirt URI "%(uri)s": %(err)s' %
+                       {'name': pool_name, 'uri': self._uri, 'err': e})
+                logger.debug(msg)
+                return
+
+            try:
+                vol = pool.storageVolLookupByName(vol_name)
+            except libvirt.libvirtError as e:
+                msg = ('Error finding Storage Volume by name "%(name)s" '
+                       'in Pool '"%(pName)s"' at libvirt URI "%(uri)s"'
+                       ': %(err)s' %
+                       {'name': vol_name, 'pName': pool_name,
+                        'uri': self._uri, 'err': e})
+                logger.debug(msg)
+                return
+            disk_device = {
+                'Name': vol.name(),
+                'CapacityBytes': vol.info()[1]
+            }
+            return disk_device
+
+    def get_simple_storage_collection(self, identity):
+        """Get a dict of simple storage controllers and their devices
+
+        Only those storage devices that are configured as a libvirt volume
+        via a pool and attached to the domain will reflect as a device.
+        Others are skipped.
+
+        :param identity: libvirt domain or ID
+        :returns: dict of simple storage controller dict with their attributes
+        """
+        domain = self._get_domain(identity, readonly=True)
+        tree = ET.fromstring(domain.XMLDesc())
+        simple_storage = defaultdict(lambda: defaultdict(DeviceList=list()))
+
+        for disk_element in tree.findall(".//disk/target[@bus]/.."):
+            source_element = disk_element.find('source')
+            if source_element is not None:
+                disk_type = disk_element.attrib['type']
+                ctl_type = disk_element.find('target').attrib['bus']
+                disk_device = None
+                if disk_type in ('file', 'block'):
+                    if disk_type == 'file':
+                        vol_path = source_element.attrib['file']
+                    else:
+                        vol_path = source_element.attrib['dev']
+                    disk_device = self._find_device_by_path(vol_path)
+                elif disk_type == 'volume':
+                    pool_name = source_element.attrib['pool']
+                    vol_name = source_element.attrib['volume']
+                    disk_device = self._find_device_from_pool(pool_name,
+                                                              vol_name)
+                if disk_device is not None:
+                    simple_storage[ctl_type]['Id'] = ctl_type
+                    simple_storage[ctl_type]['Name'] = ctl_type
+                    simple_storage[ctl_type]['DeviceList'].append(disk_device)
+        return simple_storage

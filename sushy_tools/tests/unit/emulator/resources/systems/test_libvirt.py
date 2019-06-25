@@ -567,3 +567,81 @@ class LibvirtDriverTestCase(base.BaseTestCase):
 
         nics = self.test_driver.get_nics(self.uuid)
         self.assertEqual([], nics)
+
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_get_simple_storage_collection(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/'
+                  'domain_simple_storage.xml', 'r') as f:
+            data = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        dom_mock = conn_mock.lookupByUUID.return_value
+        dom_mock.XMLDesc.return_value = data
+        vol_mock = conn_mock.storageVolLookupByPath.return_value
+        vol_mock.name.side_effect = ['testVM1.img', 'testVol1.img', 'sdb1']
+        vol_mock.info.side_effect = [['testVM1.img', 100000],
+                                     ['testVol1.img', 200000],
+                                     ['sdb1', 150000]]
+        pool_mock = conn_mock.storagePoolLookupByName.return_value
+        pvol_mock = pool_mock.storageVolLookupByName.return_value
+        pvol_mock.name.return_value = 'blk-pool0-vol0'
+        pvol_mock.info.return_value = ['volType', 300000]
+
+        simple_storage_response = (self.test_driver
+                                   .get_simple_storage_collection(self.uuid))
+
+        simple_storage_expected = {
+            'virtio': {
+                'Id': 'virtio',
+                'Name': 'virtio',
+                'DeviceList': [
+                    {
+                        'Name': 'testVM1.img',
+                        'CapacityBytes': 100000
+                    },
+                    {
+                        'Name': 'sdb1',
+                        'CapacityBytes': 150000
+                    }
+                ]
+            },
+            'ide': {
+                'Id': 'ide',
+                'Name': 'ide',
+                'DeviceList': [
+                    {
+                        'Name': 'testVol1.img',
+                        'CapacityBytes': 200000
+                    },
+                    {
+                        'Name': 'blk-pool0-vol0',
+                        'CapacityBytes': 300000
+                    }
+                ]
+            }
+        }
+
+        self.assertEqual(simple_storage_response, simple_storage_expected)
+
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_get_simple_storage_collection_empty(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/domain.xml') as f:
+            domain_xml = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        dom_mock = conn_mock.lookupByUUID.return_value
+        dom_mock.XMLDesc.return_value = domain_xml
+        vol_mock = conn_mock.storageVolLookupByPath.return_value
+        vol_mock.name.side_effect = ['testVM1.img', 'testVol1.img', 'sdb1']
+        vol_mock.info.side_effect = [['testType1', 100000],
+                                     ['testType2', 200000],
+                                     ['testType1', 150000]]
+        pool_mock = conn_mock.storagePoolLookupByName.return_value
+        pvol_mock = pool_mock.storageVolLookupByName.return_value
+        pvol_mock.name.return_value = 'blk-pool0-vol0'
+        pvol_mock.info.return_value = ['volType', 300000]
+
+        simple_storage_response = (self.test_driver
+                                   .get_simple_storage_collection(self.uuid))
+
+        self.assertEqual({}, simple_storage_response)

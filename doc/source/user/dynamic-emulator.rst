@@ -85,6 +85,62 @@ You should be able to flip its power state via the Redfish call:
 You can have as many domains as you need. The domains can be concurrently
 managed over Redfish and some other tool like *Virtual BMC*.
 
+
+Simple Storage resource
+~~~~~~~~~~~~~~~~~~~~~~~
+
+For emulating the *Simple Storage* resource, some additional preparation is
+required on the host side.
+
+First, you need to create, build and start a libvirt storage pool using virsh:
+
+.. code-block:: bash
+
+    virsh pool-define-as testPool dir - - - - "/testPool"
+    virsh pool-build testPool
+    virsh pool-start testPool
+    virsh pool-autostart testPool
+
+Next, create a storage volume in the above created storage pool:
+
+.. code-block:: bash
+
+    virsh vol-create-as testPool testVol 1G
+
+Next, attach the created volume to the virtual machine/domain:
+
+.. code-block:: bash
+
+    virsh attach-disk vbmc-node /testPool/testVol sda
+
+Now, query the *Simple Storage* resource collection for the `vbmc-node` domain
+in a closely similar format (with 'ide' and 'scsi', here, referring to the two
+Redfish Simple Storage Controllers available for this domain):
+
+.. code-block:: bash
+
+    curl http://localhost:8000/redfish/v1/vbmc-node/SimpleStorage
+    {
+        "@odata.type": "#SimpleStorageCollection.SimpleStorageCollection",
+        "Name": "Simple Storage Collection",
+        "Members@odata.count": 2,
+        "Members": [
+
+                    {
+                        "@odata.id": "/redfish/v1/Systems/vbmc-node/SimpleStorage/ide"
+                    },
+
+                    {
+                        "@odata.id": "/redfish/v1/Systems/vbmc-node/SimpleStorage/scsi"
+                    }
+
+        ],
+        "Oem": {},
+        "@odata.context": "/redfish/v1/$metadata#SimpleStorageCollection.SimpleStorageCollection",
+        "@odata.id": "/redfish/v1/Systems/vbmc-node/SimpleStorage"
+    }
+
+
 UEFI boot
 ~~~~~~~~~
 

@@ -1,0 +1,21 @@
+{
+    "@odata.type": "#SimpleStorage.v1_2_0.SimpleStorage",
+    "Id": {{ simple_storage['Id']|string|tojson }},
+    "Name": {{ "%s Controller"|format(simple_storage['Name'])|tojson }},
+    "Devices": [
+        {% for device in simple_storage['DeviceList'] %}
+                {
+                    "@odata.type": "#SimpleStorage.v1_1_0.Device",
+                    "Name": {{ device['Name']|string|tojson }},
+                    "CapacityBytes": {{ device['CapacityBytes'] }},
+                    "Status": {
+                        "@odata.type": "#Resource.Status",
+                        "State": "Enabled",
+                        "Health": "OK"
+                    }
+                }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ],
+    "@odata.context": "/redfish/v1/$metadata#SimpleStorage.SimpleStorage",
+    "@odata.id": {{ "/redfish/v1/Systems/%s/SimpleStorage/%s"|format(identity, simple_storage['Id'])|tojson }}
+}

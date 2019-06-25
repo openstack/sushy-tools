@@ -574,3 +574,147 @@ class EmulatorTestCase(base.BaseTestCase):
         self.assertEqual(204, response.status_code)
 
         vmedia_mock.eject_image.called_once_with('CD')
+
+    def test_simple_storage_collection(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
+        systems_mock.get_simple_storage_collection.return_value = {
+            'virtio': {
+                'Id': 'virtio',
+                'Name': 'virtio',
+                'DeviceList': [
+                    {
+                        'Name': 'testVM1.img',
+                        'CapacityBytes': 100000
+                    },
+                    {
+                        'Name': 'sdb1',
+                        'CapacityBytes': 150000
+                    }
+                ]
+            },
+            'ide': {
+                'Id': 'ide',
+                'Name': 'ide',
+                'DeviceList': [
+                    {
+                        'Name': 'testVol1.img',
+                        'CapacityBytes': 200000
+                    },
+                    {
+                        'Name': 'blk-pool0-vol0',
+                        'CapacityBytes': 300000
+                    }
+                ]
+            }
+        }
+        response = self.app.get('redfish/v1/Systems/' + self.uuid +
+                                '/SimpleStorage')
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('Simple Storage Collection',
+                         response.json['Name'])
+        self.assertEqual(2, response.json['Members@odata.count'])
+        self.assertEqual({'/redfish/v1/Systems/' + self.uuid +
+                          '/SimpleStorage/virtio',
+                          '/redfish/v1/Systems/' + self.uuid +
+                          '/SimpleStorage/ide'},
+                         {m['@odata.id'] for m in response.json['Members']})
+
+    def test_simple_storage_collection_empty(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
+        systems_mock.get_simple_storage_collection.return_value = []
+        response = self.app.get('redfish/v1/Systems/' + self.uuid +
+                                '/SimpleStorage')
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('Simple Storage Collection',
+                         response.json['Name'])
+        self.assertEqual(0, response.json['Members@odata.count'])
+        self.assertEqual([], response.json['Members'])
+
+    def test_simple_storage(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
+        systems_mock.get_simple_storage_collection.return_value = {
+            'virtio': {
+                'Id': 'virtio',
+                'Name': 'virtio',
+                'DeviceList': [
+                    {
+                        'Name': 'testVM1.img',
+                        'CapacityBytes': 100000
+                    },
+                    {
+                        'Name': 'sdb1',
+                        'CapacityBytes': 150000
+                    }
+                ]
+            },
+            'ide': {
+                'Id': 'ide',
+                'Name': 'ide',
+                'DeviceList': [
+                    {
+                        'Name': 'testVol1.img',
+                        'CapacityBytes': 200000
+                    },
+                    {
+                        'Name': 'blk-pool0-vol0',
+                        'CapacityBytes': 300000
+                    }
+                ]
+            }
+        }
+        response = self.app.get('/redfish/v1/Systems/' + self.uuid +
+                                '/SimpleStorage/virtio')
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('virtio', response.json['Id'])
+        self.assertEqual('virtio Controller', response.json['Name'])
+        self.assertEqual('testVM1.img', response.json['Devices'][0]['Name'])
+        self.assertEqual(100000, response.json['Devices'][0]['CapacityBytes'])
+        self.assertEqual('sdb1', response.json['Devices'][1]['Name'])
+        self.assertEqual(150000, response.json['Devices'][1]['CapacityBytes'])
+        self.assertEqual('/redfish/v1/Systems/' + self.uuid +
+                         '/SimpleStorage/virtio',
+                         response.json['@odata.id'])
+
+    def test_simple_storage_not_found(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
+        systems_mock.get_simple_storage_collection.return_value = {
+            'virtio': {
+                'Id': 'virtio',
+                'Name': 'virtio',
+                'DeviceList': [
+                    {
+                        'Name': 'testVM1.img',
+                        'CapacityBytes': 100000
+                    },
+                    {
+                        'Name': 'sdb1',
+                        'CapacityBytes': 150000
+                    }
+                ]
+            },
+            'ide': {
+                'Id': 'ide',
+                'Name': 'ide',
+                'DeviceList': [
+                    {
+                        'Name': 'testVol1.img',
+                        'CapacityBytes': 200000
+                    },
+                    {
+                        'Name': 'blk-pool0-vol0',
+                        'CapacityBytes': 300000
+                    }
+                ]
+            }
+        }
+        response = self.app.get('/redfish/v1/Systems/' + self.uuid +
+                                '/SimpleStorage/scsi')
+
+        self.assertEqual(404, response.status_code)
