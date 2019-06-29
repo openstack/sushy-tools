@@ -1,0 +1,2 @@
+libvirt-dev [platform:dpkg]
+pkg-config [platform:dpkg]
