@@ -1,0 +1,16 @@
+{
+    "@odata.type": "#StorageCollection.StorageCollection",
+    "Name": "Storage Collection",
+    "Members@odata.count": {{ storage_col|length }},
+    "Members": [
+        {% for storage in storage_col %}
+                {
+                    "@odata.id": {{ "/redfish/v1/Systems/%s/Storage/%s"|format(identity, storage.Id)|tojson }}
+                }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ],
+    "Oem": {},
+    "@odata.context": "/redfish/v1/$metadata#StorageCollection.StorageCollection",
+    "@odata.id": {{ "/redfish/v1/Systems/%s/Storage"|format(identity)|tojson }}
+}
+

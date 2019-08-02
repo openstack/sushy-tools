@@ -62,6 +62,15 @@
             {% endfor -%}
         ],
         {% endif -%}
+        {% if storage %}
+        "Storage": [
+            {%- for stg in storage %}
+            {
+                "@odata.id": {{ "/redfish/v1/Systems/%s/Storage/%s"|format(stg[0], stg[1])|tojson }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor -%}
+        ],
+        {% endif -%}
         "ManagedBy": [
             {%- for manager in managers %}
             {

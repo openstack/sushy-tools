@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Adds Storage and Storage Controllers resource support to the dynamic
+    Redfish emulator based on static user configuration.

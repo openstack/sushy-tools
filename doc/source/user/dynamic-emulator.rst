@@ -617,3 +617,52 @@ By this point the system will boot off the virtual CD drive when powering it on:
 
    ISO files to boot from must be UEFI-bootable, libvirtd should be running on the same
    machine with sushy-emulator.
+
+Storage resource
+----------------
+
+For emulating *Storage* resource for a System of choice, the
+user can statically configure one or more imaginary storage
+instances along with the corresponding storage controllers which
+are also imaginary.
+
+The *Storage* instances are keyed by the UUIDs of the System they
+belong to.
+
+.. code-block:: python
+
+    SUSHY_EMULATOR_STORAGE = {
+        "da69abcc-dae0-4913-9a7b-d344043097c0": [
+            {
+                "Id": "1",
+                "Name": "Local Storage Controller",
+                "StorageControllers": [
+                    {
+                        "MemberId": "0",
+                        "Name": "Contoso Integrated RAID",
+                        "SpeedGbps": 12
+                    }
+                ]
+            }
+        ]
+    }
+
+The Storage resources can be revealed by querying Storage resource
+for the corresponding System directly.
+
+.. code-block:: bash
+
+    curl http://localhost:8000/redfish/v1/Systems/da69abcc-dae0-4913-9a7b-d344043097c0/Storage
+    {
+        "@odata.type": "#StorageCollection.StorageCollection",
+        "Name": "Storage Collection",
+        "Members@odata.count": 1,
+        "Members": [
+            {
+                "@odata.id": "/redfish/v1/Systems/da69abcc-dae0-4913-9a7b-d344043097c0/Storage/1"
+            }
+        ],
+        "Oem": {},
+        "@odata.context": "/redfish/v1/$metadata#StorageCollection.StorageCollection",
+        "@odata.id": "/redfish/v1/Systems/da69abcc-dae0-4913-9a7b-d344043097c0/Storage"
+    }

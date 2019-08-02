@@ -718,3 +718,49 @@ class EmulatorTestCase(base.BaseTestCase):
                                 '/SimpleStorage/scsi')
 
         self.assertEqual(404, response.status_code)
+
+    def test_storage_collection_resource(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        resources_mock.storage.get_storage_col.return_value = [
+            {
+                "Id": "1",
+                "Name": "Local Storage Controller",
+                "StorageControllers": [
+                    {
+                        "MemberId": "0",
+                        "Name": "Contoso Integrated RAID",
+                        "SpeedGbps": 12
+                    }
+                ]
+            }
+        ]
+        response = self.app.get('redfish/v1/Systems/vbmc-node/Storage')
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({'@odata.id':
+                          '/redfish/v1/Systems/vbmc-node/Storage/1'},
+                         response.json['Members'][0])
+
+    def test_storage_resource_get(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        resources_mock.storage.get_storage_col.return_value = [
+            {
+                "Id": "1",
+                "Name": "Local Storage Controller",
+                "StorageControllers": [
+                    {
+                        "MemberId": "0",
+                        "Name": "Contoso Integrated RAID",
+                        "SpeedGbps": 12
+                    }
+                ]
+            }
+        ]
+        response = self.app.get('/redfish/v1/Systems/vbmc-node/Storage/1')
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('1', response.json['Id'])
+        self.assertEqual('Local Storage Controller', response.json['Name'])
+        stg_ctl = response.json['StorageControllers'][0]
+        self.assertEqual("0", stg_ctl['MemberId'])
+        self.assertEqual("Contoso Integrated RAID", stg_ctl['Name'])
+        self.assertEqual(12, stg_ctl['SpeedGbps'])

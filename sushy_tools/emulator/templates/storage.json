@@ -1,0 +1,43 @@
+{
+    "@odata.type": "##Storage.v1_4_0.Storage",
+    "Id": {{ storage['Id']|string|tojson }},
+    "Name": {{ storage['Name']|string|tojson }},
+    "Status": {
+        "@odata.type": "#Resource.Status",
+        "State": "Enabled",
+        "Health": "OK",
+        "HealthRollup": "OK"
+    },
+    {% if storage['StorageControllers'] %}
+    "StorageControllers": [
+        {%- for ctl in storage['StorageControllers'] %}
+        {
+            "@odata.id": {{ "/redfish/v1/Systems/%s/Storage/%s#/StorageControllers/%s"|format(identity, storage['Id'], ctl['MemberId'])|tojson }},
+            "@odata.type": "#Storage.v1_3_0.StorageController",
+            "MemberId": {{ ctl['MemberId']|string|tojson }},
+            "Name": {{ ctl['Name']|string|tojson }},
+            "Status": {
+                "@odata.type": "#Resource.Status",
+                "State": "Enabled",
+                "Health": "OK"
+            },
+            "Manufacturer": "Contoso",
+            "Model": "12Gbs Integrated RAID",
+            "SerialNumber": "2M220100SL",
+            "PartNumber": "CT18754",
+            "SpeedGbps": {{ ctl['SpeedGbps'] }},
+            "FirmwareVersion": "1.0.0.7",
+            "SupportedControllerProtocols": [
+                "PCIe"
+            ],
+            "SupportedDeviceProtocols": [
+                "SAS",
+                "SATA"
+            ]
+        }{% if not loop.last %},{% endif %}
+        {% endfor -%}
+    ],
+    {% endif -%}
+    "@odata.context": "/redfish/v1/$metadata#Storage.Storage",
+    "@odata.id": {{ "/redfish/v1/Systems/%s/Storage/%s"|format(identity, storage['Id'])|tojson }}
+}
