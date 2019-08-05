@@ -121,7 +121,7 @@ class LibvirtDriver(AbstractSystemsDriver):
 
     STORAGE_POOL = 'default'
 
-    STORAGE_POOL_XML = """
+    STORAGE_VOLUME_XML = """
 <volume type='file'>
   <name>%(name)s</name>
   <key>%(name)s</key>
@@ -707,7 +707,7 @@ class LibvirtDriver(AbstractSystemsDriver):
         # Create new volume
 
         volume = pool.createXML(
-            self.STORAGE_POOL_XML % {
+            self.STORAGE_VOLUME_XML % {
                 'name': image_name, 'path': image_path,
                 'size': image_size})
 

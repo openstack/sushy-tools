@@ -73,13 +73,17 @@ def memoize(permanent_cache=None):
 class PersistentDict(MutableMapping):
     DBPATH = os.path.join(tempfile.gettempdir(), 'sushy-emulator')
 
+    _connection = None
+
     def make_permanent(self, dbpath, dbfile):
         dbpath = dbpath or self.DBPATH
         if not os.path.exists(dbpath):
             os.makedirs(dbpath)
-        self.dbpath = os.path.join(dbpath, dbfile) + '.sqlite'
+        dbpath = os.path.join(dbpath, dbfile) + '.sqlite'
 
-        with self.get_connection() as connection:
+        self._connection = sqlite3.connect(dbpath)
+
+        with self.connection as connection:
             cursor = connection.cursor()
             cursor.execute(
                 'create table if not exists cache '
@@ -88,19 +92,25 @@ class PersistentDict(MutableMapping):
 
         self.update(dict(self))
 
-    def encode(self, obj):
+    @staticmethod
+    def encode(obj):
         return pickle.dumps(obj)
 
-    def decode(self, blob):
+    @staticmethod
+    def decode(blob):
         return pickle.loads(blob)
 
-    def get_connection(self):
-        return sqlite3.connect(self.dbpath)
+    @property
+    def connection(self):
+        if not self._connection:
+            raise TypeError('Dict is not yet persistent')
+
+        return self._connection
 
     def __getitem__(self, key):
         key = self.encode(key)
 
-        with self.get_connection() as connection:
+        with self.connection as connection:
             cursor = connection.cursor()
             cursor.execute(
                 'select value from cache where key=?',
@@ -117,7 +127,7 @@ class PersistentDict(MutableMapping):
         key = self.encode(key)
         value = self.encode(value)
 
-        with self.get_connection() as connection:
+        with self.connection as connection:
             cursor = connection.cursor()
             cursor.execute(
                 'insert or replace into cache values (?, ?)',
@@ -127,7 +137,7 @@ class PersistentDict(MutableMapping):
     def __delitem__(self, key):
         key = self.encode(key)
 
-        with self.get_connection() as connection:
+        with self.connection as connection:
             cursor = connection.cursor()
 
             cursor.execute(
@@ -144,7 +154,7 @@ class PersistentDict(MutableMapping):
             )
 
     def __iter__(self):
-        with self.get_connection() as connection:
+        with self.connection as connection:
             cursor = connection.cursor()
             cursor.execute(
                 'select key from cache'
@@ -155,7 +165,7 @@ class PersistentDict(MutableMapping):
             yield self.decode(r[0])
 
     def __len__(self):
-        with self.get_connection() as connection:
+        with self.connection as connection:
             cursor = connection.cursor()
             cursor.execute(
                 'select count(*) from cache'
