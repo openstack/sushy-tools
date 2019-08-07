@@ -38,6 +38,15 @@
         {% endfor -%}
     ],
     {% endif -%}
+    {% if storage['Drives'] %}
+    "Drives": [
+        {%- for drive in storage['Drives'] %}
+        {
+            "@odata.id": {{ "/redfish/v1/Systems/%s/Storage/%s/Drives/%s"|format(identity, storage['Id'], drive)|tojson }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor -%}
+    ],
+    {% endif -%}
     "@odata.context": "/redfish/v1/$metadata#Storage.Storage",
     "@odata.id": {{ "/redfish/v1/Systems/%s/Storage/%s"|format(identity, storage['Id'])|tojson }}
 }

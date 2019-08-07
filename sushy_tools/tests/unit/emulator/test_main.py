@@ -764,3 +764,22 @@ class EmulatorTestCase(base.BaseTestCase):
         self.assertEqual("0", stg_ctl['MemberId'])
         self.assertEqual("Contoso Integrated RAID", stg_ctl['Name'])
         self.assertEqual(12, stg_ctl['SpeedGbps'])
+
+    def test_drive_resource_get(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        resources_mock.drives.get_drives.return_value = [
+            {
+                "Id": "32ADF365C6C1B7BD",
+                "Name": "Drive Sample",
+                "CapacityBytes": 899527000000,
+                "Protocol": "SAS"
+            }
+        ]
+        response = self.app.get('/redfish/v1/Systems/vbmc-node/Storage/1'
+                                '/Drives/32ADF365C6C1B7BD')
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('32ADF365C6C1B7BD', response.json['Id'])
+        self.assertEqual('Drive Sample', response.json['Name'])
+        self.assertEqual(899527000000, response.json['CapacityBytes'])
+        self.assertEqual('SAS', response.json['Protocol'])

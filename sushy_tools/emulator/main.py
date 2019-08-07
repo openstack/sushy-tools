@@ -24,6 +24,7 @@ import sys
 import flask
 
 from sushy_tools.emulator.resources.chassis import staticdriver as chsdriver
+from sushy_tools.emulator.resources.drives import staticdriver as drvdriver
 from sushy_tools.emulator.resources.indicators import staticdriver as inddriver
 from sushy_tools.emulator.resources.managers import staticdriver as mgrdriver
 from sushy_tools.emulator.resources.storage import staticdriver as stgdriver
@@ -46,6 +47,7 @@ class Resources(object):
     INDICATORS = None
     VMEDIA = None
     STORAGE = None
+    DRIVES = None
 
     def __new__(cls, *args, **kwargs):
 
@@ -120,6 +122,13 @@ class Resources(object):
                 'Initialized storage resource backed by %s '
                 'driver', cls.STORAGE().driver)
 
+        if cls.DRIVES is None:
+            cls.DRIVES = drvdriver.StaticDriver.initialize(app.config)
+
+            app.logger.debug(
+                'Initialized drive resource backed by %s '
+                'driver', cls.DRIVES().driver)
+
         return super(Resources, cls).__new__(cls, *args, **kwargs)
 
     def __enter__(self):
@@ -129,6 +138,7 @@ class Resources(object):
         self.indicators = self.INDICATORS()
         self.vmedia = self.VMEDIA()
         self.storage = self.STORAGE()
+        self.drives = self.DRIVES()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -138,6 +148,7 @@ class Resources(object):
         del self.indicators
         del self.vmedia
         del self.storage
+        del self.drives
 
 
 def instance_denied(**kwargs):
@@ -231,11 +242,13 @@ def chassis_resource(identity):
                 systems = resources.systems.systems
                 managers = resources.managers.managers
                 storage = resources.storage.get_all_storage()
+                drives = resources.drives.get_all_drives()
 
             else:
                 systems = []
                 managers = []
                 storage = []
+                drives = []
 
             return flask.render_template(
                 'chassis.json',
@@ -249,7 +262,8 @@ def chassis_resource(identity):
                 managers=managers[:1],
                 indicator_led=resources.indicators.get_indicator_state(
                     uuid),
-                storage=storage
+                storage=storage,
+                drives=drives
             )
 
         elif flask.request.method == 'PATCH':
@@ -699,6 +713,23 @@ def storage(identity, storage_id):
         if stg['Id'] == storage_id:
             return flask.render_template(
                 'storage.json', identity=identity, storage=stg)
+
+    return 'Not found', 404
+
+
+@app.route('/redfish/v1/Systems/<identity>/Storage/<stg_id>/Drives/<drv_id>',
+           methods=['GET'])
+@ensure_instance_access
+@returns_json
+def drive_resource(identity, stg_id, drv_id):
+    with Resources() as resources:
+        uuid = resources.systems.uuid(identity)
+        drives = resources.drives.get_drives(uuid, stg_id)
+
+    for drv in drives:
+        if drv['Id'] == drv_id:
+            return flask.render_template(
+                'drive.json', identity=identity, storage_id=stg_id, drive=drv)
 
     return 'Not found', 404
 

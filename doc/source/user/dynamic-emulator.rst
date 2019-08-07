@@ -335,7 +335,7 @@ Chassis resource
 
 For emulating *Chassis* resource, the user can statically configure
 one or more imaginary chassis. All existing resources (e.g. *Systems*,
-*Managers*) will pretend to reside in the first chassis.
+*Managers*, *Drives*) will pretend to reside in the first chassis.
 
 .. code-block:: python
 
@@ -626,6 +626,9 @@ user can statically configure one or more imaginary storage
 instances along with the corresponding storage controllers which
 are also imaginary.
 
+The IDs of the imaginary drives associated to a *Storage* resource
+can be provided as a list under *Drives*.
+
 The *Storage* instances are keyed by the UUIDs of the System they
 belong to.
 
@@ -642,6 +645,9 @@ belong to.
                         "Name": "Contoso Integrated RAID",
                         "SpeedGbps": 12
                     }
+                ],
+                "Drives": [
+                    "32ADF365C6C1B7BD"
                 ]
             }
         ]
@@ -665,4 +671,49 @@ for the corresponding System directly.
         "Oem": {},
         "@odata.context": "/redfish/v1/$metadata#StorageCollection.StorageCollection",
         "@odata.id": "/redfish/v1/Systems/da69abcc-dae0-4913-9a7b-d344043097c0/Storage"
+    }
+
+Drive resource
+++++++++++++++
+
+For emulating the *Drive* resource, the user can statically configure
+one or more drives.
+
+The *Drive* instances are keyed in a composite manner using
+(System_UUID, Storage_ID) where System_UUID is the UUID of the System
+and Storage_ID is the ID of the Storage resource to which that particular
+drive belongs.
+
+.. code-block:: python
+
+    SUSHY_EMULATOR_DRIVES = {
+        ("da69abcc-dae0-4913-9a7b-d344043097c0", "1"): [
+            {
+                "Id": "32ADF365C6C1B7BD",
+                "Name": "Drive Sample",
+                "CapacityBytes": 899527000000,
+                "Protocol": "SAS"
+            }
+        ]
+    }
+
+The *Drive* resource can be revealed by querying it via the System and the
+Storage resource it belongs to.
+
+.. code-block:: bash
+
+    curl http://localhost:8000/redfish/v1/Systems/da69abcc-dae0-4913-9a7b-d344043097c0/Storage/1/Drives/32ADF365C6C1B7BD
+    {
+        ...
+        "Id": "32ADF365C6C1B7BD",
+        "Name": "Drive Sample",
+        "Model": "C123",
+        "Revision": "100A",
+        "CapacityBytes": 899527000000,
+        "FailurePredicted": false,
+        "Protocol": "SAS",
+        "MediaType": "HDD",
+        "Manufacturer": "Contoso",
+        "SerialNumber": "1234570",
+        ...
     }

@@ -1,0 +1,30 @@
+{
+    "@odata.type": "#Drive.v1_4_0.Drive",
+    "Id": {{ drive['Id']|string|tojson }},
+    "Name": {{ drive['Name']|string|tojson }},
+    "IndicatorLED": "Lit",
+    "Model": "C123",
+    "Revision": "100A",
+    "Status": {
+        "@odata.type": "#Resource.Status",
+        "State": "Enabled",
+        "Health": "OK"
+    },
+    "CapacityBytes": {{ drive['CapacityBytes'] }},
+    "FailurePredicted": false,
+    "Protocol": {{ drive['Protocol']|string|tojson }},
+    "MediaType": "HDD",
+    "Manufacturer": "Contoso",
+    "SerialNumber": "1234570",
+    "PartNumber": "C123-1111",
+    "HotspareType": "Global",
+    "EncryptionAbility": "SelfEncryptingDrive",
+    "EncryptionStatus": "Unlocked",
+    "RotationSpeedRPM": 15000,
+    "BlockSizeBytes": 512,
+    "CapableSpeedGbs": 12,
+    "NegotiatedSpeedGbs": 12,
+    "@odata.context": "/redfish/v1/$metadata#Drive.Drive",
+    "@odata.id": {{ "/redfish/v1/Systems/%s/Storage/%s/Drives/%s"|format(identity, storage_id, drive['Id'])|tojson }},
+    "@Redfish.Copyright": "Copyright 2014-2017 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+}

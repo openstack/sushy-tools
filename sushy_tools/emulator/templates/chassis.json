@@ -71,6 +71,15 @@
             {% endfor -%}
         ],
         {% endif -%}
+        {% if drives %}
+        "Drives": [
+            {%- for drive in drives %}
+            {
+                "@odata.id": {{ "/redfish/v1/Systems/%s/Storage/%s/Drives/%s"|format(drive[0], drive[1], drive[2])|tojson }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor -%}
+        ],
+        {% endif -%}
         "ManagedBy": [
             {%- for manager in managers %}
             {
