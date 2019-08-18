@@ -783,3 +783,63 @@ class EmulatorTestCase(base.BaseTestCase):
         self.assertEqual('Drive Sample', response.json['Name'])
         self.assertEqual(899527000000, response.json['CapacityBytes'])
         self.assertEqual('SAS', response.json['Protocol'])
+
+    def test_volume_collection_get(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        resources_mock.volumes.get_volumes_col.return_value = [
+            {
+                "libvirtPoolName": "sushyPool",
+                "libvirtVolName": "testVol",
+                "Id": "1",
+                "Name": "Sample Volume 1",
+                "VolumeType": "Mirrored",
+                "CapacityBytes": 23748
+            }
+        ]
+        resources_mock.systems.find_or_create_storage_volume.return_value = "1"
+        response = self.app.get('/redfish/v1/Systems/vmc-node/Storage/1/'
+                                'Volumes')
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({'@odata.id':
+                          '/redfish/v1/Systems/vmc-node/Storage/1/Volumes/1'},
+                         response.json['Members'][0])
+
+    def test_create_volume_post(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        systems_mock = resources_mock.systems
+        systems_mock.find_or_create_storage_volume.return_value = "13087010612"
+        data = {
+            "Name": "Sample Volume 3",
+            "VolumeType": "NonRedundant",
+            "CapacityBytes": 23456
+        }
+        response = self.app.post('/redfish/v1/Systems/vmc-node/Storage/1/'
+                                 'Volumes', json=data)
+
+        self.assertEqual(201, response.status_code)
+        self.assertEqual('http://localhost/redfish/v1/Systems/vmc-node/'
+                         'Storage/1/Volumes/13087010612',
+                         response.headers['Location'])
+
+    def test_volume_resource_get(self, resources_mock):
+        resources_mock = resources_mock.return_value.__enter__.return_value
+        resources_mock.volumes.get_volumes_col.return_value = [
+            {
+                "libvirtPoolName": "sushyPool",
+                "libvirtVolName": "testVol",
+                "Id": "1",
+                "Name": "Sample Volume 1",
+                "VolumeType": "Mirrored",
+                "CapacityBytes": 23748
+            }
+        ]
+        resources_mock.systems.find_or_create_storage_volume.return_value = "1"
+        response = self.app.get('/redfish/v1/Systems/vbmc-node/Storage/1/'
+                                'Volumes/1')
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('1', response.json['Id'])
+        self.assertEqual('Sample Volume 1', response.json['Name'])
+        self.assertEqual('Mirrored', response.json['VolumeType'])
+        self.assertEqual(23748, response.json['CapacityBytes'])

@@ -645,3 +645,24 @@ class LibvirtDriverTestCase(base.BaseTestCase):
                                    .get_simple_storage_collection(self.uuid))
 
         self.assertEqual({}, simple_storage_response)
+
+    @mock.patch('libvirt.open', autospec=True)
+    def test_find_or_create_storage_volume(self, libvirt_mock):
+        conn_mock = libvirt_mock.return_value
+        vol_data = {
+            "libvirtVolName": "123456",
+            "Id": "1",
+            "Name": "Sample Vol",
+            "CapacityBytes": 12345,
+            "VolumeType": "Mirrored"
+        }
+
+        pool_mock = conn_mock.storagePoolLookupByName.return_value
+        with open('sushy_tools/tests/unit/emulator/pool.xml', 'r') as f:
+            data = f.read()
+        pool_mock.storageVolLookupByName.side_effect = libvirt.libvirtError(
+            'Storage volume not found')
+        pool_mock.XMLDesc.return_value = data
+
+        self.test_driver.find_or_create_storage_volume(vol_data)
+        pool_mock.createXML.assert_called_once_with(mock.ANY)

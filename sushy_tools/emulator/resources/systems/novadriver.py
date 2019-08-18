@@ -374,3 +374,14 @@ class OpenStackDriver(AbstractSystemsDriver):
 
     def get_simple_storage_collection(self, identity):
         raise error.NotSupportedError('Not implemented')
+
+    def find_or_create_storage_volume(self, data):
+        """Find/create volume based on existence in the virtualization backend
+
+        :param data: data about the volume in dict form with values for `Id`,
+                     `Name`, `CapacityBytes`, `VolumeType`, `libvirtPoolName`
+                     and `libvirtVolName`
+
+        :returns: Id of the volume if successfully found/created else None
+        """
+        raise error.NotSupportedError('Not implemented')
