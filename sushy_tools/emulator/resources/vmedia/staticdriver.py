@@ -200,6 +200,8 @@ class StaticDriver(DriverBase):
         device_info['WriteProtected'] = write_protected
         device_info['_local_file_path'] = local_file_path
 
+        self._devices.update({(identity, device): device_info})
+
         return local_file_path
 
     def eject_image(self, identity, device):
@@ -215,6 +217,8 @@ class StaticDriver(DriverBase):
         device_info['ImageName'] = ''
         device_info['Inserted'] = False
         device_info['WriteProtected'] = False
+
+        self._devices.update({(identity, device): device_info})
 
         local_file = device_info.pop('_local_file', None)
         if local_file:
