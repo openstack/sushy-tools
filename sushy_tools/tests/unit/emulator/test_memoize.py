@@ -116,7 +116,6 @@ class PersistentDictTestCase(base.BaseTestCase):
 
         mock_pickle.dumps.return_value = 'pickled-key'
         mock_connection = mock_sqlite3.connect.return_value
-        mock_connection = mock_connection.__enter__.return_value
         mock_cursor = mock_connection.cursor.return_value
         mock_cursor.fetchone.return_value = ['pickled-value']
 
@@ -136,7 +135,6 @@ class PersistentDictTestCase(base.BaseTestCase):
             'pickled-key', 'pickled-value']
 
         mock_connection = mock_sqlite3.connect.return_value
-        mock_connection = mock_connection.__enter__.return_value
         mock_cursor = mock_connection.cursor.return_value
 
         pd[1] = 2
@@ -153,7 +151,6 @@ class PersistentDictTestCase(base.BaseTestCase):
 
         mock_pickle.dumps.return_value = 'pickled-key'
         mock_connection = mock_sqlite3.connect.return_value
-        mock_connection = mock_connection.__enter__.return_value
         mock_cursor = mock_connection.cursor.return_value
 
         del pd[1]
@@ -169,7 +166,6 @@ class PersistentDictTestCase(base.BaseTestCase):
 
         mock_pickle.dumps.return_value = 'pickled-key'
         mock_connection = mock_sqlite3.connect.return_value
-        mock_connection = mock_connection.__enter__.return_value
         mock_cursor = mock_connection.cursor.return_value
         mock_cursor.fetchall.return_value = [['pickled-key']]
 
@@ -186,7 +182,6 @@ class PersistentDictTestCase(base.BaseTestCase):
         pd.make_permanent('/', 'file')
 
         mock_connection = mock_sqlite3.connect.return_value
-        mock_connection = mock_connection.__enter__.return_value
         mock_cursor = mock_connection.cursor.return_value
 
         expected = 1
