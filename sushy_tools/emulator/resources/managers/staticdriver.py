@@ -33,11 +33,11 @@ class StaticDriver(AbstractManagersDriver):
             # Default Manager
             managers = [
                 {
-                    "Id": "BMC",
-                    "Name": "Manager",
-                    "ServiceEntryPointUUID": "92384634-2938-2342-"
-                                             "8820-489239905423",
-                    "UUID": "58893887-8974-2487-2389-841168418919",
+                    u'Id': u'BMC',
+                    u'Name': u'Manager',
+                    u'ServiceEntryPointUUID': u'92384634-2938-2342-'
+                                              u'8820-489239905423',
+                    u'UUID': u'58893887-8974-2487-2389-841168418919',
                 }
             ]
 
