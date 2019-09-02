@@ -33,12 +33,13 @@ class StaticDriver(DriverBase):
         cls._config = config
 
         cls._indicators = memoize.PersistentDict()
-        cls._indicators.update(
-            config.get('SUSHY_EMULATOR_INDICATOR_LEDS', {}))
 
         if hasattr(cls._indicators, 'make_permanent'):
             cls._indicators.make_permanent(
                 config.get('SUSHY_EMULATOR_STATE_DIR'), 'indicators')
+
+        cls._indicators.update(
+            config.get('SUSHY_EMULATOR_INDICATOR_LEDS', {}))
 
         return cls
 
