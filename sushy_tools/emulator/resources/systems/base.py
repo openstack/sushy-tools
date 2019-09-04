@@ -192,3 +192,10 @@ class AbstractSystemsDriver(DriverBase):
 
         :raises: `error.FishyError` if boot device can't be set
         """
+
+    @abc.abstractmethod
+    def get_simple_storage_collection(self, identity):
+        """Get a dict of Simple Storage Controllers and their devices
+
+        :returns: dict of Simple Storage Controllers and their atributes
+        """

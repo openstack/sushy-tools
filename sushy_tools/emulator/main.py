@@ -626,6 +626,37 @@ def system_reset_bios(identity):
     return '', 204
 
 
+@app.route('/redfish/v1/Systems/<identity>/SimpleStorage',
+           methods=['GET'])
+@ensure_instance_access
+@returns_json
+def simple_storage_collection(identity):
+    with Resources() as resources:
+        simple_storage_controllers = (
+            resources.systems.get_simple_storage_collection(identity))
+
+        return flask.render_template(
+            'simple_storage_collection.json', identity=identity,
+            simple_storage_controllers=simple_storage_controllers)
+
+
+@app.route('/redfish/v1/Systems/<identity>/SimpleStorage/<simple_storage_id>',
+           methods=['GET'])
+@ensure_instance_access
+@returns_json
+def simple_storage(identity, simple_storage_id):
+    with Resources() as resources:
+        simple_storage_controllers = (
+            resources.systems.get_simple_storage_collection(identity))
+        try:
+            storage_controller = simple_storage_controllers[simple_storage_id]
+        except KeyError:
+            app.logger.debug('"%s" Simple Storage resource was not found')
+            return 'Not found', 404
+        return flask.render_template('simple_storage.json', identity=identity,
+                                     simple_storage=storage_controller)
+
+
 def parse_args():
     parser = argparse.ArgumentParser('sushy-emulator')
     parser.add_argument('--config',

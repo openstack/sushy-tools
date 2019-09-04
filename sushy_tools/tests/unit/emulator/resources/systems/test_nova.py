@@ -256,3 +256,8 @@ class NovaDriverTestCase(base.BaseTestCase):
         nics = self.test_driver.get_nics(self.uuid)
         self.assertEqual([{'id': 'fa:16:3e:22:18:31',
                            'mac': 'fa:16:3e:22:18:31'}], nics)
+
+    def test_get_simple_storage_collection(self):
+        self.assertRaises(
+            error.FishyError,
+            self.test_driver.get_simple_storage_collection, self.uuid)

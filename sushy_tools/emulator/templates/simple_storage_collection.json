@@ -1,0 +1,16 @@
+{
+    "@odata.type": "#SimpleStorageCollection.SimpleStorageCollection",
+    "Name": "Simple Storage Collection",
+    "Members@odata.count": {{ simple_storage_controllers|length }},
+    "Members": [
+        {% for simple_storage in simple_storage_controllers %}
+                {
+                    "@odata.id": {{ "/redfish/v1/Systems/%s/SimpleStorage/%s"|format(identity, simple_storage_controllers[simple_storage]['Id'])|tojson }}
+                }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ],
+    "Oem": {},
+    "@odata.context": "/redfish/v1/$metadata#SimpleStorageCollection.SimpleStorageCollection",
+    "@odata.id": {{ "/redfish/v1/Systems/%s/SimpleStorage"|format(identity)|tojson }}
+}
+

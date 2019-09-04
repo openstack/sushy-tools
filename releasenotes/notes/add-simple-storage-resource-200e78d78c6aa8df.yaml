@@ -1,0 +1,8 @@
+---
+features:
+  - |
+    Adds emulation support for Simple Storage resource to libvirt
+    virtualization backend of the dynamic Redfish emulator. The emulation
+    functionality assumes that the storage devices attached to a VM are
+    configured as a libvirt Volume via a storage pool. Devices not configured
+    as a Volume will not be considered for emulation purposes.
