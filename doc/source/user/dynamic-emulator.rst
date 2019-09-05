@@ -218,7 +218,6 @@ This feature enables system boot from virtual media device.
 The limitations:
 
 * Only ISO images are supported
-* Remote libvirt hypervisor is not supported
 
 See *VirtualMedia* resource section for more information on how to perform
 virtual media boot.
