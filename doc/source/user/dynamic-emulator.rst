@@ -716,3 +716,76 @@ Storage resource it belongs to.
         "SerialNumber": "1234570",
         ...
     }
+
+Storage Volume resource
++++++++++++++++++++++++
+
+The *Volume* resource is emulated as a persistent emulator database
+record, backed by the libvirt virtualization backend of the dynamic
+Redfish emulator.
+
+Only the volumes specified in the config file or created via a POST request
+are allowed to be emulated upon by the emulator and appear as libvirt volumes
+in the libvirt virtualization backend. Volumes other than these can neither be
+listed nor deleted.
+
+To allow libvirt volumes to be emulated upon, they need to be specified
+in the configuration file in the following format (keyed compositely by
+the System UUID and the Storage ID):
+
+.. code-block:: python
+
+    SUSHY_EMULATOR_VOLUMES = {
+        ('da69abcc-dae0-4913-9a7b-d344043097c0', '1'): [
+            {
+                "libvirtPoolName": "sushyPool",
+                "libvirtVolName": "testVol",
+                "Id": "1",
+                "Name": "Sample Volume 1",
+                "VolumeType": "Mirrored",
+                "CapacityBytes": 23748
+            },
+            {
+                "libvirtPoolName": "sushyPool",
+                "libvirtVolName": "testVol1",
+                "Id": "2",
+                "Name": "Sample Volume 2",
+                "VolumeType": "StripedWithParity",
+                "CapacityBytes": 48395
+            }
+        ]
+    }
+
+The Volume resources can be revealed by querying Volumes resource
+for the corresponding System and the Storage.
+
+.. code-block:: bash
+
+    curl http://localhost:8000/redfish/v1/Systems/da69abcc-dae0-4913-9a7b-d344043097c0/Storage/1/Volumes
+    {
+        "@odata.type": "#VolumeCollection.VolumeCollection",
+        "Name": "Storage Volume Collection",
+        "Members@odata.count": 2,
+        "Members": [
+            {
+                "@odata.id": "/redfish/v1/Systems/da69abcc-dae0-4913-9a7b-d344043097c0/Storage/1/Volumes/1"
+            },
+            {
+                "@odata.id": "/redfish/v1/Systems/da69abcc-dae0-4913-9a7b-d344043097c0/Storage/1/Volumes/2"
+            }
+        ],
+        "@odata.context": "/redfish/v1/$metadata#VolumeCollection.VolumeCollection",
+        "@odata.id": "/redfish/v1/Systems/da69abcc-dae0-4913-9a7b-d344043097c0/Storage/1/Volumes",
+    }
+
+A new volume can also be created in the libvirt backend via a POST request
+on a Volume Collection:
+
+.. code-block:: bash
+
+    curl -d '{"Name": "SampleVol",\
+             "VolumeType": "Mirrored",\
+             "CapacityBytes": 74859}' \
+        -H "Content-Type: application/json" \
+        -X POST \
+        http://localhost:8000/redfish/v1/Systems/da69abcc-dae0-4913-9a7b-d344043097c0/Storage/1/Volumes

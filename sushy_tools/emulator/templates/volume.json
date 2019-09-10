@@ -1,0 +1,16 @@
+{
+    "@odata.type": "#Volume.v1_0_3.Volume",
+    "Id": {{ volume['Id']|string|tojson }},
+    "Name": {{ volume['Name']|string|tojson }},
+    "Status": {
+        "@odata.type": "#Resource.Status",
+        "State": "Enabled",
+        "Health": "OK"
+    },
+    "Encrypted": false,
+    "VolumeType": {{ volume['VolumeType']|string|tojson }},
+    "CapacityBytes": {{ volume['CapacityBytes'] }},
+    "@odata.context": "/redfish/v1/$metadata#Volume.Volume",
+    "@odata.id": {{ "/redfish/v1/Systems/%s/Storage/%s/Volumes/%s"|format(identity, storage_id, volume['Id'])|tojson }},
+    "@Redfish.Copyright": "Copyright 2014-2017 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+}

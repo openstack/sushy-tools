@@ -125,7 +125,7 @@ class LibvirtDriver(AbstractSystemsDriver):
     STORAGE_VOLUME_XML = """
 <volume type='file'>
   <name>%(name)s</name>
-  <key>%(name)s</key>
+  <key>%(path)s</key>
   <capacity unit='bytes'>%(size)i</capacity>
   <physical unit='bytes'>%(size)i</physical>
   <target>
@@ -933,3 +933,60 @@ class LibvirtDriver(AbstractSystemsDriver):
                     simple_storage[ctl_type]['Name'] = ctl_type
                     simple_storage[ctl_type]['DeviceList'].append(disk_device)
         return simple_storage
+
+    def find_or_create_storage_volume(self, data):
+        """Find/create volume based on existence in the virtualization backend
+
+        :param data: data about the volume in dict form with values for `Id`,
+                     `Name`, `CapacityBytes`, `VolumeType`, `libvirtPoolName`
+                     and `libvirtVolName`
+
+        :returns: Id of the volume if successfully found/created else None
+        """
+        with libvirt_open(self._uri) as conn:
+            try:
+                poolName = data['libvirtPoolName']
+            except KeyError:
+                poolName = self.STORAGE_POOL
+            try:
+                pool = conn.storagePoolLookupByName(poolName)
+            except libvirt.libvirtError as ex:
+                msg = ('Error finding Storage Pool by name "%(name)s" at '
+                       'libvirt URI "%(uri)s": %(err)s' %
+                       {'name': poolName, 'uri': self._uri, 'err': ex})
+                logger.debug(msg)
+                return
+            try:
+                vol = pool.storageVolLookupByName(data['libvirtVolName'])
+            except libvirt.libvirtError as ex:
+
+                msg = ('Creating storage volume with name: "%s"',
+                       data['libvirtVolName'])
+                logger.debug(msg)
+
+                pool_tree = ET.fromstring(pool.XMLDesc())
+
+                # Find out path to the volume
+                pool_path_element = pool_tree.find('target/path')
+                if pool_path_element is None:
+                    msg = ('Missing "target/path" tag in the libvirt '
+                           'storage pool "%(pool)s"'
+                           '' % {'pool': poolName})
+                    logger.debug(msg)
+                    return
+
+                vol_path = os.path.join(
+                    pool_path_element.text, data['libvirtVolName'])
+
+                # Create a new volume
+                vol = pool.createXML(
+                    self.STORAGE_VOLUME_XML % {
+                        'name': data['libvirtVolName'], 'path': vol_path,
+                        'size': data['CapacityBytes']})
+
+                if not vol:
+                    msg = ('Error creating "%s" storage volume in "%s" pool',
+                           data['libvirtVolName'], poolName)
+                    logger.debug(msg)
+                    return
+            return data['Id']

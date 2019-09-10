@@ -1,0 +1,13 @@
+---
+features:
+  - |
+    Adds Volume resource emulation support.
+
+    As of this release, a user can configure a collection of Volumes including
+    the VolumeType and Capacity. The configured volumes will appear as libvirt
+    volumes in the libvirt virtualization backend of the dynamic Redfish
+    emulator (provided the libvirt pool specified for the volume exists).
+
+    Volume creation via POST request is also supported.
+
+    In case the Openstack backend is used, the NotSupportedError is raised.

@@ -31,6 +31,7 @@ from sushy_tools.emulator.resources.storage import staticdriver as stgdriver
 from sushy_tools.emulator.resources.systems import libvirtdriver
 from sushy_tools.emulator.resources.systems import novadriver
 from sushy_tools.emulator.resources.vmedia import staticdriver as vmddriver
+from sushy_tools.emulator.resources.volumes import staticdriver as voldriver
 from sushy_tools import error
 from sushy_tools.error import FishyError
 
@@ -48,6 +49,7 @@ class Resources(object):
     VMEDIA = None
     STORAGE = None
     DRIVES = None
+    VOLUMES = None
 
     def __new__(cls, *args, **kwargs):
 
@@ -129,6 +131,13 @@ class Resources(object):
                 'Initialized drive resource backed by %s '
                 'driver', cls.DRIVES().driver)
 
+        if cls.VOLUMES is None:
+            cls.VOLUMES = voldriver.StaticDriver.initialize(app.config)
+
+            app.logger.debug(
+                'Initialized volumes resource backed by %s '
+                'driver', cls.VOLUMES().driver)
+
         return super(Resources, cls).__new__(cls, *args, **kwargs)
 
     def __enter__(self):
@@ -139,6 +148,7 @@ class Resources(object):
         self.vmedia = self.VMEDIA()
         self.storage = self.STORAGE()
         self.drives = self.DRIVES()
+        self.volumes = self.VOLUMES()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -149,6 +159,7 @@ class Resources(object):
         del self.vmedia
         del self.storage
         del self.drives
+        del self.volumes
 
 
 def instance_denied(**kwargs):
@@ -732,6 +743,72 @@ def drive_resource(identity, stg_id, drv_id):
                 'drive.json', identity=identity, storage_id=stg_id, drive=drv)
 
     return 'Not found', 404
+
+
+@app.route('/redfish/v1/Systems/<identity>/Storage/<storage_id>/Volumes',
+           methods=['GET', 'POST'])
+@ensure_instance_access
+@returns_json
+def volumes_collection(identity, storage_id):
+    with Resources() as resources:
+
+        uuid = resources.systems.uuid(identity)
+
+        if flask.request.method == 'GET':
+
+            vol_col = resources.volumes.get_volumes_col(uuid, storage_id)
+
+            vol_ids = []
+            for vol in vol_col:
+                vol_id = resources.systems.find_or_create_storage_volume(vol)
+                if not vol_id:
+                    resources.volumes.delete_volume(uuid, storage_id, vol)
+                else:
+                    vol_ids.append(vol_id)
+
+            return flask.render_template(
+                'volume_collection.json', identity=identity,
+                storage_id=storage_id, volume_col=vol_ids)
+
+        elif flask.request.method == 'POST':
+            data = {
+                "Name": flask.request.json.get('Name'),
+                "VolumeType": flask.request.json.get('VolumeType'),
+                "CapacityBytes": flask.request.json.get('CapacityBytes'),
+                "Id": str(os.getpid()) + datetime.now().strftime("%H%M%S")
+            }
+            data['libvirtVolName'] = data['Id']
+            new_id = resources.systems.find_or_create_storage_volume(data)
+            if new_id:
+                resources.volumes.add_volume(uuid, storage_id, data)
+                app.logger.debug('New storage volume created with ID "%s"',
+                                 new_id)
+                vol_url = ("/redfish/v1/Systems/%s/Storage/%s/"
+                           "Volumes/%s" % (identity, storage_id, new_id))
+                return flask.Response(status=201,
+                                      headers={'Location': vol_url})
+
+
+@app.route('/redfish/v1/Systems/<identity>/Storage/<stg_id>/Volumes/<vol_id>',
+           methods=['GET'])
+@ensure_instance_access
+@returns_json
+def volume(identity, stg_id, vol_id):
+    with Resources() as resources:
+        uuid = resources.systems.uuid(identity)
+        vol_col = resources.volumes.get_volumes_col(uuid, stg_id)
+
+        for vol in vol_col:
+            if vol['Id'] == vol_id:
+                vol_id = resources.systems.find_or_create_storage_volume(vol)
+                if not vol_id:
+                    resources.volumes.delete_volume(uuid, stg_id, vol)
+                else:
+                    return flask.render_template(
+                        'volume.json', identity=identity, storage_id=stg_id,
+                        volume=vol)
+
+    return 'Not Found', 404
 
 
 def parse_args():
