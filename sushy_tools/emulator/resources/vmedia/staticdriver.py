@@ -47,18 +47,18 @@ class StaticDriver(DriverBase):
             'SUSHY_EMULATOR_VMEDIA_DEVICES')
         if device_types is None:
             device_types = {
-                "Cd": {
-                    "Name": "Virtual CD",
-                    "MediaTypes": [
-                        "CD",
-                        "DVD"
+                u'Cd': {
+                    u'Name': u'Virtual CD',
+                    u'MediaTypes': [
+                        u'CD',
+                        u'DVD'
                     ]
                 },
-                "Floppy": {
-                    "Name": "Virtual Removable Media",
-                    "MediaTypes": [
-                        "Floppy",
-                        "USBStick"
+                u'Floppy': {
+                    u'Name': u'Virtual Removable Media',
+                    u'MediaTypes': [
+                        u'Floppy',
+                        u'USBStick'
                     ]
                 }
             }

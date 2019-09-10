@@ -32,9 +32,9 @@ class StaticDriver(AbstractChassisDriver):
             # Default chassis
             chassis = [
                 {
-                    "Id": "SheetMetalChassis",
-                    "Name": "Chassis",
-                    "UUID": "15693887-7984-9484-3272-842188918912",
+                    u'Id': u'SheetMetalChassis',
+                    u'Name': u'Chassis',
+                    u'UUID': u'15693887-7984-9484-3272-842188918912',
                 }
             ]
 
