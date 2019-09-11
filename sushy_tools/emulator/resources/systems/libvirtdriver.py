@@ -777,8 +777,6 @@ class LibvirtDriver(AbstractSystemsDriver):
             if write_protected:
                 ET.SubElement(disk_element, 'readonly')
 
-            conn.defineXML(ET.tostring(domain_tree).decode('utf-8'))
-
     def _remove_boot_images(self, domain, domain_tree, device):
 
         identity = domain.UUIDString()
@@ -840,6 +838,9 @@ class LibvirtDriver(AbstractSystemsDriver):
                        '%(error)s' % {'uri': self._uri, 'error': e})
 
                 raise error.FishyError(msg)
+
+        with libvirt_open(self._uri) as conn:
+            conn.defineXML(ET.tostring(domain_tree).decode('utf-8'))
 
     def _find_device_by_path(self, vol_path):
         """Get device attributes using path
