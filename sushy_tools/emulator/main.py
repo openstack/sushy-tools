@@ -53,14 +53,9 @@ class Resources(object):
 
     def __new__(cls, *args, **kwargs):
 
-        config_file = os.environ.pop('SUSHY_EMULATOR_CONFIG', None)
-        if config_file:
-            app.config.from_pyfile(config_file)
-
         if not cls.SYSTEMS:
 
-            os_cloud = (os.environ.get('OS_CLOUD') or
-                        app.config.get('SUSHY_EMULATOR_OS_CLOUD'))
+            os_cloud = app.config.get('SUSHY_EMULATOR_OS_CLOUD')
 
             if os_cloud:
                 if not novadriver.is_loaded:
@@ -75,12 +70,7 @@ class Resources(object):
                     app.logger.error('libvirt driver not loaded')
                     sys.exit(1)
 
-                libvirt_uri = (
-                    os.environ.get('SUSHY_EMULATOR_LIBVIRT_URI') or
-                    # NOTE(etingof): left for backward compatibility
-                    os.environ.get('SUSHY_EMULATOR_LIBVIRT_URL') or
-                    app.config.get('SUSHY_EMULATOR_LIBVIRT_URI') or
-                    '')
+                libvirt_uri = app.config.get('SUSHY_EMULATOR_LIBVIRT_URI', '')
 
                 cls.SYSTEMS = libvirtdriver.LibvirtDriver.initialize(
                     app.config, libvirt_uri)
@@ -860,26 +850,45 @@ def main():
     if args.config:
         os.environ['SUSHY_EMULATOR_CONFIG'] = args.config
 
+    config_file = os.environ.get('SUSHY_EMULATOR_CONFIG')
+    if config_file:
+        app.config.from_pyfile(config_file)
+
     if args.os_cloud:
-        os.environ['OS_CLOUD'] = args.os_cloud
+        app.config['SUSHY_EMULATOR_OS_CLOUD'] = args.os_cloud
 
     if args.libvirt_uri:
-        os.environ['SUSHY_EMULATOR_LIBVIRT_URI'] = args.libvirt_uri
+        app.config['SUSHY_EMULATOR_LIBVIRT_URI'] = args.libvirt_uri
+
+    else:
+        for envvar in ('SUSHY_EMULATOR_LIBVIRT_URL',  # backward compatibility
+                       'SUSHY_EMULATOR_LIBVIRT_URI'):
+            envvar = os.environ.get(envvar)
+            if envvar:
+                app.config['SUSHY_EMULATOR_LIBVIRT_URI'] = envvar
+
+    if args.interface:
+        app.config['SUSHY_EMULATOR_LISTEN_IP'] = args.interface
+
+    if args.port:
+        app.config['SUSHY_EMULATOR_LISTEN_PORT'] = args.port
+
+    if args.ssl_certificate:
+        app.config['SUSHY_EMULATOR_SSL_CERT'] = args.ssl_certificate
+
+    if args.ssl_key:
+        app.config['SUSHY_EMULATOR_SSL_KEY'] = args.ssl_key
 
     ssl_context = None
-
-    ssl_certificate = (args.ssl_certificate or
-                       app.config.get('SUSHY_EMULATOR_SSL_CERT'))
-    ssl_key = args.ssl_key or app.config.get('SUSHY_EMULATOR_SSL_KEY')
+    ssl_certificate = app.config.get('SUSHY_EMULATOR_SSL_CERT')
+    ssl_key = app.config.get('SUSHY_EMULATOR_SSL_KEY')
 
     if ssl_certificate and ssl_key:
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
         ssl_context.load_cert_chain(ssl_certificate, ssl_key)
 
-    app.run(host=(args.interface or
-                  app.config.get('SUSHY_EMULATOR_LISTEN_IP')),
-            port=(args.port or
-                  app.config.get('SUSHY_EMULATOR_LISTEN_PORT', 8000)),
+    app.run(host=app.config.get('SUSHY_EMULATOR_LISTEN_IP'),
+            port=app.config.get('SUSHY_EMULATOR_LISTEN_PORT', 8000),
             ssl_context=ssl_context)
 
     return 0
