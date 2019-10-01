@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Fixes occasional failure when setting boot image to libvirt domain in
+    response to virtual media "Insert" operation.

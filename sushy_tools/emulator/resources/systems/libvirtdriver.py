@@ -109,10 +109,10 @@ class LibvirtDriver(AbstractSystemsDriver):
 
     DEVICE_TYPE_MAP_REV = {v: k for k, v in DEVICE_TYPE_MAP.items()}
 
-    # target device, controller ID, controller unit number
+    # target device, controller ID
     DEVICE_TARGET_MAP = {
-        constants.DEVICE_TYPE_FLOPPY: ('fda', 'fdc', '0'),
-        constants.DEVICE_TYPE_CD: ('hdc', 'ide', '1')
+        constants.DEVICE_TYPE_FLOPPY: ('fda', 'fdc'),
+        constants.DEVICE_TYPE_CD: ('hdc', 'ide')
     }
 
     DEFAULT_BIOS_ATTRIBUTES = {"BootMode": "Uefi",
@@ -754,7 +754,7 @@ class LibvirtDriver(AbstractSystemsDriver):
             disk_element.set('type', 'file')
             disk_element.set('device', lv_device)
 
-            tgt_dev, tgt_bus, tgt_unit = self.DEVICE_TARGET_MAP[device]
+            tgt_dev, tgt_bus = self.DEVICE_TARGET_MAP[device]
 
             target_element = ET.SubElement(disk_element, 'target')
             target_element.set('dev', tgt_dev)
@@ -763,13 +763,6 @@ class LibvirtDriver(AbstractSystemsDriver):
             driver_element = ET.SubElement(disk_element, 'driver')
             driver_element.set('name', 'qemu')
             driver_element.set('type', 'raw')
-
-            address_element = ET.SubElement(disk_element, 'address')
-            address_element.set('type', 'drive')
-            address_element.set('controller', '0')
-            address_element.set('bus', '0')
-            address_element.set('target', '0')
-            address_element.set('unit', tgt_unit)
 
             source_element = ET.SubElement(disk_element, 'source')
             source_element.set('file', image_path)
