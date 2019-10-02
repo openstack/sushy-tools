@@ -1,0 +1,10 @@
+---
+fixes:
+  - |
+    Fixes potential failure on reading/setting boot device of libvirt domain.
+    Prior to this fix, boot device has only been respected in the boot loader
+    part of libvirt domain XML. However per-device boot configuration can
+    also be used. If the latter way is in place in a libvirt domain, reading
+    boot device would yield nothing, while setting it in the boot loader would
+    fail. This fix respects both ways of configuring libvirt boot device
+    preferring the per-device configuration when setting new boot device.

@@ -162,8 +162,9 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         domain_mock.injectNMI.assert_called_once_with()
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
-    def test_get_boot_device(self, libvirt_mock):
-        with open('sushy_tools/tests/unit/emulator/domain.xml', 'r') as f:
+    def test_get_boot_device_os(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/'
+                  'domain_boot_os.xml', 'r') as f:
             data = f.read()
 
         conn_mock = libvirt_mock.return_value
@@ -175,8 +176,9 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         self.assertEqual('Cd', boot_device)
 
     @mock.patch('libvirt.open', autospec=True)
-    def test_set_boot_device(self, libvirt_mock):
-        with open('sushy_tools/tests/unit/emulator/domain.xml', 'r') as f:
+    def test_set_boot_device_os(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/'
+                  'domain_boot_os.xml', 'r') as f:
             data = f.read()
 
         conn_mock = libvirt_mock.return_value
@@ -186,6 +188,76 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         self.test_driver.set_boot_device(self.uuid, 'Hdd')
 
         conn_mock.defineXML.assert_called_once_with(mock.ANY)
+
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_get_boot_device_disk(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/'
+                  'domain_boot_disk.xml', 'r') as f:
+            data = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = data
+
+        boot_device = self.test_driver.get_boot_device(self.uuid)
+
+        self.assertEqual('Cd', boot_device)
+
+    @mock.patch('libvirt.open', autospec=True)
+    def test_set_boot_device_disk(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/'
+                  'domain_boot_disk.xml', 'r') as f:
+            data = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = data
+
+        self.test_driver.set_boot_device(self.uuid, 'Hdd')
+
+        conn_mock.defineXML.assert_called_once_with(mock.ANY)
+
+        expected = '<disk device="disk" type="file">\n      <source ' \
+                   'file="/home/user/fedora.img" />\n      <target ' \
+                   'dev="hda" />\n    <boot order="1" /></disk>\n'
+
+        self.assertIn(expected, conn_mock.defineXML.call_args[0][0])
+
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_get_boot_device_network(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/'
+                  'domain_boot_network.xml', 'r') as f:
+            data = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = data
+
+        boot_device = self.test_driver.get_boot_device(self.uuid)
+
+        self.assertEqual('Pxe', boot_device)
+
+    @mock.patch('libvirt.open', autospec=True)
+    def test_set_boot_device_network(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/'
+                  'domain_boot_network.xml', 'r') as f:
+            data = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = data
+
+        self.test_driver.set_boot_device(self.uuid, 'Pxe')
+
+        conn_mock.defineXML.assert_called_once_with(mock.ANY)
+
+        expected = '<interface type="direct">\n      <mac address=' \
+                   '"52:54:00:da:ac:54" />\n      <source dev="tap-' \
+                   'node-2i1" mode="vepa" />\n      <model type="vir' \
+                   'tio" />\n      <address bus="0x01" domain="0x' \
+                   '0000" function="0x0" slot="0x01" type="pci" />'
+
+        self.assertIn(expected, conn_mock.defineXML.call_args[0][0])
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
     def test_get_boot_mode(self, libvirt_mock):

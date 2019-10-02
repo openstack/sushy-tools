@@ -81,6 +81,20 @@ class LibvirtDriver(AbstractSystemsDriver):
 
     BOOT_DEVICE_MAP_REV = {v: k for k, v in BOOT_DEVICE_MAP.items()}
 
+    DISK_DEVICE_MAP = {
+        constants.DEVICE_TYPE_HDD: 'disk',
+        constants.DEVICE_TYPE_CD: 'cdrom',
+        constants.DEVICE_TYPE_FLOPPY: 'floppy'
+    }
+
+    DISK_DEVICE_MAP_REV = {v: k for k, v in DISK_DEVICE_MAP.items()}
+
+    INTERFACE_MAP = {
+        constants.DEVICE_TYPE_PXE: 'network',
+    }
+
+    INTERFACE_MAP_REV = {v: k for k, v in INTERFACE_MAP.items()}
+
     LIBVIRT_URI = 'qemu:///system'
 
     BOOT_MODE_MAP = {
@@ -262,6 +276,10 @@ class LibvirtDriver(AbstractSystemsDriver):
     def get_boot_device(self, identity):
         """Get computer system boot device name
 
+        First try to get boot device from bootloader configuration.. If it's
+        not present, proceed towards gathering boot order information from
+        per-device boot configuration, then pick the lowest ordered device.
+
         :param identity: libvirt domain name or ID
 
         :returns: boot device name as `str` or `None` if device name
@@ -271,21 +289,78 @@ class LibvirtDriver(AbstractSystemsDriver):
 
         tree = ET.fromstring(domain.XMLDesc())
 
+        # Try boot configuration in the bootloader
+
         boot_element = tree.find('.//boot')
         if boot_element is not None:
-            boot_source_target = (
-                self.BOOT_DEVICE_MAP_REV.get(boot_element.get('dev'))
-            )
+            dev_attr = boot_element.get('dev')
+            if dev_attr is not None:
+                boot_source_target = self.BOOT_DEVICE_MAP_REV.get(dev_attr)
+                if boot_source_target:
+                    return boot_source_target
 
-            return boot_source_target
+        min_order = boot_source_target = None
+
+        # If bootloader config is not present, try per-device boot elements
+
+        devices_element = tree.find('devices')
+
+        if devices_element is not None:
+
+            for disk_element in devices_element.findall('disk'):
+                boot_element = disk_element.find('boot')
+                if boot_element is None:
+                    continue
+
+                order = boot_element.get('order')
+                if not order:
+                    continue
+
+                order = int(order)
+                if min_order is not None and order >= min_order:
+                    continue
+
+                device_attr = disk_element.get('device')
+                if device_attr is None:
+                    continue
+
+                boot_source_target = self.DISK_DEVICE_MAP_REV.get(
+                    device_attr)
+
+                if boot_source_target:
+                    min_order = order
+
+            for interface_element in devices_element.findall('interface'):
+                boot_element = interface_element.find('boot')
+                if boot_element is None:
+                    continue
+
+                order = boot_element.get('order')
+                if not order:
+                    continue
+
+                order = int(order)
+                if min_order is not None and order >= min_order:
+                    continue
+
+                boot_source_target = self.INTERFACE_MAP_REV.get('network')
+
+                if boot_source_target:
+                    min_order = order
+
+        return boot_source_target
 
     def set_boot_device(self, identity, boot_source):
         """Get/Set computer system boot device name
 
+        First remove all boot device configuration from bootloader because
+        that's legacy with libvirt. Then remove possible boot configuration
+        in the per-device settings. Finally, make the desired boot device
+        the only bootable by means of per-device configuration boot option.
+
         :param identity: libvirt domain name or ID
         :param boot_source: optional string literal requesting boot device
-            change on the system. If not specified, current boot device is
-            returned. Valid values are: *Pxe*, *Hdd*, *Cd*.
+            change on the system. Valid values are: *Pxe*, *Hdd*, *Cd*.
 
         :raises: `error.FishyError` if boot device can't be set
         """
@@ -294,23 +369,65 @@ class LibvirtDriver(AbstractSystemsDriver):
         # XML schema: https://libvirt.org/formatdomain.html#elementsOSBIOS
         tree = ET.fromstring(domain.XMLDesc())
 
-        try:
-            target = self.BOOT_DEVICE_MAP[boot_source]
-
-        except KeyError:
-            msg = ('Unknown power state requested: '
-                   '%(boot_source)s' % {'boot_source': boot_source})
-
-            raise error.FishyError(msg)
+        # Remove bootloader configuration
 
         for os_element in tree.findall('os'):
-            # Remove all "boot" elements
             for boot_element in os_element.findall('boot'):
                 os_element.remove(boot_element)
 
-            # Add a new boot element with the request boot device
-            boot_element = ET.SubElement(os_element, 'boot')
-            boot_element.set('dev', target)
+        target = self.DISK_DEVICE_MAP.get(boot_source)
+
+        # Process per-device boot configuration
+
+        devices_element = tree.find('devices')
+        if devices_element is None:
+            msg = ('Incomplete libvirt domain configuration - <devices> '
+                   'element is missing in domain '
+                   '%(uuid)s' % {'uuid': domain.UUIDString()})
+
+            raise error.FishyError(msg)
+
+        target_device_elements = []
+
+        # Remove per-disk boot configuration
+
+        for disk_element in devices_element.findall('disk'):
+
+            device_attr = disk_element.get('device')
+            if device_attr is None:
+                continue
+
+            # NOTE(etingof): multiple devices of the same type not supported
+            if device_attr == target:
+                target_device_elements.append(disk_element)
+
+            for boot_element in disk_element.findall('boot'):
+                disk_element.remove(boot_element)
+
+        target = self.INTERFACE_MAP.get(boot_source)
+
+        # Remove per-interface boot configuration
+
+        for interface_element in devices_element.findall('interface'):
+
+            if target == 'network':
+                target_device_elements.append(interface_element)
+
+            for boot_element in interface_element.findall('boot'):
+                interface_element.remove(boot_element)
+
+        if not target_device_elements:
+            msg = ('Target libvirt device %(target)s does not exist in domain '
+                   '%(uuid)s' % {'target': boot_source,
+                                 'uuid': domain.UUIDString()})
+
+            raise error.FishyError(msg)
+
+        # NOTE(etingof): Make all chosen devices bootable (important for NICs)
+
+        for order, target_device_element in enumerate(target_device_elements):
+            boot_element = ET.SubElement(target_device_element, 'boot')
+            boot_element.set('order', str(order + 1))
 
         try:
             with libvirt_open(self._uri) as conn:

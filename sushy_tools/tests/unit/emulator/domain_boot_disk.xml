@@ -1,0 +1,16 @@
+<domain type='qemu'>
+  <name>QEmu-fedora-i686</name>
+  <uuid>c7a5fdbd-cdaf-9455-926a-d65c16db1809</uuid>
+  <devices>
+    <disk type='file' device='cdrom'>
+      <source file='/home/user/boot.iso'/>
+      <target dev='hdc'/>
+      <readonly/>
+      <boot order='1'/>
+    </disk>
+    <disk type='file' device='disk'>
+      <source file='/home/user/fedora.img'/>
+      <target dev='hda'/>
+    </disk>
+  </devices>
+</domain>
