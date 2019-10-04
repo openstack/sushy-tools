@@ -76,7 +76,6 @@ class AbstractSystemsDriver(DriverBase):
         """Set computer system power state
 
         :param state: string literal requesting power state transition.
-            If not specified, current system power state is returned.
             Valid values  are: *On*, *ForceOn*, *ForceOff*, *GracefulShutdown*,
             *GracefulRestart*, *ForceRestart*, *Nmi*.
 
@@ -96,8 +95,7 @@ class AbstractSystemsDriver(DriverBase):
         """Set computer system boot device name
 
         :param boot_source: string literal requesting boot device change on the
-            system. If not specified, current boot device is returned.
-            Valid values are: *Pxe*, *Hdd*, *Cd*.
+            system. Valid values are: *Pxe*, *Hdd*, *Cd*.
 
         :raises: `FishyError` if boot device can't be set
         """
@@ -112,9 +110,8 @@ class AbstractSystemsDriver(DriverBase):
     def set_boot_mode(self, identity, boot_mode):
         """Set computer system boot mode.
 
-        :param boot_mode: optional string literal requesting boot mode
-            change on the system. If not specified, current boot mode is
-            returned. Valid values are: *Uefi*, *Legacy*.
+        :param boot_mode: string literal requesting boot mode
+            change on the system. Valid values are: *Uefi*, *Legacy*.
 
         :raises: `FishyError` if boot mode can't be set
         """
