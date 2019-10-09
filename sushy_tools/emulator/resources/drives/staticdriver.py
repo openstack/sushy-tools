@@ -28,7 +28,7 @@ class StaticDriver(DriverBase):
     @classmethod
     def initialize(cls, config):
         cls._config = config
-        cls._drives = cls._config.get('SUSHY_EMULATOR_DRIVES')
+        cls._drives = cls._config.get('SUSHY_EMULATOR_DRIVES', {})
         return cls
 
     @property
@@ -60,5 +60,5 @@ class StaticDriver(DriverBase):
 
         :returns: list of tuples representing the drives
         """
-        return [k + (d['Id'],) for k in self._drives.keys()
+        return [k + (d['Id'],) for k in self._drives
                 for d in self._drives[k]]

@@ -1,0 +1,7 @@
+---
+fixes:
+  - |
+    Fixes defaults to storage and drive resources. Prior to this fix,
+    if storage and/or drive resource emulation is not set up via sushy
+    emulator configuration, the clients trying to read either of
+    these resources would hit hard HTTP 500 response.
