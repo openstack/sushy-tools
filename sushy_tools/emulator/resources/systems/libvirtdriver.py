@@ -99,13 +99,13 @@ class LibvirtDriver(AbstractSystemsDriver):
 
     BOOT_MODE_MAP = {
         'Legacy': 'rom',
-        'Uefi': 'pflash'
+        'UEFI': 'pflash'
     }
 
     BOOT_MODE_MAP_REV = {v: k for k, v in BOOT_MODE_MAP.items()}
 
     BOOT_LOADER_MAP = {
-        'Uefi': {
+        'UEFI': {
             'x86_64': '/usr/share/OVMF/OVMF_CODE.fd',
             'aarch64': '/usr/share/AAVMF/AAVMF_CODE.fd'
         },
@@ -441,7 +441,7 @@ class LibvirtDriver(AbstractSystemsDriver):
     def get_boot_mode(self, identity):
         """Get computer system boot mode.
 
-        :returns: either *Uefi* or *Legacy* as `str` or `None` if
+        :returns: either *UEFI* or *Legacy* as `str` or `None` if
             current boot mode can't be determined
         """
         domain = self._get_domain(identity, readonly=True)
@@ -462,7 +462,7 @@ class LibvirtDriver(AbstractSystemsDriver):
         """Set computer system boot mode.
 
         :param boot_mode: string literal requesting boot mode
-            change on the system. Valid values are: *Uefi*, *Legacy*.
+            change on the system. Valid values are: *UEFI*, *Legacy*.
 
         :raises: `error.FishyError` if boot mode can't be set
         """
@@ -785,7 +785,7 @@ class LibvirtDriver(AbstractSystemsDriver):
             inserted = (self.get_boot_device(identity) ==
                         constants.DEVICE_TYPE_CD)
             if inserted:
-                inserted = self.get_boot_mode(identity) == 'Uefi'
+                inserted = self.get_boot_mode(identity) == 'UEFI'
 
             return boot_image, read_only, inserted
 

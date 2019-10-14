@@ -103,7 +103,7 @@ class AbstractSystemsDriver(DriverBase):
     def get_boot_mode(self, identity):
         """Get computer system boot mode.
 
-        :returns: either *Uefi* or *Legacy* as `str` or `None` if
+        :returns: either *UEFI* or *Legacy* as `str` or `None` if
             current boot mode can't be determined
         """
 
@@ -111,7 +111,7 @@ class AbstractSystemsDriver(DriverBase):
         """Set computer system boot mode.
 
         :param boot_mode: string literal requesting boot mode
-            change on the system. Valid values are: *Uefi*, *Legacy*.
+            change on the system. Valid values are: *UEFI*, *Legacy*.
 
         :raises: `FishyError` if boot mode can't be set
         """

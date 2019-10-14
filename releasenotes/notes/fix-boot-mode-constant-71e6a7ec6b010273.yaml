@@ -1,0 +1,7 @@
+---
+fixes:
+  - |
+    Fixes one of the allowed values for ``BootSourceOverrideMode``
+    element - Redfish specification requires UEFI boot mode to be indicated
+    as ``UEFI``, not ``Uefi`` as the dynamic Redfish emulator erroneously
+    adopted.

@@ -282,7 +282,7 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = data
 
-        self.test_driver.set_boot_mode(self.uuid, 'Uefi')
+        self.test_driver.set_boot_mode(self.uuid, 'UEFI')
 
         conn_mock = libvirt_rw_mock.return_value
         conn_mock.defineXML.assert_called_once_with(mock.ANY)
@@ -297,7 +297,7 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = data
 
-        self.test_driver.set_boot_mode(self.uuid, 'Uefi')
+        self.test_driver.set_boot_mode(self.uuid, 'UEFI')
 
         conn_mock = libvirt_rw_mock.return_value
         xml_document = conn_mock.defineXML.call_args[0][0]
@@ -404,7 +404,7 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = data
 
-        self.test_driver.set_boot_mode(self.uuid, 'Uefi')
+        self.test_driver.set_boot_mode(self.uuid, 'UEFI')
 
         conn_mock = libvirt_rw_mock.return_value
         xml_document = conn_mock.defineXML.call_args[0][0]
