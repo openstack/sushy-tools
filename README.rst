@@ -21,6 +21,6 @@ virtualization backend and, for that matter, virtual Redfish BMC is similar
 to the static Redfish responser.
 
 * Free software: Apache license
-* Documentation: https://docs.openstack.org/sushy/
+* Documentation: https://docs.openstack.org/sushy-tools
 * Source: http://opendev.org/openstack/sushy-tools
 * Bugs: https://storyboard.openstack.org/#!/project/openstack/sushy-tools
