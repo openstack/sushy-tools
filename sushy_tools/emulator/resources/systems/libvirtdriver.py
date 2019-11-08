@@ -863,17 +863,56 @@ class LibvirtDriver(AbstractSystemsDriver):
                 raise error.FishyError(
                     'Unknown device %s at %s' % (device, identity))
 
+            tgt_dev, tgt_bus = self.DEVICE_TARGET_MAP[device]
+
+            # Enumerate existing disks to find a free unit on the bus
+
+            free_units = {i for i in range(100)}
+
+            disk_elements = device_element.findall('disk')
+
+            for disk_element in disk_elements:
+                target_element = disk_element.find('target')
+                if target_element is None:
+                    continue
+
+                bus_type = target_element.attrib.get('bus')
+                if bus_type != tgt_bus:
+                    continue
+
+                address_element = disk_element.find('address')
+                if address_element is None:
+                    continue
+
+                unit_num = address_element.attrib.get('unit')
+                if unit_num is None:
+                    continue
+
+                if unit_num in free_units:
+                    free_units.remove(unit_num)
+
+            if not free_units:
+                msg = ('No free %(bus)s bus unit found in the libvirt domain '
+                       '"%(identity)s" configuration' % {'identity': identity,
+                                                         'bus': tgt_bus})
+                raise error.FishyError(msg)
+
             # Add disk element pointing to the boot image
 
             disk_element = ET.SubElement(device_element, 'disk')
             disk_element.set('type', 'file')
             disk_element.set('device', lv_device)
 
-            tgt_dev, tgt_bus = self.DEVICE_TARGET_MAP[device]
-
             target_element = ET.SubElement(disk_element, 'target')
             target_element.set('dev', tgt_dev)
             target_element.set('bus', tgt_bus)
+
+            address_element = ET.SubElement(disk_element, 'address')
+            address_element.set('type', 'drive')
+            address_element.set('controller', '0')
+            address_element.set('bus', '0')
+            address_element.set('target', '0')
+            address_element.set('unit', '%s' % min(free_units))
 
             driver_element = ET.SubElement(disk_element, 'driver')
             driver_element.set('name', 'qemu')
@@ -889,12 +928,6 @@ class LibvirtDriver(AbstractSystemsDriver):
 
         identity = domain.UUIDString()
 
-        device_element = domain_tree.find('devices')
-        if device_element is None:
-            msg = ('Missing "devices" tag in the libvirt domain '
-                   '"%(identity)s" configuration' % {'identity': identity})
-            raise error.FishyError(msg)
-
         try:
             lv_device = self.BOOT_DEVICE_MAP[device]
 
@@ -908,7 +941,7 @@ class LibvirtDriver(AbstractSystemsDriver):
                    '"%(identity)s" configuration' % {'identity': identity})
             raise error.FishyError(msg)
 
-        # First, remove all existing devices
+        # Remove all existing devices
         disk_elements = device_element.findall('disk')
 
         for disk_element in disk_elements:
@@ -937,18 +970,22 @@ class LibvirtDriver(AbstractSystemsDriver):
 
         if boot_image:
 
-            try:
-                self._add_boot_image(domain, domain_tree, device,
-                                     boot_image, write_protected)
+            self._add_boot_image(domain, domain_tree, device,
+                                 boot_image, write_protected)
 
-            except libvirt.libvirtError as e:
+        with libvirt_open(self._uri) as conn:
+            xml = ET.tostring(domain_tree)
+
+            try:
+                conn.defineXML(xml.decode('utf-8'))
+
+            except Exception as e:
+                self._logger.error('Rejected libvirt domain XML is %s', xml)
+
                 msg = ('Error changing boot image at libvirt URI "%(uri)s": '
                        '%(error)s' % {'uri': self._uri, 'error': e})
 
                 raise error.FishyError(msg)
-
-        with libvirt_open(self._uri) as conn:
-            conn.defineXML(ET.tostring(domain_tree).decode('utf-8'))
 
     def _find_device_by_path(self, vol_path):
         """Get device attributes using path
