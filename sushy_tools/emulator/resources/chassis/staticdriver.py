@@ -13,13 +13,10 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import logging
 import uuid
 
 from sushy_tools.emulator.resources.chassis.base import AbstractChassisDriver
 from sushy_tools import error
-
-logger = logging.getLogger(__name__)
 
 
 class StaticDriver(AbstractChassisDriver):
@@ -71,7 +68,7 @@ class StaticDriver(AbstractChassisDriver):
                     msg = ('Error finding chassis by UUID/Name/Id '
                            '"%(identity)s"' % {'identity': identity})
 
-                    logger.debug(msg)
+                    self._logger.debug(msg)
 
                     raise error.FishyError(msg)
 

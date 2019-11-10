@@ -33,23 +33,27 @@ class StaticDriverTestCase(base.BaseTestCase):
     }
 
     def test_indicators(self):
-        test_driver = StaticDriver.initialize(self.CONFIG)()
+        test_driver = StaticDriver.initialize(
+            self.CONFIG, mock.MagicMock())()
         indicators = test_driver.indicators
         self.assertEqual([self.UUID], indicators)
 
     def test_get_indicator_state(self):
-        test_driver = StaticDriver.initialize(self.CONFIG)()
+        test_driver = StaticDriver.initialize(
+            self.CONFIG, mock.MagicMock())()
         state = test_driver.get_indicator_state(self.UUID)
         self.assertEqual('Off', state)
 
     def test_set_indicator_state_ok(self):
-        test_driver = StaticDriver.initialize(self.CONFIG)()
+        test_driver = StaticDriver.initialize(
+            self.CONFIG, mock.MagicMock())()
         test_driver.set_indicator_state(self.UUID, 'Lit')
         state = test_driver.get_indicator_state(self.UUID)
         self.assertEqual('Lit', state)
 
     def test_set_indicator_state_fail(self):
-        test_driver = StaticDriver.initialize(self.CONFIG)()
+        test_driver = StaticDriver.initialize(
+            self.CONFIG, mock.MagicMock())()
 
         self.assertRaises(
             error.FishyError,

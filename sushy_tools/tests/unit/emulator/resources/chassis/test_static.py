@@ -45,7 +45,8 @@ class StaticDriverTestCase(base.BaseTestCase):
         self.mgr_uuid = self.uuid.replace('8', '2')
 
         test_driver = StaticDriver.initialize(
-            {'SUSHY_EMULATOR_CHASSIS': self.chassis})
+            {'SUSHY_EMULATOR_CHASSIS': self.chassis},
+            mock.MagicMock())
 
         self.test_driver = test_driver()
 

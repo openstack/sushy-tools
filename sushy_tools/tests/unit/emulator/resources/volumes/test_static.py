@@ -50,13 +50,15 @@ class StaticDriverTestCase(base.BaseTestCase):
     }
 
     def test_get_volumes_col(self):
-        test_driver = StaticDriver.initialize(self.CONFIG)()
+        test_driver = StaticDriver.initialize(
+            self.CONFIG, mock.MagicMock())()
         vol_col = test_driver.get_volumes_col(self.SYSTEM_UUID,
                                               self.STORAGE_ID)
         self.assertEqual(self.VOLUMES_COL, vol_col)
 
     def test_add_volume(self):
-        test_driver = StaticDriver.initialize(self.CONFIG)()
+        test_driver = StaticDriver.initialize(
+            self.CONFIG, mock.MagicMock())()
         vol = {
             "libvirtPoolName": "sushyPool",
             "libvirtVolName": "testVol2",
@@ -71,7 +73,8 @@ class StaticDriverTestCase(base.BaseTestCase):
         self.assertTrue(vol in vol_col)
 
     def test_delete_volume(self):
-        test_driver = StaticDriver.initialize(self.CONFIG)()
+        test_driver = StaticDriver.initialize(
+            self.CONFIG, mock.MagicMock())()
         vol = {
             "libvirtPoolName": "sushyPool",
             "libvirtVolName": "testVol",

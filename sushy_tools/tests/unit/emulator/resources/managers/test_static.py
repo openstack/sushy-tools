@@ -15,6 +15,7 @@
 import uuid
 
 from oslotest import base
+from six.moves import mock
 
 from sushy_tools.emulator.resources.managers.staticdriver import StaticDriver
 from sushy_tools import error
@@ -37,7 +38,9 @@ class StaticDriverTestCase(base.BaseTestCase):
         self.name = self.managers[0]['Name']
 
         test_driver = StaticDriver.initialize(
-            {'SUSHY_EMULATOR_MANAGERS': self.managers})
+            {'SUSHY_EMULATOR_MANAGERS': self.managers},
+            mock.MagicMock())
+
         self.test_driver = test_driver()
 
         super(StaticDriverTestCase, self).setUp()

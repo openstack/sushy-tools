@@ -63,7 +63,7 @@ class Resources(object):
                     sys.exit(1)
 
                 cls.SYSTEMS = novadriver.OpenStackDriver.initialize(
-                    app.config, os_cloud)
+                    app.config, app.logger, os_cloud)
 
             else:
                 if not libvirtdriver.is_loaded:
@@ -73,56 +73,63 @@ class Resources(object):
                 libvirt_uri = app.config.get('SUSHY_EMULATOR_LIBVIRT_URI', '')
 
                 cls.SYSTEMS = libvirtdriver.LibvirtDriver.initialize(
-                    app.config, libvirt_uri)
+                    app.config, app.logger, libvirt_uri)
 
             app.logger.debug(
                 'Initialized system resource backed by %s '
                 'driver', cls.SYSTEMS().driver)
 
         if cls.MANAGERS is None:
-            cls.MANAGERS = mgrdriver.StaticDriver.initialize(app.config)
+            cls.MANAGERS = mgrdriver.StaticDriver.initialize(
+                app.config, app.logger)
 
             app.logger.debug(
                 'Initialized manager resource backed by %s '
                 'driver', cls.MANAGERS().driver)
 
         if cls.CHASSIS is None:
-            cls.CHASSIS = chsdriver.StaticDriver.initialize(app.config)
+            cls.CHASSIS = chsdriver.StaticDriver.initialize(
+                app.config, app.logger)
 
             app.logger.debug(
                 'Initialized chassis resource backed by %s '
                 'driver', cls.CHASSIS().driver)
 
         if cls.INDICATORS is None:
-            cls.INDICATORS = inddriver.StaticDriver.initialize(app.config)
+            cls.INDICATORS = inddriver.StaticDriver.initialize(
+                app.config, app.logger)
 
             app.logger.debug(
                 'Initialized indicators resource backed by %s '
                 'driver', cls.INDICATORS().driver)
 
         if cls.VMEDIA is None:
-            cls.VMEDIA = vmddriver.StaticDriver.initialize(app.config)
+            cls.VMEDIA = vmddriver.StaticDriver.initialize(
+                app.config, app.logger)
 
             app.logger.debug(
                 'Initialized virtual media resource backed by %s '
                 'driver', cls.VMEDIA().driver)
 
         if cls.STORAGE is None:
-            cls.STORAGE = stgdriver.StaticDriver.initialize(app.config)
+            cls.STORAGE = stgdriver.StaticDriver.initialize(
+                app.config, app.logger)
 
             app.logger.debug(
                 'Initialized storage resource backed by %s '
                 'driver', cls.STORAGE().driver)
 
         if cls.DRIVES is None:
-            cls.DRIVES = drvdriver.StaticDriver.initialize(app.config)
+            cls.DRIVES = drvdriver.StaticDriver.initialize(
+                app.config, app.logger)
 
             app.logger.debug(
                 'Initialized drive resource backed by %s '
                 'driver', cls.DRIVES().driver)
 
         if cls.VOLUMES is None:
-            cls.VOLUMES = voldriver.StaticDriver.initialize(app.config)
+            cls.VOLUMES = voldriver.StaticDriver.initialize(
+                app.config, app.logger)
 
             app.logger.debug(
                 'Initialized volumes resource backed by %s '

@@ -43,27 +43,31 @@ class StaticDriverTestCase(base.BaseTestCase):
     }
 
     def test_devices(self):
-        test_driver = StaticDriver.initialize(self.CONFIG)()
+        test_driver = StaticDriver.initialize(
+            self.CONFIG, mock.MagicMock())()
 
         devices = test_driver.devices
         self.assertEqual(['Cd', 'Floppy'], sorted(devices))
 
     def test_get_device_name(self):
-        test_driver = StaticDriver.initialize(self.CONFIG)()
+        test_driver = StaticDriver.initialize(
+            self.CONFIG, mock.MagicMock())()
 
         device_name = test_driver.get_device_name(
             self.UUID, 'Cd')
         self.assertEqual('Virtual CD', device_name)
 
     def test_get_device_media_types(self):
-        test_driver = StaticDriver.initialize(self.CONFIG)()
+        test_driver = StaticDriver.initialize(
+            self.CONFIG, mock.MagicMock())()
 
         media_types = test_driver.get_device_media_types(
             self.UUID, 'Cd')
         self.assertEqual(['CD', 'DVD'], media_types)
 
     def test_get_device_image_info(self):
-        test_driver = StaticDriver.initialize(self.CONFIG)()
+        test_driver = StaticDriver.initialize(
+            self.CONFIG, mock.MagicMock())()
 
         dev_info = test_driver.get_device_image_info(
             self.UUID, 'Cd')
@@ -83,7 +87,8 @@ class StaticDriverTestCase(base.BaseTestCase):
                 '.staticdriver.requests', autospec=True)
     def test_insert_image(self, mock_requests, mock_tempfile, mock_rename,
                           mock_open, mock_get_device):
-        test_driver = StaticDriver.initialize(self.CONFIG)()
+        test_driver = StaticDriver.initialize(
+            self.CONFIG, mock.MagicMock())()
 
         device_info = {}
         mock_get_device.return_value = device_info
@@ -119,7 +124,8 @@ class StaticDriverTestCase(base.BaseTestCase):
     @mock.patch('sushy_tools.emulator.resources.vmedia'
                 '.staticdriver.os.unlink', autospec=True)
     def test_eject_image(self, mock_unlink, mock_get_device):
-        test_driver = StaticDriver.initialize(self.CONFIG)()
+        test_driver = StaticDriver.initialize(
+            self.CONFIG, mock.MagicMock())()
 
         device_info = {
             '_local_file': '/tmp/fish.iso'

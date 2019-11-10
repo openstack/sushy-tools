@@ -31,7 +31,8 @@ class NovaDriverTestCase(base.BaseTestCase):
         self.nova_patcher = mock.patch('openstack.connect', autospec=True)
         self.nova_mock = self.nova_patcher.start()
 
-        test_driver_class = OpenStackDriver.initialize({}, 'fake-cloud')
+        test_driver_class = OpenStackDriver.initialize(
+            {}, mock.MagicMock(), 'fake-cloud')
         self.test_driver = test_driver_class()
 
         super(NovaDriverTestCase, self).setUp()

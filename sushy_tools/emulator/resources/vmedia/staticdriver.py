@@ -13,7 +13,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import logging
 import os
 import re
 import tempfile
@@ -25,8 +24,6 @@ from sushy_tools.emulator import memoize
 from sushy_tools.emulator.resources.base import DriverBase
 from sushy_tools import error
 
-logger = logging.getLogger(__name__)
-
 
 class StaticDriver(DriverBase):
     """Redfish virtual media simulator
@@ -34,14 +31,15 @@ class StaticDriver(DriverBase):
     """
 
     @classmethod
-    def initialize(cls, config):
+    def initialize(cls, config, logger, *args, **kwargs):
         cls._config = config
+        cls._logger = logger
 
         cls._devices = memoize.PersistentDict()
 
         if hasattr(cls._devices, 'make_permanent'):
             cls._devices.make_permanent(
-                config.get('SUSHY_EMULATOR_STATE_DIR'), 'vmedia')
+                cls._config.get('SUSHY_EMULATOR_STATE_DIR'), 'vmedia')
 
         device_types = cls._config.get(
             'SUSHY_EMULATOR_VMEDIA_DEVICES')
@@ -188,10 +186,10 @@ class StaticDriver(DriverBase):
 
         except Exception as ex:
             msg = 'Failed fetching image from URL %s: %s' % (image_url, ex)
-            logger.error(msg)
+            self._logger.error(msg)
             raise error.FishyError(msg)
 
-        logger.debug(
+        self._logger.debug(
             'Fetched image %(file)s for %(identity)s' % {
                 'identity': identity, 'file': local_file})
 
@@ -224,6 +222,6 @@ class StaticDriver(DriverBase):
         if local_file:
             os.unlink(local_file)
 
-            logger.debug(
+            self._logger.debug(
                 'Removed local file %(file)s for %(identity)s' % {
                     'identity': identity, 'file': local_file})
