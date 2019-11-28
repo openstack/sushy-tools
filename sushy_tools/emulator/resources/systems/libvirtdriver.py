@@ -67,6 +67,23 @@ class libvirt_open(object):
         self._conn.close()
 
 
+def power_cycle(wrapped):
+    def wrapper(self, identity, *args, **kwargs):
+        power_state = self.get_power_state(identity)
+
+        if power_state == 'On':
+            self.set_power_state(identity, 'ForceOff')
+
+        try:
+            return wrapped(self, identity, *args, **kwargs)
+
+        finally:
+            if power_state == 'On':
+                self.set_power_state(identity, power_state)
+
+    return wrapper
+
+
 class LibvirtDriver(AbstractSystemsDriver):
     """Libvirt driver"""
 
@@ -349,6 +366,7 @@ class LibvirtDriver(AbstractSystemsDriver):
 
         return boot_source_target
 
+    @power_cycle
     def set_boot_device(self, identity, boot_source):
         """Get/Set computer system boot device name
 
@@ -458,6 +476,7 @@ class LibvirtDriver(AbstractSystemsDriver):
 
             return boot_mode
 
+    @power_cycle
     def set_boot_mode(self, identity, boot_mode):
         """Set computer system boot mode.
 
@@ -702,6 +721,7 @@ class LibvirtDriver(AbstractSystemsDriver):
         """
         return self._process_bios(identity)
 
+    @power_cycle
     def set_bios(self, identity, attributes):
         """Update BIOS attributes
 
@@ -724,6 +744,7 @@ class LibvirtDriver(AbstractSystemsDriver):
         self._process_bios(identity, bios_attributes,
                            update_existing_attributes=True)
 
+    @power_cycle
     def reset_bios(self, identity):
         """Reset BIOS attributes to default
 
@@ -949,6 +970,7 @@ class LibvirtDriver(AbstractSystemsDriver):
             if dev_type == lv_device:
                 device_element.remove(disk_element)
 
+    @power_cycle
     def set_boot_image(self, identity, device, boot_image=None,
                        write_protected=True):
         """Set backend VM boot image

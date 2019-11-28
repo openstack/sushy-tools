@@ -161,6 +161,46 @@ class LibvirtDriverTestCase(base.BaseTestCase):
 
         domain_mock.injectNMI.assert_called_once_with()
 
+    @mock.patch('libvirt.open', autospec=True)
+    def test_power_cycle_when_off(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/'
+                  'domain_boot_os.xml', 'r') as f:
+            data = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = data
+
+        with mock.patch.object(
+                self.test_driver, 'get_power_state') as gps_mock:
+            with mock.patch.object(
+                    self.test_driver, 'set_power_state') as sps_mock:
+                gps_mock.return_value = 'Off'
+                self.test_driver.set_boot_device(self.uuid, 'Cd')
+
+        self.assertTrue(gps_mock.called)
+        self.assertFalse(sps_mock.called)
+
+    @mock.patch('libvirt.open', autospec=True)
+    def test_power_cycle_when_on(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/'
+                  'domain_boot_os.xml', 'r') as f:
+            data = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = data
+
+        with mock.patch.object(
+                self.test_driver, 'get_power_state') as gps_mock:
+            with mock.patch.object(
+                    self.test_driver, 'set_power_state') as sps_mock:
+                gps_mock.return_value = 'On'
+                self.test_driver.set_boot_device(self.uuid, 'Cd')
+
+        self.assertTrue(gps_mock.called)
+        self.assertTrue(sps_mock.called)
+
     @mock.patch('libvirt.openReadOnly', autospec=True)
     def test_get_boot_device_os(self, libvirt_mock):
         with open('sushy_tools/tests/unit/emulator/'
@@ -185,7 +225,9 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = data
 
-        self.test_driver.set_boot_device(self.uuid, 'Hdd')
+        with mock.patch.object(
+                self.test_driver, 'get_power_state', return_value='Off'):
+            self.test_driver.set_boot_device(self.uuid, 'Hdd')
 
         conn_mock.defineXML.assert_called_once_with(mock.ANY)
 
@@ -213,7 +255,9 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = data
 
-        self.test_driver.set_boot_device(self.uuid, 'Hdd')
+        with mock.patch.object(
+                self.test_driver, 'get_power_state', return_value='Off'):
+            self.test_driver.set_boot_device(self.uuid, 'Hdd')
 
         conn_mock.defineXML.assert_called_once_with(mock.ANY)
 
@@ -247,7 +291,9 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = data
 
-        self.test_driver.set_boot_device(self.uuid, 'Pxe')
+        with mock.patch.object(
+                self.test_driver, 'get_power_state', return_value='Off'):
+            self.test_driver.set_boot_device(self.uuid, 'Pxe')
 
         conn_mock.defineXML.assert_called_once_with(mock.ANY)
 
@@ -282,7 +328,9 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = data
 
-        self.test_driver.set_boot_mode(self.uuid, 'UEFI')
+        with mock.patch.object(
+                self.test_driver, 'get_power_state', return_value='Off'):
+            self.test_driver.set_boot_mode(self.uuid, 'UEFI')
 
         conn_mock = libvirt_rw_mock.return_value
         conn_mock.defineXML.assert_called_once_with(mock.ANY)
@@ -297,7 +345,9 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = data
 
-        self.test_driver.set_boot_mode(self.uuid, 'UEFI')
+        with mock.patch.object(
+                self.test_driver, 'get_power_state', return_value='Off'):
+            self.test_driver.set_boot_mode(self.uuid, 'UEFI')
 
         conn_mock = libvirt_rw_mock.return_value
         xml_document = conn_mock.defineXML.call_args[0][0]
@@ -323,9 +373,11 @@ class LibvirtDriverTestCase(base.BaseTestCase):
 
         with mock.patch.dict(
                 self.test_driver.KNOWN_BOOT_LOADERS, {}, clear=True):
-            self.assertRaises(
-                error.FishyError, self.test_driver.set_boot_mode,
-                self.uuid, 'Uefi')
+            with mock.patch.object(
+                    self.test_driver, 'get_power_state', return_value='Off'):
+                self.assertRaises(
+                    error.FishyError, self.test_driver.set_boot_mode,
+                    self.uuid, 'Uefi')
 
     @mock.patch('libvirt.open', autospec=True)
     @mock.patch('libvirt.openReadOnly', autospec=True)
@@ -343,9 +395,11 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = data
 
-        self.assertRaises(
-            error.FishyError, self.test_driver.set_boot_mode,
-            self.uuid, 'Uefi')
+        with mock.patch.object(
+                self.test_driver, 'get_power_state', return_value='Off'):
+            self.assertRaises(
+                error.FishyError, self.test_driver.set_boot_mode,
+                self.uuid, 'Uefi')
 
     @mock.patch('libvirt.open', autospec=True)
     @mock.patch('libvirt.openReadOnly', autospec=True)
@@ -363,9 +417,11 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = data
 
-        self.assertRaises(
-            error.FishyError, self.test_driver.set_boot_mode,
-            self.uuid, 'Uefi')
+        with mock.patch.object(
+                self.test_driver, 'get_power_state', return_value='Off'):
+            self.assertRaises(
+                error.FishyError, self.test_driver.set_boot_mode,
+                self.uuid, 'Uefi')
 
     @mock.patch('libvirt.open', autospec=True)
     @mock.patch('libvirt.openReadOnly', autospec=True)
@@ -383,9 +439,11 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = data
 
-        self.assertRaises(
-            error.FishyError, self.test_driver.set_boot_mode,
-            self.uuid, 'Uefi')
+        with mock.patch.object(
+                self.test_driver, 'get_power_state', return_value='Off'):
+            self.assertRaises(
+                error.FishyError, self.test_driver.set_boot_mode,
+                self.uuid, 'Uefi')
 
     @mock.patch('libvirt.open', autospec=True)
     @mock.patch('libvirt.openReadOnly', autospec=True)
@@ -404,7 +462,9 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = data
 
-        self.test_driver.set_boot_mode(self.uuid, 'UEFI')
+        with mock.patch.object(
+                self.test_driver, 'get_power_state', return_value='Off'):
+            self.test_driver.set_boot_mode(self.uuid, 'UEFI')
 
         conn_mock = libvirt_rw_mock.return_value
         xml_document = conn_mock.defineXML.call_args[0][0]
@@ -450,7 +510,9 @@ class LibvirtDriverTestCase(base.BaseTestCase):
 
         pool_mock.XMLDesc.return_value = data
 
-        self.test_driver.set_boot_image(self.uuid, 'Cd', '/tmp/image.iso')
+        with mock.patch.object(
+                self.test_driver, 'get_power_state', return_value='Off'):
+            self.test_driver.set_boot_image(self.uuid, 'Cd', '/tmp/image.iso')
 
         conn_mock = libvirt_rw_mock.return_value
         pool_mock.listAllVolumes.assert_called_once_with()
@@ -524,9 +586,12 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = domain_xml
 
-        self.test_driver.set_bios(self.uuid,
-                                  {"BootMode": "Uefi",
-                                   "ProcTurboMode": "Enabled"})
+        with mock.patch.object(
+                self.test_driver, 'get_power_state', return_value='Off'):
+            self.test_driver.set_bios(
+                self.uuid, {"BootMode": "Uefi",
+                            "ProcTurboMode": "Enabled"})
+
         conn_mock.defineXML.assert_called_once_with(mock.ANY)
 
     @mock.patch('libvirt.open', autospec=True)
@@ -538,7 +603,10 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = domain_xml
 
-        self.test_driver.reset_bios(self.uuid)
+        with mock.patch.object(
+                self.test_driver, 'get_power_state', return_value='Off'):
+            self.test_driver.reset_bios(self.uuid)
+
         conn_mock.defineXML.assert_called_once_with(mock.ANY)
 
     def test__process_bios_attributes_get_default(self):

@@ -1,0 +1,16 @@
+---
+fixes:
+  - |
+    Brings libvirt domain down prior to any change. When Redfish emulator
+    is running against libvirt virtualization backend, any changes being
+    done to domain are not applied for as long as the domain is up. This
+    leads to two nuisances:
+
+    + REST API is not really REST-ful meaning that successfully
+      applied change is not reflected in the document tree
+    + Multiple changes done to live domain XML tree may override one
+      another because N-1 change done to a domain is not visible
+      to N's change
+
+    The fix is to bring running domain down briefly while the change is
+    applied.
