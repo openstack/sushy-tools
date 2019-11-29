@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Fixes situation when changing boot image could invalidate current boot
+    device selection. The fix is to note current libvirt boot device and restore
+    it if the image being changed resides on the active boot device.

@@ -512,7 +512,11 @@ class LibvirtDriverTestCase(base.BaseTestCase):
 
         with mock.patch.object(
                 self.test_driver, 'get_power_state', return_value='Off'):
-            self.test_driver.set_boot_image(self.uuid, 'Cd', '/tmp/image.iso')
+            with mock.patch.object(
+                    self.test_driver, 'get_boot_device', return_value=None):
+
+                self.test_driver.set_boot_image(
+                    self.uuid, 'Cd', '/tmp/image.iso')
 
         conn_mock = libvirt_rw_mock.return_value
         pool_mock.listAllVolumes.assert_called_once_with()
@@ -523,6 +527,39 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         volume_mock.upload.assert_called_once_with(mock.ANY, 0, mock.ANY)
 
         conn_mock.defineXML.assert_called_once_with(mock.ANY)
+
+    @mock.patch('libvirt.open', autospec=True)
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    @mock.patch(
+        'sushy_tools.emulator.resources.systems.libvirtdriver.LibvirtDriver'
+        '.get_power_state', new=mock.MagicMock(return_value='Off'))
+    @mock.patch(
+        'sushy_tools.emulator.resources.systems.libvirtdriver.LibvirtDriver'
+        '.get_boot_device', return_value='Cd')
+    @mock.patch(
+        'sushy_tools.emulator.resources.systems.libvirtdriver.LibvirtDriver'
+        '.set_boot_device')
+    @mock.patch(
+        'sushy_tools.emulator.resources.systems.libvirtdriver.LibvirtDriver'
+        '._add_boot_image', new=mock.MagicMock())
+    @mock.patch(
+        'sushy_tools.emulator.resources.systems.libvirtdriver.LibvirtDriver'
+        '._remove_boot_images', new=mock.MagicMock())
+    def test_set_boot_image_restore_boot_device(
+            self, sbd_mock, gbd_mock, libvirt_mock, libvirt_rw_mock):
+
+        with open('sushy_tools/tests/unit/emulator/domain.xml', 'r') as f:
+            data = f.read()
+
+        conn_mock = libvirt_rw_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = data
+
+        self.test_driver.set_boot_image(
+            self.uuid, 'Cd', '/tmp/image.iso')
+
+        gbd_mock.assert_called_once_with(self.uuid)
+        sbd_mock.assert_called_once_with(self.uuid, 'Cd')
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
     def test_get_total_memory(self, libvirt_mock):

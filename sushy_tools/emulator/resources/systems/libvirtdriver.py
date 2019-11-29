@@ -990,10 +990,13 @@ class LibvirtDriver(AbstractSystemsDriver):
 
         self._remove_boot_images(domain, domain_tree, device)
 
-        if boot_image:
+        boot_device = None
 
+        if boot_image:
             self._add_boot_image(domain, domain_tree, device,
                                  boot_image, write_protected)
+
+            boot_device = self.get_boot_device(identity)
 
         with libvirt_open(self._uri) as conn:
             xml = ET.tostring(domain_tree)
@@ -1008,6 +1011,9 @@ class LibvirtDriver(AbstractSystemsDriver):
                        '%(error)s' % {'uri': self._uri, 'error': e})
 
                 raise error.FishyError(msg)
+
+        if device == boot_device:
+            self.set_boot_device(identity, boot_device)
 
     def _find_device_by_path(self, vol_path):
         """Get device attributes using path
