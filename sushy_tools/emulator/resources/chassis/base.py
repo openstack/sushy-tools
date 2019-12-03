@@ -15,13 +15,10 @@
 
 import abc
 
-import six
-
 from sushy_tools.emulator import base
 
 
-@six.add_metaclass(abc.ABCMeta)
-class AbstractChassisDriver(base.DriverBase):
+class AbstractChassisDriver(base.DriverBase, metaclass=abc.ABCMeta):
     """Base class backing Redfish Chassis"""
 
     @classmethod

@@ -12,10 +12,10 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+from unittest import mock
 import uuid
 
 from oslotest import base
-from six.moves import mock
 
 from sushy_tools.emulator.resources.chassis.staticdriver import StaticDriver
 from sushy_tools import error

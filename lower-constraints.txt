@@ -44,7 +44,6 @@ requests==2.14.2
 requests-ntlm==1.1.0
 requests-kerberos==0.6
 requestsexceptions==1.2.0
-six==1.10.0
 snowballstemmer==1.2.1
 Sphinx==1.6.2
 sphinxcontrib-websupport==1.0.1

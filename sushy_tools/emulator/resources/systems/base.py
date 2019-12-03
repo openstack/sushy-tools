@@ -15,13 +15,10 @@
 
 import abc
 
-import six
-
 from sushy_tools.emulator.resources.base import DriverBase
 
 
-@six.add_metaclass(abc.ABCMeta)
-class AbstractSystemsDriver(DriverBase):
+class AbstractSystemsDriver(DriverBase, metaclass=abc.ABCMeta):
     """Base class for all virtualization drivers"""
 
     @abc.abstractproperty

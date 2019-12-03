@@ -16,9 +16,9 @@
 import os
 import re
 import tempfile
+from urllib import parse as urlparse
 
 import requests
-from six.moves.urllib.parse import urlparse
 
 from sushy_tools.emulator import memoize
 from sushy_tools.emulator.resources.base import DriverBase
