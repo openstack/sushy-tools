@@ -26,7 +26,8 @@ class LibvirtDriverTestCase(base.BaseTestCase):
     uuid = 'c7a5fdbd-cdaf-9455-926a-d65c16db1809'
 
     def setUp(self):
-        test_driver_class = LibvirtDriver.initialize({})
+        test_driver_class = LibvirtDriver.initialize(
+            {}, mock.MagicMock())
         self.test_driver = test_driver_class()
         super(LibvirtDriverTestCase, self).setUp()
 

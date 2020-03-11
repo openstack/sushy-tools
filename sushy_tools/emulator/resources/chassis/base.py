@@ -24,8 +24,9 @@ class AbstractChassisDriver(base.DriverBase):
     """Base class backing Redfish Chassis"""
 
     @classmethod
-    def initialize(cls, config):
+    def initialize(cls, config, logger, *args, **kwargs):
         cls._config = config
+        cls._logger = logger
         return cls
 
     @abc.abstractproperty

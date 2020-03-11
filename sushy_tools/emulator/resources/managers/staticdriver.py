@@ -13,14 +13,10 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import logging
 import uuid
 
 from sushy_tools.emulator.resources.managers.base import AbstractManagersDriver
 from sushy_tools import error
-
-
-logger = logging.getLogger(__name__)
 
 
 class StaticDriver(AbstractManagersDriver):
@@ -75,7 +71,7 @@ class StaticDriver(AbstractManagersDriver):
                     msg = ('Error finding manager by UUID/Name/Id '
                            '"%(identity)s"' % {'identity': identity})
 
-                    logger.debug(msg)
+                    self._logger.debug(msg)
 
                     raise error.FishyError(msg)
 

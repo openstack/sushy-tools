@@ -13,7 +13,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import logging
 import math
 
 from sushy_tools.emulator import memoize
@@ -28,8 +27,6 @@ except ImportError:
 
 
 is_loaded = bool(openstack)
-
-logger = logging.getLogger(__name__)
 
 
 class OpenStackDriver(AbstractSystemsDriver):
@@ -55,10 +52,13 @@ class OpenStackDriver(AbstractSystemsDriver):
     PERMANENT_CACHE = {}
 
     @classmethod
-    def initialize(cls, config, os_cloud, readonly=False):
-        cls._cc = openstack.connect(cloud=os_cloud)
-        cls._os_cloud = os_cloud
+    def initialize(cls, config, logger, os_cloud, *args, **kwargs):
         cls._config = config
+        cls._logger = logger
+        cls._os_cloud = os_cloud
+
+        cls._cc = openstack.connect(cloud=os_cloud)
+
         return cls
 
     @memoize.memoize()
@@ -74,7 +74,7 @@ class OpenStackDriver(AbstractSystemsDriver):
                'cloud %(os_cloud)s"' % {'identity': identity,
                                         'os_cloud': self._os_cloud})
 
-        logger.debug(msg)
+        self._logger.debug(msg)
 
         raise error.FishyError(msg)
 
@@ -339,7 +339,8 @@ class OpenStackDriver(AbstractSystemsDriver):
                 try:
                     macs.add(adr['OS-EXT-IPS-MAC:mac_addr'])
                 except KeyError:
-                    logger.warning('Could not find MAC address in %s', adr)
+                    self._logger.warning(
+                        'Could not find MAC address in %s', adr)
         return [{'id': mac, 'mac': mac}
                 for mac in macs]
 

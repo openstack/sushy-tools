@@ -18,7 +18,7 @@ class DriverBase(object):
     """Common base for emulated Redfish resource drivers"""
 
     @classmethod
-    def initialize(cls, *args, **kwargs):
+    def initialize(cls, config, logger, *args, **kwargs):
         """Initialize class attributes
 
         Since drivers may need to cache thing short-term. The emulator
@@ -31,6 +31,8 @@ class DriverBase(object):
         The `initialize` method is provided to set up the driver in a way
         that would affect all the subsequent sessions.
 
+        :params config: system configuration dict
+        :params logger: system logger object
         :params *args: driver-specific parameters
         :params **kwargs: driver-specific parameters
         :returns: initialized driver class

@@ -15,7 +15,6 @@
 
 from collections import defaultdict
 from collections import namedtuple
-import logging
 import os
 import uuid
 import xml.etree.ElementTree as ET
@@ -33,10 +32,6 @@ except ImportError:
 
 
 is_loaded = bool(libvirt)
-
-
-logger = logging.getLogger(__name__)
-
 
 BiosProcessResult = namedtuple('BiosProcessResult',
                                ['tree',
@@ -167,9 +162,12 @@ class LibvirtDriver(AbstractSystemsDriver):
 """
 
     @classmethod
-    def initialize(cls, config, uri=None):
+    def initialize(cls, config, logger, uri=None, *args, **kwargs):
         cls._config = config
+        cls._logger = logger
+
         cls._uri = uri or cls.LIBVIRT_URI
+
         cls.BOOT_LOADER_MAP = cls._config.get(
             'SUSHY_EMULATOR_BOOT_LOADER_MAP', cls.BOOT_LOADER_MAP)
         cls.KNOWN_BOOT_LOADERS = set(y for x in cls.BOOT_LOADER_MAP.values()
@@ -194,7 +192,7 @@ class LibvirtDriver(AbstractSystemsDriver):
                            {'identity': identity,
                             'uri': self._uri, 'err': ex})
 
-                    logger.debug(msg)
+                    self._logger.debug(msg)
 
                     raise error.FishyError(msg)
 
@@ -519,10 +517,11 @@ class LibvirtDriver(AbstractSystemsDriver):
             loader_path = self.BOOT_LOADER_MAP[boot_mode][os_arch]
 
         except KeyError:
-            logger.warning('Boot loader binary is not configured for '
-                           'boot mode %s and OS architecture %s. '
-                           'Assuming default boot loader for the domain.',
-                           boot_mode, os_arch)
+            self._logger.warning(
+                'Boot loader binary is not configured for '
+                'boot mode %s and OS architecture %s. '
+                'Assuming default boot loader for the domain.',
+                boot_mode, os_arch)
             loader_path = None
 
         loader_elements = os_element.findall('loader')
@@ -1030,7 +1029,7 @@ class LibvirtDriver(AbstractSystemsDriver):
                        '%(err)s' %
                        {'path': vol_path, 'uri': self._uri,
                         'err': e})
-                logger.debug(msg)
+                self._logger.debug(msg)
                 return
             disk_device = {
                 'Name': vol.name(),
@@ -1052,7 +1051,7 @@ class LibvirtDriver(AbstractSystemsDriver):
                 msg = ('Error finding Storage Pool by name "%(name)s" at'
                        'libvirt URI "%(uri)s": %(err)s' %
                        {'name': pool_name, 'uri': self._uri, 'err': e})
-                logger.debug(msg)
+                self._logger.debug(msg)
                 return
 
             try:
@@ -1063,7 +1062,7 @@ class LibvirtDriver(AbstractSystemsDriver):
                        ': %(err)s' %
                        {'name': vol_name, 'pName': pool_name,
                         'uri': self._uri, 'err': e})
-                logger.debug(msg)
+                self._logger.debug(msg)
                 return
             disk_device = {
                 'Name': vol.name(),
@@ -1128,7 +1127,7 @@ class LibvirtDriver(AbstractSystemsDriver):
                 msg = ('Error finding Storage Pool by name "%(name)s" at '
                        'libvirt URI "%(uri)s": %(err)s' %
                        {'name': poolName, 'uri': self._uri, 'err': ex})
-                logger.debug(msg)
+                self._logger.debug(msg)
                 return
             try:
                 vol = pool.storageVolLookupByName(data['libvirtVolName'])
@@ -1136,7 +1135,7 @@ class LibvirtDriver(AbstractSystemsDriver):
 
                 msg = ('Creating storage volume with name: "%s"',
                        data['libvirtVolName'])
-                logger.debug(msg)
+                self._logger.debug(msg)
 
                 pool_tree = ET.fromstring(pool.XMLDesc())
 
@@ -1146,7 +1145,7 @@ class LibvirtDriver(AbstractSystemsDriver):
                     msg = ('Missing "target/path" tag in the libvirt '
                            'storage pool "%(pool)s"'
                            '' % {'pool': poolName})
-                    logger.debug(msg)
+                    self._logger.debug(msg)
                     return
 
                 vol_path = os.path.join(
@@ -1161,6 +1160,6 @@ class LibvirtDriver(AbstractSystemsDriver):
                 if not vol:
                     msg = ('Error creating "%s" storage volume in "%s" pool',
                            data['libvirtVolName'], poolName)
-                    logger.debug(msg)
+                    self._logger.debug(msg)
                     return
             return data['Id']

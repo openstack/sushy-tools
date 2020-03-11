@@ -13,22 +13,22 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import logging
 import uuid
 
 from sushy_tools.emulator.resources.base import DriverBase
 from sushy_tools import error
-
-logger = logging.getLogger(__name__)
 
 
 class StaticDriver(DriverBase):
     """Redfish storage drives backed by configuration file"""
 
     @classmethod
-    def initialize(cls, config):
+    def initialize(cls, config, logger, *args, **kwargs):
         cls._config = config
+        cls._logger = logger
+
         cls._drives = cls._config.get('SUSHY_EMULATOR_DRIVES', {})
+
         return cls
 
     @property
@@ -49,7 +49,7 @@ class StaticDriver(DriverBase):
             msg = ('Error finding drive for System UUID "%s" and Storage ID '
                    '"%s"', identity, storage_id)
 
-            logger.debug(msg)
+            self._logger.debug(msg)
 
             raise error.FishyError(msg)
 

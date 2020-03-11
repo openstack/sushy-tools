@@ -13,13 +13,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import logging
-
 from sushy_tools.emulator import memoize
 from sushy_tools.emulator.resources.base import DriverBase
 from sushy_tools import error
-
-logger = logging.getLogger(__name__)
 
 
 class StaticDriver(DriverBase):
@@ -29,17 +25,18 @@ class StaticDriver(DriverBase):
     anything.
     """
     @classmethod
-    def initialize(cls, config):
+    def initialize(cls, config, logger, *args, **kwargs):
         cls._config = config
+        cls._logger = logger
 
         cls._indicators = memoize.PersistentDict()
 
         if hasattr(cls._indicators, 'make_permanent'):
             cls._indicators.make_permanent(
-                config.get('SUSHY_EMULATOR_STATE_DIR'), 'indicators')
+                cls._config.get('SUSHY_EMULATOR_STATE_DIR'), 'indicators')
 
         cls._indicators.update(
-            config.get('SUSHY_EMULATOR_INDICATOR_LEDS', {}))
+            cls._config.get('SUSHY_EMULATOR_INDICATOR_LEDS', {}))
 
         return cls
 

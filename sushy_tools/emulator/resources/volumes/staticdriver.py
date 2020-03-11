@@ -12,14 +12,9 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-
-import logging
-
 from sushy_tools.emulator import memoize
 from sushy_tools.emulator.resources.base import DriverBase
 import uuid
-
-logger = logging.getLogger(__name__)
 
 
 class StaticDriver(DriverBase):
@@ -28,17 +23,18 @@ class StaticDriver(DriverBase):
     Maintains the libvirt volumes in memory.
     """
     @classmethod
-    def initialize(cls, config):
+    def initialize(cls, config, logger, *args, **kwargs):
         cls._config = config
+        cls._logger = logger
 
         cls._volumes = memoize.PersistentDict()
 
         if hasattr(cls._volumes, 'make_permanent'):
             cls._volumes.make_permanent(
-                config.get('SUSHY_EMULATOR_STATE_DIR'), 'volumes')
+                cls._config.get('SUSHY_EMULATOR_STATE_DIR'), 'volumes')
 
         cls._volumes.update(
-            config.get('SUSHY_EMULATOR_VOLUMES', {}))
+            cls._config.get('SUSHY_EMULATOR_VOLUMES', {}))
 
         return cls
 
@@ -59,7 +55,7 @@ class StaticDriver(DriverBase):
         except (KeyError, ValueError):
             msg = ('Error finding volume collection by System UUID %s '
                    'and Storage ID %s' % (uu_identity, storage_id))
-            logger.debug(msg)
+            self._logger.debug(msg)
 
     def add_volume(self, uu_identity, storage_id, vol):
         if not self._volumes[(uu_identity, storage_id)]:
@@ -75,7 +71,7 @@ class StaticDriver(DriverBase):
         except KeyError:
             msg = ('Error finding volume collection by System UUID %s '
                    'and Storage ID %s' % (uu_identity, storage_id))
-            logger.debug(msg)
+            self._logger.debug(msg)
         else:
             vol_col.remove(vol)
             self._volumes.update({(uu_identity, storage_id): vol_col})
