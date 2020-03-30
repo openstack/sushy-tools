@@ -412,8 +412,8 @@ class EmulatorTestCase(base.BaseTestCase):
         resources_mock = resources_mock.return_value.__enter__.return_value
         systems_mock = resources_mock.systems
         self.app.driver = systems_mock
-        response = self.app.post('/redfish/v1/Systems/' + self.uuid +
-                                 '/BIOS/Actions/Bios.ResetBios')
+        response = self.app.post('/redfish/v1/Systems/%s/BIOS/Actions/'
+                                 'Bios.ResetBios' % self.uuid)
         self.assertEqual(204, response.status_code)
         systems_mock.reset_bios.assert_called_once_with(self.uuid)
 
@@ -423,25 +423,25 @@ class EmulatorTestCase(base.BaseTestCase):
         systems_mock.get_nics.return_value = [
             {'id': 'nic1', 'mac': '52:54:00:4e:5d:37'},
             {'id': 'nic2', 'mac': '00:11:22:33:44:55'}]
-        response = self.app.get('redfish/v1/Systems/' + self.uuid +
-                                '/EthernetInterfaces')
+        response = self.app.get('redfish/v1/Systems/%s/EthernetInterfaces'
+                                % self.uuid)
 
         self.assertEqual(200, response.status_code)
         self.assertEqual('Ethernet Interface Collection',
                          response.json['Name'])
         self.assertEqual(2, response.json['Members@odata.count'])
-        self.assertEqual(['/redfish/v1/Systems/' + self.uuid +
-                          '/EthernetInterfaces/nic1',
-                          '/redfish/v1/Systems/' + self.uuid +
-                          '/EthernetInterfaces/nic2'],
+        self.assertEqual(['/redfish/v1/Systems/%s/EthernetInterfaces/nic1'
+                          % self.uuid,
+                          '/redfish/v1/Systems/%s/EthernetInterfaces/nic2'
+                          % self.uuid],
                          [m['@odata.id'] for m in response.json['Members']])
 
     def test_ethernet_interfaces_collection_empty(self, resources_mock):
         resources_mock = resources_mock.return_value.__enter__.return_value
         systems_mock = resources_mock.systems
         systems_mock.get_nics.return_value = []
-        response = self.app.get('redfish/v1/Systems/' + self.uuid +
-                                '/EthernetInterfaces')
+        response = self.app.get('redfish/v1/Systems/%s/EthernetInterfaces'
+                                % self.uuid)
 
         self.assertEqual(200, response.status_code)
         self.assertEqual('Ethernet Interface Collection',
@@ -455,8 +455,8 @@ class EmulatorTestCase(base.BaseTestCase):
         systems_mock.get_nics.return_value = [
             {'id': 'nic1', 'mac': '52:54:00:4e:5d:37'},
             {'id': 'nic2', 'mac': '00:11:22:33:44:55'}]
-        response = self.app.get('/redfish/v1/Systems/' + self.uuid +
-                                '/EthernetInterfaces/nic2')
+        response = self.app.get('/redfish/v1/Systems/%s/EthernetInterfaces/'
+                                'nic2' % self.uuid)
 
         self.assertEqual(200, response.status_code)
         self.assertEqual('nic2', response.json['Id'])
@@ -465,8 +465,8 @@ class EmulatorTestCase(base.BaseTestCase):
                          response.json['PermanentMACAddress'])
         self.assertEqual('00:11:22:33:44:55',
                          response.json['MACAddress'])
-        self.assertEqual('/redfish/v1/Systems/' + self.uuid +
-                         '/EthernetInterfaces/nic2',
+        self.assertEqual('/redfish/v1/Systems/%s/EthernetInterfaces/nic2'
+                         % self.uuid,
                          response.json['@odata.id'])
 
     def test_ethernet_interface_not_found(self, resources_mock):
@@ -476,8 +476,8 @@ class EmulatorTestCase(base.BaseTestCase):
             {'id': 'nic1', 'mac': '52:54:00:4e:5d:37'},
             {'id': 'nic2', 'mac': '00:11:22:33:44:55'}
         ]
-        response = self.app.get('/redfish/v1/Systems/' + self.uuid +
-                                '/EthernetInterfaces/nic3')
+        response = self.app.get('/redfish/v1/Systems/%s/EthernetInterfaces/'
+                                'nic3' % self.uuid)
 
         self.assertEqual(404, response.status_code)
 
@@ -490,16 +490,14 @@ class EmulatorTestCase(base.BaseTestCase):
         vmedia_mock.devices = ['CD', 'Floppy']
 
         response = self.app.get(
-            'redfish/v1/Managers/' + self.uuid + '/VirtualMedia')
+            'redfish/v1/Managers/%s/VirtualMedia' % self.uuid)
 
         self.assertEqual(200, response.status_code)
         self.assertEqual('Virtual Media Services', response.json['Name'])
         self.assertEqual(2, response.json['Members@odata.count'])
         self.assertEqual(
-            ['/redfish/v1/Managers/' + self.uuid +
-             '/VirtualMedia/CD',
-             '/redfish/v1/Managers/' + self.uuid +
-             '/VirtualMedia/Floppy'],
+            ['/redfish/v1/Managers/%s/VirtualMedia/CD' % self.uuid,
+             '/redfish/v1/Managers/%s/VirtualMedia/Floppy' % self.uuid],
             [m['@odata.id'] for m in response.json['Members']])
 
     def test_virtual_media_collection_empty(self, resources_mock):
@@ -526,8 +524,7 @@ class EmulatorTestCase(base.BaseTestCase):
             'image-of-a-fish', 'fishy.iso', True, True]
 
         response = self.app.get(
-            '/redfish/v1/Managers/' + self.uuid +
-            '/VirtualMedia/CD')
+            '/redfish/v1/Managers/%s/VirtualMedia/CD' % self.uuid)
 
         self.assertEqual(200, response.status_code)
         self.assertEqual('CD', response.json['Id'])
@@ -543,8 +540,7 @@ class EmulatorTestCase(base.BaseTestCase):
         vmedia_mock.get_device_name.side_effect = error.FishyError
 
         response = self.app.get(
-            '/redfish/v1/Managers/' + self.uuid +
-            '/VirtualMedia/DVD-ROM')
+            '/redfish/v1/Managers/%s/VirtualMedia/DVD-ROM' % self.uuid)
 
         self.assertEqual(404, response.status_code)
 
@@ -553,8 +549,8 @@ class EmulatorTestCase(base.BaseTestCase):
         vmedia_mock = resources_mock.vmedia
 
         response = self.app.post(
-            '/redfish/v1/Managers/' + self.uuid +
-            '/VirtualMedia/CD/Actions/VirtualMedia.InsertMedia',
+            '/redfish/v1/Managers/%s/VirtualMedia/CD/Actions/'
+            'VirtualMedia.InsertMedia' % self.uuid,
             json={"Image": "http://fish.iso"})
 
         self.assertEqual(204, response.status_code)
@@ -567,8 +563,8 @@ class EmulatorTestCase(base.BaseTestCase):
         vmedia_mock = resources_mock.vmedia
 
         response = self.app.post(
-            '/redfish/v1/Managers/' + self.uuid +
-            '/VirtualMedia/CD/Actions/VirtualMedia.EjectMedia',
+            '/redfish/v1/Managers/%s/VirtualMedia/CD/Actions/'
+            'VirtualMedia.EjectMedia' % self.uuid,
             json={})
 
         self.assertEqual(204, response.status_code)
@@ -608,25 +604,25 @@ class EmulatorTestCase(base.BaseTestCase):
                 ]
             }
         }
-        response = self.app.get('redfish/v1/Systems/' + self.uuid +
-                                '/SimpleStorage')
+        response = self.app.get('redfish/v1/Systems/%s/SimpleStorage'
+                                % self.uuid)
 
         self.assertEqual(200, response.status_code)
         self.assertEqual('Simple Storage Collection',
                          response.json['Name'])
         self.assertEqual(2, response.json['Members@odata.count'])
-        self.assertEqual({'/redfish/v1/Systems/' + self.uuid +
-                          '/SimpleStorage/virtio',
-                          '/redfish/v1/Systems/' + self.uuid +
-                          '/SimpleStorage/ide'},
+        self.assertEqual({'/redfish/v1/Systems/%s/SimpleStorage/virtio'
+                          % self.uuid,
+                          '/redfish/v1/Systems/%s/SimpleStorage/ide'
+                          % self.uuid},
                          {m['@odata.id'] for m in response.json['Members']})
 
     def test_simple_storage_collection_empty(self, resources_mock):
         resources_mock = resources_mock.return_value.__enter__.return_value
         systems_mock = resources_mock.systems
         systems_mock.get_simple_storage_collection.return_value = []
-        response = self.app.get('redfish/v1/Systems/' + self.uuid +
-                                '/SimpleStorage')
+        response = self.app.get('redfish/v1/Systems/%s/SimpleStorage'
+                                % self.uuid)
 
         self.assertEqual(200, response.status_code)
         self.assertEqual('Simple Storage Collection',
@@ -667,8 +663,8 @@ class EmulatorTestCase(base.BaseTestCase):
                 ]
             }
         }
-        response = self.app.get('/redfish/v1/Systems/' + self.uuid +
-                                '/SimpleStorage/virtio')
+        response = self.app.get('/redfish/v1/Systems/%s/SimpleStorage/virtio'
+                                % self.uuid)
 
         self.assertEqual(200, response.status_code)
         self.assertEqual('virtio', response.json['Id'])
@@ -677,8 +673,8 @@ class EmulatorTestCase(base.BaseTestCase):
         self.assertEqual(100000, response.json['Devices'][0]['CapacityBytes'])
         self.assertEqual('sdb1', response.json['Devices'][1]['Name'])
         self.assertEqual(150000, response.json['Devices'][1]['CapacityBytes'])
-        self.assertEqual('/redfish/v1/Systems/' + self.uuid +
-                         '/SimpleStorage/virtio',
+        self.assertEqual('/redfish/v1/Systems/%s/SimpleStorage/virtio'
+                         % self.uuid,
                          response.json['@odata.id'])
 
     def test_simple_storage_not_found(self, resources_mock):
@@ -714,8 +710,8 @@ class EmulatorTestCase(base.BaseTestCase):
                 ]
             }
         }
-        response = self.app.get('/redfish/v1/Systems/' + self.uuid +
-                                '/SimpleStorage/scsi')
+        response = self.app.get('/redfish/v1/Systems/%s/SimpleStorage/scsi'
+                                % self.uuid)
 
         self.assertEqual(404, response.status_code)
 

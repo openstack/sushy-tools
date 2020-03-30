@@ -788,8 +788,8 @@ class LibvirtDriver(AbstractSystemsDriver):
 
         for disk_element in device_element.findall('disk'):
             dev_type = disk_element.attrib.get('device')
-            if (dev_type not in self.DEVICE_TYPE_MAP_REV or
-                    dev_type != self.DEVICE_TYPE_MAP.get(device)):
+            if (dev_type not in self.DEVICE_TYPE_MAP_REV
+                    or dev_type != self.DEVICE_TYPE_MAP.get(device)):
                 continue
 
             source_element = disk_element.find('source')
@@ -802,8 +802,9 @@ class LibvirtDriver(AbstractSystemsDriver):
 
             read_only = disk_element.find('readonly') or False
 
-            inserted = (self.get_boot_device(identity) ==
-                        constants.DEVICE_TYPE_CD)
+            inserted = (
+                self.get_boot_device(identity) == constants.DEVICE_TYPE_CD
+            )
             if inserted:
                 inserted = self.get_boot_mode(identity) == 'UEFI'
 
@@ -1131,7 +1132,7 @@ class LibvirtDriver(AbstractSystemsDriver):
                 return
             try:
                 vol = pool.storageVolLookupByName(data['libvirtVolName'])
-            except libvirt.libvirtError as ex:
+            except libvirt.libvirtError:
 
                 msg = ('Creating storage volume with name: "%s"',
                        data['libvirtVolName'])
