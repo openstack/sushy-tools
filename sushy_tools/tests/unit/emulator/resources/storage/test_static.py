@@ -12,10 +12,11 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-from sushy_tools.emulator.resources.storage.staticdriver import StaticDriver
 
 from oslotest import base
 from six.moves import mock
+
+from sushy_tools.emulator.resources.storage.staticdriver import StaticDriver
 
 
 class StaticDriverTestCase(base.BaseTestCase):

@@ -14,11 +14,11 @@
 #    under the License.
 import uuid
 
-from sushy_tools.emulator.resources.chassis.staticdriver import StaticDriver
-from sushy_tools import error
-
 from oslotest import base
 from six.moves import mock
+
+from sushy_tools.emulator.resources.chassis.staticdriver import StaticDriver
+from sushy_tools import error
 
 
 class StaticDriverTestCase(base.BaseTestCase):
