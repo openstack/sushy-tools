@@ -12,11 +12,11 @@
 
 import sys
 import uuid
+import xml.etree.ElementTree as ET
 
 import libvirt
 from oslotest import base
 from six.moves import mock
-import xml.etree.ElementTree as ET
 
 from sushy_tools.emulator.resources.systems.libvirtdriver import LibvirtDriver
 from sushy_tools import error
