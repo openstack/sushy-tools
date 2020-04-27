@@ -9,6 +9,8 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+
+import sys
 import uuid
 
 import libvirt
@@ -266,6 +268,13 @@ class LibvirtDriverTestCase(base.BaseTestCase):
                    'file="/home/user/fedora.img" />\n      <target ' \
                    'dev="hda" />\n    <boot order="1" /></disk>\n'
 
+        # NOTE(rpittau): starting from Python 3.8 the tostring() function
+        # preserves the attribute order specified by the user.
+        if sys.version_info[1] >= 8:
+            expected = '<disk type="file" device="disk">\n      <source ' \
+                       'file="/home/user/fedora.img" />\n      <target ' \
+                       'dev="hda" />\n    <boot order="1" /></disk>\n'
+
         self.assertIn(expected, conn_mock.defineXML.call_args[0][0])
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
@@ -303,6 +312,15 @@ class LibvirtDriverTestCase(base.BaseTestCase):
                    'node-2i1" mode="vepa" />\n      <model type="vir' \
                    'tio" />\n      <address bus="0x01" domain="0x' \
                    '0000" function="0x0" slot="0x01" type="pci" />'
+
+        # NOTE(rpittau): starting from Python 3.8 the tostring() function
+        # preserves the attribute order specified by the user.
+        if sys.version_info[1] >= 8:
+            expected = '<interface type="direct">\n      <mac address=' \
+                       '"52:54:00:da:ac:54" />\n      <source dev="tap-' \
+                       'node-2i1" mode="vepa" />\n      <model type="vir' \
+                       'tio" />\n      <address type="pci" domain="0x0000" ' \
+                       'bus="0x01" slot="0x01" function="0x0" />'
 
         self.assertIn(expected, conn_mock.defineXML.call_args[0][0])
 
