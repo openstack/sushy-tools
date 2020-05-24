@@ -27,8 +27,9 @@ extensions = [
 ]
 
 # openstackdocstheme options
-repository_name = 'openstack/sushy-tools'
-use_storyboard = True
+openstackdocs_repo_name = 'openstack/sushy-tools'
+openstackdocs_pdf_link = True
+openstackdocs_use_storyboard = True
 
 # autodoc generation is a bit aggressive and a nuisance when doing heavy
 # text edit cycles.
@@ -51,7 +52,7 @@ add_function_parentheses = True
 add_module_names = True
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = 'sphinx'
+pygments_style = 'native'
 
 # -- Options for HTML output --------------------------------------------------
 

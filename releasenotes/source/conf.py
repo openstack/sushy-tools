@@ -57,6 +57,11 @@ master_doc = 'index'
 project = u'sushy-tools Release Notes'
 copyright = u'2018, Sushy Developers'
 
+# openstackdocstheme options
+openstackdocs_repo_name = 'openstack/sushy-tools'
+openstackdocs_use_storyboard = True
+openstackdocs_auto_name = False
+
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
@@ -97,7 +102,7 @@ exclude_patterns = []
 # show_authors = False
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = 'sphinx'
+pygments_style = 'native'
 
 # A list of ignored prefixes for module index sorting.
 # modindex_common_prefix = []
