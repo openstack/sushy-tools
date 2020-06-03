@@ -1,0 +1,11 @@
+---
+issues:
+  - |
+    Reads hardware state from libvirt domain XML
+
+    Now reads boot device/mode/image from domain XML on
+    filesystem rather then the running VM, thus avoiding
+    the need for a reboot after setting soemthing. The client
+    should now power cycle the instance if the changes are
+    required in the running VM.
+    note: not simply a soft reboot.

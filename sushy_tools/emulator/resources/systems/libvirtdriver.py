@@ -62,23 +62,6 @@ class libvirt_open(object):
         self._conn.close()
 
 
-def power_cycle(wrapped):
-    def wrapper(self, identity, *args, **kwargs):
-        power_state = self.get_power_state(identity)
-
-        if power_state == 'On':
-            self.set_power_state(identity, 'ForceOff')
-
-        try:
-            return wrapped(self, identity, *args, **kwargs)
-
-        finally:
-            if power_state == 'On':
-                self.set_power_state(identity, power_state)
-
-    return wrapper
-
-
 class LibvirtDriver(AbstractSystemsDriver):
     """Libvirt driver"""
 
@@ -301,7 +284,7 @@ class LibvirtDriver(AbstractSystemsDriver):
         """
         domain = self._get_domain(identity, readonly=True)
 
-        tree = ET.fromstring(domain.XMLDesc())
+        tree = ET.fromstring(domain.XMLDesc(libvirt.VIR_DOMAIN_XML_INACTIVE))
 
         # Try boot configuration in the bootloader
 
@@ -364,7 +347,6 @@ class LibvirtDriver(AbstractSystemsDriver):
 
         return boot_source_target
 
-    @power_cycle
     def set_boot_device(self, identity, boot_source):
         """Get/Set computer system boot device name
 
@@ -382,7 +364,7 @@ class LibvirtDriver(AbstractSystemsDriver):
         domain = self._get_domain(identity)
 
         # XML schema: https://libvirt.org/formatdomain.html#elementsOSBIOS
-        tree = ET.fromstring(domain.XMLDesc())
+        tree = ET.fromstring(domain.XMLDesc(libvirt.VIR_DOMAIN_XML_INACTIVE))
 
         # Remove bootloader configuration
 
@@ -463,7 +445,7 @@ class LibvirtDriver(AbstractSystemsDriver):
         domain = self._get_domain(identity, readonly=True)
 
         # XML schema: https://libvirt.org/formatdomain.html#elementsOSBIOS
-        tree = ET.fromstring(domain.XMLDesc())
+        tree = ET.fromstring(domain.XMLDesc(libvirt.VIR_DOMAIN_XML_INACTIVE))
 
         loader_element = tree.find('.//loader')
 
@@ -474,7 +456,6 @@ class LibvirtDriver(AbstractSystemsDriver):
 
             return boot_mode
 
-    @power_cycle
     def set_boot_mode(self, identity, boot_mode):
         """Set computer system boot mode.
 
@@ -486,7 +467,7 @@ class LibvirtDriver(AbstractSystemsDriver):
         domain = self._get_domain(identity, readonly=True)
 
         # XML schema: https://libvirt.org/formatdomain.html#elementsOSBIOS
-        tree = ET.fromstring(domain.XMLDesc())
+        tree = ET.fromstring(domain.XMLDesc(libvirt.VIR_DOMAIN_XML_INACTIVE))
 
         try:
             loader_type = self.BOOT_MODE_MAP[boot_mode]
@@ -593,7 +574,7 @@ class LibvirtDriver(AbstractSystemsDriver):
         """
         domain = self._get_domain(identity, readonly=True)
 
-        tree = ET.fromstring(domain.XMLDesc())
+        tree = ET.fromstring(domain.XMLDesc(libvirt.VIR_DOMAIN_XML_INACTIVE))
 
         total_cpus = 0
 
@@ -692,9 +673,10 @@ class LibvirtDriver(AbstractSystemsDriver):
         """
         domain = self._get_domain(identity)
 
-        result = self._process_bios_attributes(domain.XMLDesc(),
-                                               bios_attributes,
-                                               update_existing_attributes)
+        result = self._process_bios_attributes(
+            domain.XMLDesc(libvirt.VIR_DOMAIN_XML_INACTIVE),
+            bios_attributes,
+            update_existing_attributes)
 
         if result.attributes_written:
 
@@ -720,7 +702,6 @@ class LibvirtDriver(AbstractSystemsDriver):
         """
         return self._process_bios(identity)
 
-    @power_cycle
     def set_bios(self, identity, attributes):
         """Update BIOS attributes
 
@@ -743,7 +724,6 @@ class LibvirtDriver(AbstractSystemsDriver):
         self._process_bios(identity, bios_attributes,
                            update_existing_attributes=True)
 
-    @power_cycle
     def reset_bios(self, identity):
         """Reset BIOS attributes to default
 
@@ -762,7 +742,7 @@ class LibvirtDriver(AbstractSystemsDriver):
         :returns: list of network interfaces dict with their attributes
         """
         domain = self._get_domain(identity, readonly=True)
-        tree = ET.fromstring(domain.XMLDesc())
+        tree = ET.fromstring(domain.XMLDesc(libvirt.VIR_DOMAIN_XML_INACTIVE))
         return [{'id': iface.get('address'), 'mac': iface.get('address')}
                 for iface in tree.findall(
                 ".//devices/interface[@type='network']/mac")]
@@ -778,7 +758,7 @@ class LibvirtDriver(AbstractSystemsDriver):
         """
         domain = self._get_domain(identity, readonly=True)
 
-        tree = ET.fromstring(domain.XMLDesc())
+        tree = ET.fromstring(domain.XMLDesc(libvirt.VIR_DOMAIN_XML_INACTIVE))
 
         device_element = tree.find('devices')
         if device_element is None:
@@ -970,7 +950,6 @@ class LibvirtDriver(AbstractSystemsDriver):
             if dev_type == lv_device:
                 device_element.remove(disk_element)
 
-    @power_cycle
     def set_boot_image(self, identity, device, boot_image=None,
                        write_protected=True):
         """Set backend VM boot image
@@ -986,7 +965,8 @@ class LibvirtDriver(AbstractSystemsDriver):
         """
         domain = self._get_domain(identity)
 
-        domain_tree = ET.fromstring(domain.XMLDesc())
+        domain_tree = ET.fromstring(
+            domain.XMLDesc(libvirt.VIR_DOMAIN_XML_INACTIVE))
 
         self._remove_boot_images(domain, domain_tree, device)
 
@@ -1082,7 +1062,7 @@ class LibvirtDriver(AbstractSystemsDriver):
         :returns: dict of simple storage controller dict with their attributes
         """
         domain = self._get_domain(identity, readonly=True)
-        tree = ET.fromstring(domain.XMLDesc())
+        tree = ET.fromstring(domain.XMLDesc(libvirt.VIR_DOMAIN_XML_INACTIVE))
         simple_storage = defaultdict(lambda: defaultdict(DeviceList=list()))
 
         for disk_element in tree.findall(".//disk/target[@bus]/.."):

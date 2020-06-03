@@ -165,7 +165,7 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         domain_mock.injectNMI.assert_called_once_with()
 
     @mock.patch('libvirt.open', autospec=True)
-    def test_power_cycle_when_off(self, libvirt_mock):
+    def test_power_cycle(self, libvirt_mock):
         with open('sushy_tools/tests/unit/emulator/'
                   'domain_boot_os.xml', 'r') as f:
             data = f.read()
@@ -181,28 +181,8 @@ class LibvirtDriverTestCase(base.BaseTestCase):
                 gps_mock.return_value = 'Off'
                 self.test_driver.set_boot_device(self.uuid, 'Cd')
 
-        self.assertTrue(gps_mock.called)
+        self.assertFalse(gps_mock.called)
         self.assertFalse(sps_mock.called)
-
-    @mock.patch('libvirt.open', autospec=True)
-    def test_power_cycle_when_on(self, libvirt_mock):
-        with open('sushy_tools/tests/unit/emulator/'
-                  'domain_boot_os.xml', 'r') as f:
-            data = f.read()
-
-        conn_mock = libvirt_mock.return_value
-        domain_mock = conn_mock.lookupByUUID.return_value
-        domain_mock.XMLDesc.return_value = data
-
-        with mock.patch.object(
-                self.test_driver, 'get_power_state') as gps_mock:
-            with mock.patch.object(
-                    self.test_driver, 'set_power_state') as sps_mock:
-                gps_mock.return_value = 'On'
-                self.test_driver.set_boot_device(self.uuid, 'Cd')
-
-        self.assertTrue(gps_mock.called)
-        self.assertTrue(sps_mock.called)
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
     def test_get_boot_device_os(self, libvirt_mock):
