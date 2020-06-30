@@ -123,6 +123,92 @@ class StaticDriverTestCase(base.BaseTestCase):
                 '.staticdriver.StaticDriver._get_device',
                 autospec=True)
     @mock.patch('sushy_tools.emulator.resources.vmedia'
+                '.staticdriver.open')
+    @mock.patch('sushy_tools.emulator.resources.vmedia'
+                '.staticdriver.os.rename', autospec=True)
+    @mock.patch('sushy_tools.emulator.resources.vmedia'
+                '.staticdriver.tempfile', autospec=True)
+    @mock.patch('sushy_tools.emulator.resources.vmedia'
+                '.staticdriver.requests', autospec=True)
+    def test_insert_image_no_local_file(self, mock_requests, mock_tempfile,
+                                        mock_rename, mock_open,
+                                        mock_get_device):
+        test_driver = StaticDriver.initialize(
+            self.CONFIG, mock.MagicMock())()
+
+        device_info = {}
+        mock_get_device.return_value = device_info
+
+        mock_tempfile.mkdtemp.return_value = '/alphabet/soup'
+        mock_tempfile.gettempdir.return_value = '/tmp'
+        mock_tmp_file = (mock_tempfile.NamedTemporaryFile
+                         .return_value.__enter__.return_value)
+        mock_tmp_file.name = 'alphabet.soup'
+        mock_rsp = mock_requests.get.return_value.__enter__.return_value
+        mock_rsp.headers = {}
+
+        local_file = test_driver.insert_image(
+            self.UUID, 'Cd', 'http://fish.it/red.iso', inserted=True,
+            write_protected=False)
+
+        self.assertEqual('/alphabet/soup/red.iso', local_file)
+        mock_requests.get.assert_called_once_with(
+            'http://fish.it/red.iso', stream=True)
+        mock_open.assert_called_once_with(mock.ANY, 'wb')
+        mock_rename.assert_called_once_with(
+            'alphabet.soup', '/alphabet/soup/red.iso')
+
+        self.assertEqual('red.iso', device_info['Image'])
+        self.assertTrue(device_info['Inserted'])
+        self.assertFalse(device_info['WriteProtected'])
+
+    @mock.patch('sushy_tools.emulator.resources.vmedia'
+                '.staticdriver.StaticDriver._get_device',
+                autospec=True)
+    @mock.patch('sushy_tools.emulator.resources.vmedia'
+                '.staticdriver.open')
+    @mock.patch('sushy_tools.emulator.resources.vmedia'
+                '.staticdriver.os.rename', autospec=True)
+    @mock.patch('sushy_tools.emulator.resources.vmedia'
+                '.staticdriver.tempfile', autospec=True)
+    @mock.patch('sushy_tools.emulator.resources.vmedia'
+                '.staticdriver.requests', autospec=True)
+    def test_insert_image_full_url_v6(self, mock_requests, mock_tempfile,
+                                      mock_rename, mock_open,
+                                      mock_get_device):
+        test_driver = StaticDriver.initialize(
+            self.CONFIG, mock.MagicMock())()
+
+        device_info = {}
+        mock_get_device.return_value = device_info
+
+        mock_tempfile.mkdtemp.return_value = '/alphabet/soup'
+        mock_tempfile.gettempdir.return_value = '/tmp'
+        mock_tmp_file = (mock_tempfile.NamedTemporaryFile
+                         .return_value.__enter__.return_value)
+        mock_tmp_file.name = 'alphabet.soup'
+        mock_rsp = mock_requests.get.return_value.__enter__.return_value
+        mock_rsp.headers = {}
+
+        full_url = 'http://[::2]:80/redfish/boot-abc?filename=tmp.iso'
+        local_file = test_driver.insert_image(
+            self.UUID, 'Cd', full_url,
+            inserted=True, write_protected=False)
+
+        self.assertEqual('/alphabet/soup/boot-abc', local_file)
+        mock_requests.get.assert_called_once_with(full_url, stream=True)
+        mock_open.assert_called_once_with(mock.ANY, 'wb')
+        mock_rename.assert_called_once_with(
+            'alphabet.soup', '/alphabet/soup/boot-abc')
+
+        self.assertEqual('boot-abc', device_info['Image'])
+        self.assertTrue(device_info['Inserted'])
+        self.assertFalse(device_info['WriteProtected'])
+
+    @mock.patch('sushy_tools.emulator.resources.vmedia'
+                '.staticdriver.StaticDriver._get_device',
+                autospec=True)
+    @mock.patch('sushy_tools.emulator.resources.vmedia'
                 '.staticdriver.os.unlink', autospec=True)
     def test_eject_image(self, mock_unlink, mock_get_device):
         test_driver = StaticDriver.initialize(

@@ -171,7 +171,7 @@ class StaticDriver(DriverBase):
                         local_file = local_file[0]
 
                     if not local_file:
-                        parsed_url = urlparse(image_url)
+                        parsed_url = urlparse.urlparse(image_url)
                         local_file = os.path.basename(parsed_url.path)
 
                     if not local_file:
@@ -186,7 +186,7 @@ class StaticDriver(DriverBase):
 
         except Exception as ex:
             msg = 'Failed fetching image from URL %s: %s' % (image_url, ex)
-            self._logger.error(msg)
+            self._logger.exception(msg)
             raise error.FishyError(msg)
 
         self._logger.debug(
