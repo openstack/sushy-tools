@@ -525,7 +525,102 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         volume_mock = pool_mock.createXML.return_value
         volume_mock.upload.assert_called_once_with(mock.ANY, 0, mock.ANY)
 
-        conn_mock.defineXML.assert_called_once_with(mock.ANY)
+        expected_disk = ('<disk device="cdrom" type="file">'
+                         '<target bus="ide" dev="hdc" />'
+                         '<address bus="0" controller="0" '
+                         'target="0" type="drive" unit="0" />')
+        self.assertEqual(1, conn_mock.defineXML.call_count)
+        self.assertIn(expected_disk, conn_mock.defineXML.call_args[0][0])
+
+    @mock.patch('sushy_tools.emulator.resources.systems.libvirtdriver'
+                '.os.stat', autospec=True)
+    @mock.patch('sushy_tools.emulator.resources.systems.libvirtdriver'
+                '.open')
+    @mock.patch('libvirt.open', autospec=True)
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_set_boot_image_sata(self, libvirt_mock, libvirt_rw_mock,
+                                 open_mock, stat_mock):
+        with open('sushy_tools/tests/unit/emulator/domain-sata.xml', 'r') as f:
+            data = f.read()
+
+        conn_mock = libvirt_rw_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = data
+
+        pool_mock = conn_mock.storagePoolLookupByName.return_value
+
+        with open('sushy_tools/tests/unit/emulator/pool.xml', 'r') as f:
+            data = f.read()
+
+        pool_mock.XMLDesc.return_value = data
+
+        with mock.patch.object(
+                self.test_driver, 'get_power_state', return_value='Off'):
+            with mock.patch.object(
+                    self.test_driver, 'get_boot_device', return_value=None):
+
+                self.test_driver.set_boot_image(
+                    self.uuid, 'Cd', '/tmp/image.iso')
+
+        conn_mock = libvirt_rw_mock.return_value
+        pool_mock.listAllVolumes.assert_called_once_with()
+        stat_mock.assert_called_once_with('/tmp/image.iso')
+        pool_mock.createXML.assert_called_once_with(mock.ANY)
+
+        volume_mock = pool_mock.createXML.return_value
+        volume_mock.upload.assert_called_once_with(mock.ANY, 0, mock.ANY)
+
+        expected_disk = ('<disk device="cdrom" type="file">'
+                         '<target bus="sata" dev="sdc" />'
+                         '<address bus="0" controller="0" '
+                         'target="0" type="drive" unit="1" />')
+        self.assertEqual(1, conn_mock.defineXML.call_count)
+        self.assertIn(expected_disk, conn_mock.defineXML.call_args[0][0])
+
+    @mock.patch('sushy_tools.emulator.resources.systems.libvirtdriver'
+                '.os.stat', autospec=True)
+    @mock.patch('sushy_tools.emulator.resources.systems.libvirtdriver'
+                '.open')
+    @mock.patch('libvirt.open', autospec=True)
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_set_boot_image_scsi(self, libvirt_mock, libvirt_rw_mock,
+                                 open_mock, stat_mock):
+        with open('sushy_tools/tests/unit/emulator/domain-scsi.xml', 'r') as f:
+            data = f.read()
+
+        conn_mock = libvirt_rw_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = data
+
+        pool_mock = conn_mock.storagePoolLookupByName.return_value
+
+        with open('sushy_tools/tests/unit/emulator/pool.xml', 'r') as f:
+            data = f.read()
+
+        pool_mock.XMLDesc.return_value = data
+
+        with mock.patch.object(
+                self.test_driver, 'get_power_state', return_value='Off'):
+            with mock.patch.object(
+                    self.test_driver, 'get_boot_device', return_value=None):
+
+                self.test_driver.set_boot_image(
+                    self.uuid, 'Cd', '/tmp/image.iso')
+
+        conn_mock = libvirt_rw_mock.return_value
+        pool_mock.listAllVolumes.assert_called_once_with()
+        stat_mock.assert_called_once_with('/tmp/image.iso')
+        pool_mock.createXML.assert_called_once_with(mock.ANY)
+
+        volume_mock = pool_mock.createXML.return_value
+        volume_mock.upload.assert_called_once_with(mock.ANY, 0, mock.ANY)
+
+        expected_disk = ('<disk device="cdrom" type="file">'
+                         '<target bus="scsi" dev="sdc" />'
+                         '<address bus="0" controller="0" '
+                         'target="0" type="drive" unit="1" />')
+        self.assertEqual(1, conn_mock.defineXML.call_count)
+        self.assertIn(expected_disk, conn_mock.defineXML.call_args[0][0])
 
     @mock.patch('libvirt.open', autospec=True)
     @mock.patch('libvirt.openReadOnly', autospec=True)

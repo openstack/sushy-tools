@@ -118,10 +118,10 @@ class LibvirtDriver(AbstractSystemsDriver):
 
     DEVICE_TYPE_MAP_REV = {v: k for k, v in DEVICE_TYPE_MAP.items()}
 
-    # target device, controller ID
+    # target device, controller ID for libvirt domain
     DEVICE_TARGET_MAP = {
         constants.DEVICE_TYPE_FLOPPY: ('fda', 'fdc'),
-        constants.DEVICE_TYPE_CD: ('hdc', 'ide')
+        constants.DEVICE_TYPE_CD: ('hdc', 'ide'),
     }
 
     DEFAULT_BIOS_ATTRIBUTES = {"BootMode": "Uefi",
@@ -864,7 +864,21 @@ class LibvirtDriver(AbstractSystemsDriver):
                 raise error.FishyError(
                     'Unknown device %s at %s' % (device, identity))
 
-            tgt_dev, tgt_bus = self.DEVICE_TARGET_MAP[device]
+            disk_elements = device_element.findall('disk')
+            controller_type = 'ide'
+            for disk_element in disk_elements:
+                target_element = disk_element.find('target')
+                if target_element is None:
+                    continue
+                elif target_element.attrib.get('bus') == 'scsi':
+                    controller_type = 'scsi'
+                elif target_element.attrib.get('bus') == 'sata':
+                    controller_type = 'sata'
+
+            if controller_type == 'ide':
+                tgt_dev, tgt_bus = self.DEVICE_TARGET_MAP[device]
+            else:
+                tgt_dev, tgt_bus = ('sdc', controller_type)
 
             # Enumerate existing disks to find a free unit on the bus
 
@@ -889,8 +903,8 @@ class LibvirtDriver(AbstractSystemsDriver):
                 if unit_num is None:
                     continue
 
-                if unit_num in free_units:
-                    free_units.remove(unit_num)
+                if int(unit_num) in free_units:
+                    free_units.remove(int(unit_num))
 
             if not free_units:
                 msg = ('No free %(bus)s bus unit found in the libvirt domain '
