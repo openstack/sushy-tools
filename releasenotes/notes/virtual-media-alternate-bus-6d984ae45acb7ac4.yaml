@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Adds basic support for virtual media devices on non-IDE buses, such as SATA and
+    SCSI, as IDE devices are not supported on Q35 libvirt domains.
