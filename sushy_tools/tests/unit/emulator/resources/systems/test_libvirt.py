@@ -529,6 +529,14 @@ class LibvirtDriverTestCase(base.BaseTestCase):
                          '<target bus="ide" dev="hdc" />'
                          '<address bus="0" controller="0" '
                          'target="0" type="drive" unit="0" />')
+
+        # NOTE(rpittau): starting from Python 3.8 the tostring() function
+        # preserves the attribute order specified by the user.
+        if sys.version_info[1] >= 8:
+            expected_disk = ('<disk type="file" device="cdrom">'
+                             '<target dev="hdc" bus="ide" />'
+                             '<address type="drive" controller="0"'
+                             ' bus="0" target="0" unit="0" />')
         self.assertEqual(1, conn_mock.defineXML.call_count)
         self.assertIn(expected_disk, conn_mock.defineXML.call_args[0][0])
 
@@ -574,6 +582,14 @@ class LibvirtDriverTestCase(base.BaseTestCase):
                          '<target bus="sata" dev="sdc" />'
                          '<address bus="0" controller="0" '
                          'target="0" type="drive" unit="1" />')
+
+        # NOTE(rpittau): starting from Python 3.8 the tostring() function
+        # preserves the attribute order specified by the user.
+        if sys.version_info[1] >= 8:
+            expected_disk = ('<disk type="file" device="cdrom">'
+                             '<target dev="sdc" bus="sata" />'
+                             '<address type="drive" controller="0"'
+                             ' bus="0" target="0" unit="1" />')
         self.assertEqual(1, conn_mock.defineXML.call_count)
         self.assertIn(expected_disk, conn_mock.defineXML.call_args[0][0])
 
@@ -619,6 +635,15 @@ class LibvirtDriverTestCase(base.BaseTestCase):
                          '<target bus="scsi" dev="sdc" />'
                          '<address bus="0" controller="0" '
                          'target="0" type="drive" unit="1" />')
+
+        # NOTE(rpittau): starting from Python 3.8 the tostring() function
+        # preserves the attribute order specified by the user.
+        if sys.version_info[1] >= 8:
+            expected_disk = ('<disk type="file" device="cdrom">'
+                             '<target dev="sdc" bus="scsi" />'
+                             '<address type="drive" controller="0"'
+                             ' bus="0" target="0" unit="1" />')
+
         self.assertEqual(1, conn_mock.defineXML.call_count)
         self.assertIn(expected_disk, conn_mock.defineXML.call_args[0][0])
 
