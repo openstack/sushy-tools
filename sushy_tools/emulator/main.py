@@ -35,9 +35,19 @@ from sushy_tools.emulator.resources.volumes import staticdriver as voldriver
 from sushy_tools import error
 from sushy_tools.error import FishyError
 
-app = flask.Flask(__name__)
-# Turn off strict_slashes on all routes
-app.url_map.strict_slashes = False
+
+class Application(flask.Flask):
+
+    def __init__(self):
+        super().__init__(__name__)
+        # Turn off strict_slashes on all routes
+        self.url_map.strict_slashes = False
+        config_file = os.environ.get('SUSHY_EMULATOR_CONFIG')
+        if config_file:
+            self.config.from_pyfile(config_file)
+
+
+app = Application()
 
 
 class Resources(object):
@@ -855,11 +865,7 @@ def main():
     args = parse_args()
 
     if args.config:
-        os.environ['SUSHY_EMULATOR_CONFIG'] = args.config
-
-    config_file = os.environ.get('SUSHY_EMULATOR_CONFIG')
-    if config_file:
-        app.config.from_pyfile(config_file)
+        app.config.from_pyfile(args.config)
 
     if args.os_cloud:
         app.config['SUSHY_EMULATOR_OS_CLOUD'] = args.os_cloud
