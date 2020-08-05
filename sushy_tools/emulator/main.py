@@ -22,6 +22,7 @@ import ssl
 import sys
 
 import flask
+from werkzeug import exceptions as wz_exc
 
 from sushy_tools.emulator.resources.chassis import staticdriver as chsdriver
 from sushy_tools.emulator.resources.drives import staticdriver as drvdriver
@@ -220,6 +221,15 @@ def all_exception_handler(message):
     if isinstance(message, error.AliasAccessError):
         url = flask.url_for(flask.request.endpoint, identity=message.args[0])
         return flask.redirect(url, code=307, Response=flask.Response)
+
+    if (isinstance(message, error.FishyError)
+            or isinstance(message, wz_exc.HTTPException)):
+        app.logger.debug(
+            'Request failed with %s: %s', message.__class__.__name__, message)
+    else:
+        app.logger.exception(
+            'Unexpected %s: %s', message.__class__.__name__, message)
+
     return flask.render_template('error.json', message=message), 500
 
 
