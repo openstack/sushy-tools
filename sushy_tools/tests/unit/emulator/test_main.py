@@ -143,22 +143,22 @@ class EmulatorTestCase(base.BaseTestCase):
 
     def test_manager_resource_get(self, resources_mock):
         resources_mock = resources_mock.return_value.__enter__.return_value
-        systems_mock = resources_mock.systems
-        systems_mock.systems = ['xxx']
         managers_mock = resources_mock.managers
         managers_mock.managers = ['xxxx-yyyy-zzzz']
-        managers_mock.uuid.return_value = 'xxxx-yyyy-zzzz'
-        managers_mock.name.return_value = 'name'
-        chassis_mock = resources_mock.chassis
-        chassis_mock.chassis = ['chassis0']
+        managers_mock.get_manager.return_value = {
+            'UUID': 'xxxx-yyyy-zzzz',
+            'Name': 'name',
+            'Id': 'xxxx-yyyy-zzzz',
+        }
+        managers_mock.get_managed_systems.return_value = ['xxx']
+        managers_mock.get_managed_chassis.return_value = ['chassis0']
 
         response = self.app.get('/redfish/v1/Managers/xxxx-yyyy-zzzz')
 
-        self.assertEqual(200, response.status_code)
+        self.assertEqual(200, response.status_code, response.json)
         self.assertEqual('xxxx-yyyy-zzzz', response.json['Id'])
         self.assertEqual('xxxx-yyyy-zzzz', response.json['UUID'])
-        self.assertEqual('xxxx-yyyy-zzzz',
-                         response.json['ServiceEntryPointUUID'])
+        self.assertIsNone(response.json['ServiceEntryPointUUID'])
         self.assertEqual([{'@odata.id': '/redfish/v1/Systems/xxx'}],
                          response.json['Links']['ManagerForServers'])
         self.assertEqual([{'@odata.id': '/redfish/v1/Chassis/chassis0'}],
@@ -187,7 +187,7 @@ class EmulatorTestCase(base.BaseTestCase):
         systems_mock.get_boot_device.return_value = 'Cd'
         systems_mock.get_boot_mode.return_value = 'Legacy'
         managers_mock = resources_mock.managers
-        managers_mock.managers = ['aaaa-bbbb-cccc']
+        managers_mock.get_managers_for_system.return_value = ['aaaa-bbbb-cccc']
         chassis_mock = resources_mock.chassis
         chassis_mock.chassis = ['chassis0']
         indicators_mock = resources_mock.indicators
@@ -485,7 +485,7 @@ class EmulatorTestCase(base.BaseTestCase):
         resources_mock = resources_mock.return_value.__enter__.return_value
         managers_mock = resources_mock.managers
         managers_mock.managers = [self.uuid]
-        managers_mock.uuid.return_value = self.uuid
+        managers_mock.get_manager.return_value = {'UUID': self.uuid}
         vmedia_mock = resources_mock.vmedia
         vmedia_mock.devices = ['CD', 'Floppy']
 

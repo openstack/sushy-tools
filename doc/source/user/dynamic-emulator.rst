@@ -289,23 +289,9 @@ concurrently managed over Redfish and functionally similar tools.
 Managers resource
 -----------------
 
-For emulating *Managers* resource, the user can statically configure
-one or more imaginary Managers. The first configured manager will
-pretend to manage all *Systems*, *Chassis* and potentially other
-resources.
-
-.. code-block:: python
-
-    SUSHY_EMULATOR_MANAGERS = [
-        {
-            "Id": "BMC",
-            "Name": "Manager",
-            "ServiceEntryPointUUID": "92384634-2938-2342-8820-489239905423",
-            "UUID": "58893887-8974-2487-2389-841168418919"
-        }
-    ]
-
-By default a single manager with be configured automatically.
+*Managers* are emulated based on systems: each *System* has a *Manager* with
+the same UUID. The first (alphabetically) manager will pretend to manage all
+*Chassis* and potentially other resources.
 
 Managers will be revealed when querying the *Managers* resource
 directly, as well as other resources they manage or have some

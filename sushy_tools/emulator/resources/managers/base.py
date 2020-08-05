@@ -35,6 +35,13 @@ class AbstractManagersDriver(base.DriverBase, metaclass=abc.ABCMeta):
         :returns: driver information as `str`
         """
 
+    @abc.abstractmethod
+    def get_manager(self, identity):
+        """Get a manager by its identity
+
+        :returns: Redfish manager object.
+        """
+
     @property
     @abc.abstractmethod
     def managers(self):
@@ -44,27 +51,27 @@ class AbstractManagersDriver(base.DriverBase, metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    def uuid(self, identity):
-        """Get Redfish manager UUID
+    def get_managed_systems(self, manager, systems_driver):
+        """Get systems managed by this manager.
 
-        The universal unique identifier (UUID) for this system. Can be used
-        in place of manager name if there are duplicates.
-
-        If driver backend does not support non-unique manager identity,
-        this method may just return the `identity`.
-
-        :returns: Redfish manager UUID
+        :param manager: Redfish manager object.
+        :param systems_driver: A systems driver.
+        :returns: List of Redfish system UUIDs.
         """
 
     @abc.abstractmethod
-    def name(self, identity):
-        """Get Redfish manager name by UUID
+    def get_managed_chassis(self, manager, chassis_driver):
+        """Get chassis managed by this manager.
 
-        The universal unique identifier (UUID) for this Redfish manager.
-        Can be used in place of manager name if there are duplicates.
+        :param manager: Redfish manager object.
+        :param chassis_driver: A chassis driver.
+        :returns: List of Redfish chassis UUIDs.
+        """
 
-        If driver backend does not support manager names, this method may
-        just return the `identity`.
+    @abc.abstractmethod
+    def get_managers_for_system(self, ident):
+        """Get managers that manage the given system.
 
-        :returns: Redfish manager name
+        :param ident: System UUID.
+        :returns: list of UUIDs representing the managers
         """

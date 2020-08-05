@@ -27,7 +27,7 @@ from werkzeug import exceptions as wz_exc
 from sushy_tools.emulator.resources.chassis import staticdriver as chsdriver
 from sushy_tools.emulator.resources.drives import staticdriver as drvdriver
 from sushy_tools.emulator.resources.indicators import staticdriver as inddriver
-from sushy_tools.emulator.resources.managers import staticdriver as mgrdriver
+from sushy_tools.emulator.resources.managers import fakedriver as fakemgrdriver
 from sushy_tools.emulator.resources.storage import staticdriver as stgdriver
 from sushy_tools.emulator.resources.systems import libvirtdriver
 from sushy_tools.emulator.resources.systems import novadriver
@@ -91,12 +91,12 @@ class Resources(object):
                 'driver', cls.SYSTEMS().driver)
 
         if cls.MANAGERS is None:
-            cls.MANAGERS = mgrdriver.StaticDriver.initialize(
+            cls.MANAGERS = fakemgrdriver.FakeDriver.initialize(
                 app.config, app.logger)
 
             app.logger.debug(
                 'Initialized manager resource backed by %s '
-                'driver', cls.MANAGERS().driver)
+                'driver', cls.MANAGERS(None, None).driver)
 
         if cls.CHASSIS is None:
             cls.CHASSIS = chsdriver.StaticDriver.initialize(
@@ -150,8 +150,8 @@ class Resources(object):
 
     def __enter__(self):
         self.systems = self.SYSTEMS()
-        self.managers = self.MANAGERS()
         self.chassis = self.CHASSIS()
+        self.managers = self.MANAGERS(self.systems, self.chassis)
         self.indicators = self.INDICATORS()
         self.vmedia = self.VMEDIA()
         self.storage = self.STORAGE()
@@ -350,6 +350,18 @@ def manager_collection_resource():
             managers=resources.managers.managers)
 
 
+def jsonify(obj_type, obj_version, obj):
+    obj.update({
+        "@odata.type": "#{0}.{1}.{0}".format(obj_type, obj_version),
+        "@odata.context": "/redfish/v1/$metadata#{0}.{0}".format(obj_type),
+        "@Redfish.Copyright": ("Copyright 2014-2017 Distributed Management "
+                               "Task Force, Inc. (DMTF). For the full DMTF "
+                               "copyright policy, see http://www.dmtf.org/"
+                               "about/policies/copyright.")
+    })
+    return flask.jsonify(obj)
+
+
 @app.route('/redfish/v1/Managers/<identity>', methods=['GET'])
 @returns_json
 def manager_resource(identity):
@@ -359,29 +371,50 @@ def manager_resource(identity):
 
             app.logger.debug('Serving resources for manager "%s"', identity)
 
-            managers = resources.managers
+            try:
+                manager = resources.managers.get_manager(identity)
+            except error.FishyError as exc:
+                return str(exc), 404
 
-            uuid = managers.uuid(identity)
+            systems = resources.managers.get_managed_systems(manager)
+            chassis = resources.managers.get_managed_chassis(manager)
 
-            # the first manager gets all resources
-            if uuid == managers.managers[0]:
-                systems = resources.systems.systems
-                chassis = resources.chassis.chassis
-
-            else:
-                systems = []
-                chassis = []
-
-            return flask.render_template(
-                'manager.json',
-                dateTime=datetime.now().strftime('%Y-%M-%dT%H:%M:%S+00:00'),
-                identity=identity,
-                name=resources.managers.name(identity),
-                uuid=uuid,
-                serviceEntryPointUUID=resources.managers.uuid(identity),
-                systems=systems,
-                chassis=chassis
-            )
+            uuid = manager['UUID']
+            return jsonify('Manager', 'v1_3_1', {
+                "Id": manager['Id'],
+                "Name": manager.get('Name'),
+                "UUID": uuid,
+                "ServiceEntryPointUUID": manager.get('ServiceEntryPointUUID'),
+                "ManagerType": "BMC",
+                "Description": "Contoso BMC",
+                "Model": "Joo Janta 200",
+                "DateTime": datetime.now().strftime('%Y-%M-%dT%H:%M:%S+00:00'),
+                "DateTimeLocalOffset": "+00:00",
+                "Status": {
+                    "State": "Enabled",
+                    "Health": "OK"
+                },
+                "PowerState": "On",
+                "FirmwareVersion": "1.00",
+                "VirtualMedia": {
+                    "@odata.id": "/redfish/v1/Managers/%s/VirtualMedia" % uuid
+                },
+                "Links": {
+                    "ManagerForServers": [
+                        {
+                            "@odata.id": "/redfish/v1/Systems/%s" % system
+                        }
+                        for system in systems
+                    ],
+                    "ManagerForChassis": [
+                        {
+                            "@odata.id": "/redfish/v1/Chassis/%s" % ch
+                        }
+                        for ch in chassis
+                    ]
+                },
+                "@odata.id": "/redfish/v1/Managers/%s" % uuid
+            })
 
 
 @app.route('/redfish/v1/Managers/<identity>/VirtualMedia', methods=['GET'])
@@ -397,7 +430,7 @@ def virtual_media_collection_resource(identity):
             return flask.render_template(
                 'virtual_media_collection.json',
                 identity=identity,
-                uuid=resources.managers.uuid(identity),
+                uuid=resources.managers.get_manager(identity)['UUID'],
                 devices=resources.vmedia.devices
             )
 
@@ -453,11 +486,16 @@ def virtual_media_insert(identity, device):
     write_protected = flask.request.json.get('WriteProtected', False)
 
     with Resources() as resources:
+        manager = resources.managers.get_manager(identity)
+        systems = resources.managers.get_managed_systems(manager)
+        if not systems:
+            app.logger.warning('Manager %s manages no systems', identity)
+            return '', 204
 
         image_path = resources.vmedia.insert_image(
             identity, device, image, inserted, write_protected)
 
-        for system in resources.systems.systems:
+        for system in systems:
             try:
                 resources.systems.set_boot_image(
                     system, device, boot_image=image_path,
@@ -469,8 +507,10 @@ def virtual_media_insert(identity, device):
                     '%s', system, image_path, device, ex)
 
     app.logger.info(
-        'Virtual media placed into device %s manager %s image %s '
-        'inserted %s', device, identity, image or '<empty>', inserted)
+        'Virtual media placed into device %(dev)s of manager %(mgr)s for '
+        'systems %(sys)s. Image %(img)s inserted %(ins)s',
+        {'dev': device, 'mgr': identity, 'sys': systems,
+         'img': image or '<empty>', 'ins': inserted})
 
     return '', 204
 
@@ -483,7 +523,13 @@ def virtual_media_eject(identity, device):
     with Resources() as resources:
         resources.vmedia.eject_image(identity, device)
 
-        for system in resources.systems.systems:
+        manager = resources.managers.get_manager(identity)
+        systems = resources.managers.get_managed_systems(manager)
+        if not systems:
+            app.logger.warning('Manager %s manages no systems', identity)
+            return '', 204
+
+        for system in systems:
             try:
                 resources.systems.set_boot_image(system, device)
 
@@ -493,8 +539,8 @@ def virtual_media_eject(identity, device):
                     '%s', system, device, ex)
 
     app.logger.info(
-        'Virtual media ejected from device %s manager %s '
-        'image ', device, identity)
+        'Virtual media ejected from device %s manager %s systems %s',
+        device, identity, systems)
 
     return '', 204
 
@@ -533,7 +579,7 @@ def system_resource(identity):
                 total_cpus=resources.systems.get_total_cpus(identity),
                 boot_source_target=resources.systems.get_boot_device(identity),
                 boot_source_mode=resources.systems.get_boot_mode(identity),
-                managers=resources.managers.managers[:1],
+                managers=resources.managers.get_managers_for_system(identity),
                 chassis=resources.chassis.chassis[:1],
                 indicator_led=resources.indicators.get_indicator_state(
                     resources.systems.uuid(identity))
