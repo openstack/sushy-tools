@@ -17,6 +17,12 @@
 
 from oslotest import base
 
+from sushy_tools.emulator import main
+
 
 class TestCase(base.BaseTestCase):
     """Test case base class for all unit tests"""
+
+    def setUp(self):
+        super().setUp()
+        main.app._cache = {}
