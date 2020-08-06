@@ -27,14 +27,16 @@ class AbstractManagersDriver(base.DriverBase, metaclass=abc.ABCMeta):
         cls._logger = logger
         return cls
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def driver(self):
         """Return human-friendly driver information
 
         :returns: driver information as `str`
         """
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def managers(self):
         """Return available Redfish managers
 

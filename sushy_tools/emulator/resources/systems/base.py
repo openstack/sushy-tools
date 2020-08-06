@@ -21,14 +21,16 @@ from sushy_tools.emulator.resources.base import DriverBase
 class AbstractSystemsDriver(DriverBase, metaclass=abc.ABCMeta):
     """Base class for all virtualization drivers"""
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def driver(self):
         """Return human-friendly driver information
 
         :returns: driver information as `str`
         """
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def systems(self):
         """Return available computer systems
 
