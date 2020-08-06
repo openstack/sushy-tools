@@ -16,7 +16,7 @@
 from oslotest import base
 from six.moves import mock
 
-from sushy_tools.emulator.resources.drives.staticdriver import StaticDriver
+from sushy_tools.emulator.resources.drives import StaticDriver
 
 
 class StaticDriverTestCase(base.BaseTestCase):
@@ -44,14 +44,12 @@ class StaticDriverTestCase(base.BaseTestCase):
     }
 
     def test_get_drives(self):
-        test_driver = StaticDriver.initialize(
-            self.CONFIG, mock.MagicMock())()
+        test_driver = StaticDriver(self.CONFIG, mock.MagicMock())
         drv_col = test_driver.get_drives(self.SYSTEM_UUID, self.STORAGE_ID)
         self.assertEqual(self.DRIVE_COL, drv_col)
 
     def test_get_all_drives(self):
-        test_driver = StaticDriver.initialize(
-            self.CONFIG, mock.MagicMock())()
+        test_driver = StaticDriver(self.CONFIG, mock.MagicMock())
         drives = test_driver.get_all_drives()
         self.assertEqual({('da69abcc-dae0-4913-9a7b-d344043097c0', '1',
                            '32ADF365C6C1B7BD'),

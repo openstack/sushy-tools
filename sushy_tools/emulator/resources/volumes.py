@@ -16,29 +16,23 @@
 import uuid
 
 from sushy_tools.emulator import memoize
-from sushy_tools.emulator.resources.base import DriverBase
+from sushy_tools.emulator.resources import base
 
 
-class StaticDriver(DriverBase):
+class StaticDriver(base.DriverBase):
     """Redfish Volumes emulated in libvirt backed by the config file
 
     Maintains the libvirt volumes in memory.
     """
-    @classmethod
-    def initialize(cls, config, logger, *args, **kwargs):
-        cls._config = config
-        cls._logger = logger
 
-        cls._volumes = memoize.PersistentDict()
+    def __init__(self, config, logger):
+        super().__init__(config, logger)
+        self._volumes = memoize.PersistentDict()
+        self._volumes.make_permanent(
+            self._config.get('SUSHY_EMULATOR_STATE_DIR'), 'volumes')
 
-        if hasattr(cls._volumes, 'make_permanent'):
-            cls._volumes.make_permanent(
-                cls._config.get('SUSHY_EMULATOR_STATE_DIR'), 'volumes')
-
-        cls._volumes.update(
-            cls._config.get('SUSHY_EMULATOR_VOLUMES', {}))
-
-        return cls
+        self._volumes.update(
+            self._config.get('SUSHY_EMULATOR_VOLUMES', {}))
 
     @property
     def driver(self):

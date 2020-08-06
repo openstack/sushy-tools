@@ -10,14 +10,15 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from sushy_tools.emulator.resources.managers.base import AbstractManagersDriver
+from sushy_tools.emulator.resources import base
 from sushy_tools import error
 
 
-class FakeDriver(AbstractManagersDriver):
+class FakeDriver(base.DriverBase):
     """Redfish manager that copied systems."""
 
-    def __init__(self, systems, chassis):
+    def __init__(self, config, logger, systems, chassis):
+        super().__init__(config, logger)
         self._systems = systems
         self._chassis = chassis
 

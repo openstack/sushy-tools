@@ -17,7 +17,7 @@ import uuid
 
 from oslotest import base
 
-from sushy_tools.emulator.resources.chassis.staticdriver import StaticDriver
+from sushy_tools.emulator.resources.chassis import StaticDriver
 from sushy_tools import error
 
 
@@ -44,11 +44,8 @@ class StaticDriverTestCase(base.BaseTestCase):
         self.mgr_name = 'manager01'
         self.mgr_uuid = self.uuid.replace('8', '2')
 
-        test_driver = StaticDriver.initialize(
-            {'SUSHY_EMULATOR_CHASSIS': self.chassis},
-            mock.MagicMock())
-
-        self.test_driver = test_driver()
+        self.test_driver = StaticDriver(
+            {'SUSHY_EMULATOR_CHASSIS': self.chassis}, mock.MagicMock())
 
         systems_mock = mock.MagicMock()
         systems_mock.name.return_value = self.sys_name

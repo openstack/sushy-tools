@@ -15,21 +15,16 @@
 
 import uuid
 
-from sushy_tools.emulator.resources.base import DriverBase
+from sushy_tools.emulator.resources import base
 from sushy_tools import error
 
 
-class StaticDriver(DriverBase):
+class StaticDriver(base.DriverBase):
     """Redfish storage drives backed by configuration file"""
 
-    @classmethod
-    def initialize(cls, config, logger, *args, **kwargs):
-        cls._config = config
-        cls._logger = logger
-
-        cls._drives = cls._config.get('SUSHY_EMULATOR_DRIVES', {})
-
-        return cls
+    def __init__(self, config, logger):
+        super().__init__(config, logger)
+        self._drives = self._config.get('SUSHY_EMULATOR_DRIVES', {})
 
     @property
     def driver(self):

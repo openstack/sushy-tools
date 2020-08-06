@@ -15,11 +15,15 @@
 
 import abc
 
-from sushy_tools.emulator.resources.base import DriverBase
 
-
-class AbstractSystemsDriver(DriverBase, metaclass=abc.ABCMeta):
+class AbstractSystemsDriver(metaclass=abc.ABCMeta):
     """Base class for all virtualization drivers"""
+
+    @classmethod
+    def initialize(cls, config, logger, *args, **kwargs):
+        """Initialize class attribute."""
+        cls._config = config
+        cls._logger = logger
 
     @property
     @abc.abstractmethod

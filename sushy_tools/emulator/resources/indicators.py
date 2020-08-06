@@ -14,31 +14,25 @@
 #    under the License.
 
 from sushy_tools.emulator import memoize
-from sushy_tools.emulator.resources.base import DriverBase
+from sushy_tools.emulator.resources import base
 from sushy_tools import error
 
 
-class StaticDriver(DriverBase):
+class StaticDriver(base.DriverBase):
     """Redfish indicator LED simulator
 
     Maintain indicators states in memory. Does not light up
     anything.
     """
-    @classmethod
-    def initialize(cls, config, logger, *args, **kwargs):
-        cls._config = config
-        cls._logger = logger
 
-        cls._indicators = memoize.PersistentDict()
-
-        if hasattr(cls._indicators, 'make_permanent'):
-            cls._indicators.make_permanent(
-                cls._config.get('SUSHY_EMULATOR_STATE_DIR'), 'indicators')
-
-        cls._indicators.update(
-            cls._config.get('SUSHY_EMULATOR_INDICATOR_LEDS', {}))
-
-        return cls
+    def __init__(self, config, logger):
+        super().__init__(config, logger)
+        self._indicators = memoize.PersistentDict()
+        if hasattr(self._indicators, 'make_permanent'):
+            self._indicators.make_permanent(
+                self._config.get('SUSHY_EMULATOR_STATE_DIR'), 'indicators')
+        self._indicators.update(
+            self._config.get('SUSHY_EMULATOR_INDICATOR_LEDS', {}))
 
     @property
     def driver(self):

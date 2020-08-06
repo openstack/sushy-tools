@@ -16,11 +16,11 @@ from unittest import mock
 
 from oslotest import base
 
-from sushy_tools.emulator.resources.volumes.staticdriver import StaticDriver
+from sushy_tools.emulator.resources.volumes import StaticDriver
 
 
-@mock.patch('sushy_tools.emulator.resources.volumes'
-            '.staticdriver.memoize.PersistentDict', new=dict)
+@mock.patch('sushy_tools.emulator.resources.volumes.memoize.PersistentDict',
+            new=dict)
 class StaticDriverTestCase(base.BaseTestCase):
 
     SYSTEM_UUID = "da69abcc-dae0-4913-9a7b-d344043097c0"
@@ -50,16 +50,16 @@ class StaticDriverTestCase(base.BaseTestCase):
         }
     }
 
+    def setUp(self):
+        super().setUp()
+        self.test_driver = StaticDriver(self.CONFIG, mock.MagicMock())
+
     def test_get_volumes_col(self):
-        test_driver = StaticDriver.initialize(
-            self.CONFIG, mock.MagicMock())()
-        vol_col = test_driver.get_volumes_col(self.SYSTEM_UUID,
-                                              self.STORAGE_ID)
+        vol_col = self.test_driver.get_volumes_col(self.SYSTEM_UUID,
+                                                   self.STORAGE_ID)
         self.assertEqual(self.VOLUMES_COL, vol_col)
 
     def test_add_volume(self):
-        test_driver = StaticDriver.initialize(
-            self.CONFIG, mock.MagicMock())()
         vol = {
             "libvirtPoolName": "sushyPool",
             "libvirtVolName": "testVol2",
@@ -68,14 +68,12 @@ class StaticDriverTestCase(base.BaseTestCase):
             "VolumeType": "Mirrored",
             "CapacityBytes": 76584
         }
-        test_driver.add_volume(self.SYSTEM_UUID, self.STORAGE_ID, vol)
-        vol_col = test_driver.get_volumes_col(self.SYSTEM_UUID,
-                                              self.STORAGE_ID)
+        self.test_driver.add_volume(self.SYSTEM_UUID, self.STORAGE_ID, vol)
+        vol_col = self.test_driver.get_volumes_col(self.SYSTEM_UUID,
+                                                   self.STORAGE_ID)
         self.assertTrue(vol in vol_col)
 
     def test_delete_volume(self):
-        test_driver = StaticDriver.initialize(
-            self.CONFIG, mock.MagicMock())()
         vol = {
             "libvirtPoolName": "sushyPool",
             "libvirtVolName": "testVol",
@@ -84,7 +82,7 @@ class StaticDriverTestCase(base.BaseTestCase):
             "VolumeType": "Mirrored",
             "CapacityBytes": 23748
         }
-        test_driver.delete_volume(self.SYSTEM_UUID, self.STORAGE_ID, vol)
-        vol_col = test_driver.get_volumes_col(self.SYSTEM_UUID,
-                                              self.STORAGE_ID)
+        self.test_driver.delete_volume(self.SYSTEM_UUID, self.STORAGE_ID, vol)
+        vol_col = self.test_driver.get_volumes_col(self.SYSTEM_UUID,
+                                                   self.STORAGE_ID)
         self.assertFalse(vol in vol_col)

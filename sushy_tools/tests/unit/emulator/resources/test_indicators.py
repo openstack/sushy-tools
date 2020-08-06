@@ -16,12 +16,10 @@ from unittest import mock
 
 from oslotest import base
 
-from sushy_tools.emulator.resources.indicators.staticdriver import StaticDriver
+from sushy_tools.emulator.resources.indicators import StaticDriver
 from sushy_tools import error
 
 
-@mock.patch('sushy_tools.emulator.resources.indicators'
-            '.staticdriver.memoize.PersistentDict', new=dict)
 class StaticDriverTestCase(base.BaseTestCase):
 
     UUID = "58893887-8974-2487-2389-841168418919"
@@ -33,30 +31,27 @@ class StaticDriverTestCase(base.BaseTestCase):
         }
     }
 
+    def setUp(self):
+        super().setUp()
+        with mock.patch('sushy_tools.emulator.memoize.PersistentDict',
+                        return_value={}, autospec=True):
+            self.test_driver = StaticDriver(self.CONFIG, mock.MagicMock())
+
     def test_indicators(self):
-        test_driver = StaticDriver.initialize(
-            self.CONFIG, mock.MagicMock())()
-        indicators = test_driver.indicators
+        indicators = self.test_driver.indicators
         self.assertEqual([self.UUID], indicators)
 
     def test_get_indicator_state(self):
-        test_driver = StaticDriver.initialize(
-            self.CONFIG, mock.MagicMock())()
-        state = test_driver.get_indicator_state(self.UUID)
+        state = self.test_driver.get_indicator_state(self.UUID)
         self.assertEqual('Off', state)
 
     def test_set_indicator_state_ok(self):
-        test_driver = StaticDriver.initialize(
-            self.CONFIG, mock.MagicMock())()
-        test_driver.set_indicator_state(self.UUID, 'Lit')
-        state = test_driver.get_indicator_state(self.UUID)
+        self.test_driver.set_indicator_state(self.UUID, 'Lit')
+        state = self.test_driver.get_indicator_state(self.UUID)
         self.assertEqual('Lit', state)
 
     def test_set_indicator_state_fail(self):
-        test_driver = StaticDriver.initialize(
-            self.CONFIG, mock.MagicMock())()
-
         self.assertRaises(
             error.FishyError,
-            test_driver.set_indicator_state,
+            self.test_driver.set_indicator_state,
             self.UUID, 'Blah')

@@ -25,15 +25,15 @@ import flask
 from werkzeug import exceptions as wz_exc
 
 from sushy_tools.emulator import memoize
-from sushy_tools.emulator.resources.chassis import staticdriver as chsdriver
-from sushy_tools.emulator.resources.drives import staticdriver as drvdriver
-from sushy_tools.emulator.resources.indicators import staticdriver as inddriver
-from sushy_tools.emulator.resources.managers import fakedriver as fakemgrdriver
-from sushy_tools.emulator.resources.storage import staticdriver as stgdriver
+from sushy_tools.emulator.resources import chassis as chsdriver
+from sushy_tools.emulator.resources import drives as drvdriver
+from sushy_tools.emulator.resources import indicators as inddriver
+from sushy_tools.emulator.resources import managers as mgrdriver
+from sushy_tools.emulator.resources import storage as stgdriver
 from sushy_tools.emulator.resources.systems import libvirtdriver
 from sushy_tools.emulator.resources.systems import novadriver
-from sushy_tools.emulator.resources.vmedia import staticdriver as vmddriver
-from sushy_tools.emulator.resources.volumes import staticdriver as voldriver
+from sushy_tools.emulator.resources import vmedia as vmddriver
+from sushy_tools.emulator.resources import volumes as voldriver
 from sushy_tools import error
 from sushy_tools.error import FishyError
 
@@ -78,38 +78,38 @@ class Application(flask.Flask):
     @property
     @memoize.memoize()
     def managers(self):
-        return fakemgrdriver.FakeDriver.initialize(app.config, app.logger)(
-            self.systems, self.chassis)
+        return mgrdriver.FakeDriver(self.config, self.logger,
+                                    self.systems, self.chassis)
 
     @property
     @memoize.memoize()
     def chassis(self):
-        return chsdriver.StaticDriver.initialize(app.config, app.logger)()
+        return chsdriver.StaticDriver(self.config, self.logger)
 
     @property
     @memoize.memoize()
     def indicators(self):
-        return inddriver.StaticDriver.initialize(app.config, app.logger)()
+        return inddriver.StaticDriver(self.config, self.logger)
 
     @property
     @memoize.memoize()
     def vmedia(self):
-        return vmddriver.StaticDriver.initialize(app.config, app.logger)()
+        return vmddriver.StaticDriver(self.config, self.logger)
 
     @property
     @memoize.memoize()
     def storage(self):
-        return stgdriver.StaticDriver.initialize(app.config, app.logger)()
+        return stgdriver.StaticDriver(self.config, self.logger)
 
     @property
     @memoize.memoize()
     def drives(self):
-        return drvdriver.StaticDriver.initialize(app.config, app.logger)()
+        return drvdriver.StaticDriver(self.config, self.logger)
 
     @property
     @memoize.memoize()
     def volumes(self):
-        return voldriver.StaticDriver.initialize(app.config, app.logger)()
+        return voldriver.StaticDriver(self.config, self.logger)
 
 
 app = Application()

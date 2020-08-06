@@ -12,14 +12,15 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+
+import builtins
 from unittest import mock
 
 from oslotest import base
 
-from sushy_tools.emulator.resources.vmedia.staticdriver import StaticDriver
+from sushy_tools.emulator.resources import vmedia
 
 
-@mock.patch('sushy_tools.emulator.memoize.PersistentDict', new=dict)
 class StaticDriverTestCase(base.BaseTestCase):
 
     UUID = 'ZZZ-YYY-XXX'
@@ -43,54 +44,40 @@ class StaticDriverTestCase(base.BaseTestCase):
         }
     }
 
-    def test_devices(self):
-        test_driver = StaticDriver.initialize(
-            self.CONFIG, mock.MagicMock())()
+    def setUp(self):
+        super().setUp()
+        with mock.patch('sushy_tools.emulator.memoize.PersistentDict',
+                        return_value={}, autospec=True):
+            self.test_driver = vmedia.StaticDriver(self.CONFIG,
+                                                   mock.MagicMock())
 
-        devices = test_driver.devices
+    def test_devices(self):
+        devices = self.test_driver.devices
         self.assertEqual(['Cd', 'Floppy'], sorted(devices))
 
     def test_get_device_name(self):
-        test_driver = StaticDriver.initialize(
-            self.CONFIG, mock.MagicMock())()
-
-        device_name = test_driver.get_device_name(
+        device_name = self.test_driver.get_device_name(
             self.UUID, 'Cd')
         self.assertEqual('Virtual CD', device_name)
 
     def test_get_device_media_types(self):
-        test_driver = StaticDriver.initialize(
-            self.CONFIG, mock.MagicMock())()
-
-        media_types = test_driver.get_device_media_types(
+        media_types = self.test_driver.get_device_media_types(
             self.UUID, 'Cd')
         self.assertEqual(['CD', 'DVD'], media_types)
 
     def test_get_device_image_info(self):
-        test_driver = StaticDriver.initialize(
-            self.CONFIG, mock.MagicMock())()
-
-        dev_info = test_driver.get_device_image_info(
+        dev_info = self.test_driver.get_device_image_info(
             self.UUID, 'Cd')
         expected = ('', '', False, False)
         self.assertEqual(expected, dev_info)
 
-    @mock.patch('sushy_tools.emulator.resources.vmedia'
-                '.staticdriver.StaticDriver._get_device',
-                autospec=True)
-    @mock.patch('sushy_tools.emulator.resources.vmedia'
-                '.staticdriver.open')
-    @mock.patch('sushy_tools.emulator.resources.vmedia'
-                '.staticdriver.os.rename', autospec=True)
-    @mock.patch('sushy_tools.emulator.resources.vmedia'
-                '.staticdriver.tempfile', autospec=True)
-    @mock.patch('sushy_tools.emulator.resources.vmedia'
-                '.staticdriver.requests', autospec=True)
+    @mock.patch.object(vmedia.StaticDriver, '_get_device', autospec=True)
+    @mock.patch.object(builtins, 'open', autospec=True)
+    @mock.patch.object(vmedia.os, 'rename', autospec=True)
+    @mock.patch.object(vmedia, 'tempfile', autospec=True)
+    @mock.patch.object(vmedia, 'requests', autospec=True)
     def test_insert_image(self, mock_requests, mock_tempfile, mock_rename,
                           mock_open, mock_get_device):
-        test_driver = StaticDriver.initialize(
-            self.CONFIG, mock.MagicMock())()
-
         device_info = {}
         mock_get_device.return_value = device_info
 
@@ -104,7 +91,7 @@ class StaticDriverTestCase(base.BaseTestCase):
             'content-disposition': 'attachment; filename="fish.iso"'
         }
 
-        local_file = test_driver.insert_image(
+        local_file = self.test_driver.insert_image(
             self.UUID, 'Cd', 'http://fish.it/red.iso', inserted=True,
             write_protected=False)
 
@@ -119,23 +106,14 @@ class StaticDriverTestCase(base.BaseTestCase):
         self.assertTrue(device_info['Inserted'])
         self.assertFalse(device_info['WriteProtected'])
 
-    @mock.patch('sushy_tools.emulator.resources.vmedia'
-                '.staticdriver.StaticDriver._get_device',
-                autospec=True)
-    @mock.patch('sushy_tools.emulator.resources.vmedia'
-                '.staticdriver.open')
-    @mock.patch('sushy_tools.emulator.resources.vmedia'
-                '.staticdriver.os.rename', autospec=True)
-    @mock.patch('sushy_tools.emulator.resources.vmedia'
-                '.staticdriver.tempfile', autospec=True)
-    @mock.patch('sushy_tools.emulator.resources.vmedia'
-                '.staticdriver.requests', autospec=True)
+    @mock.patch.object(vmedia.StaticDriver, '_get_device', autospec=True)
+    @mock.patch.object(builtins, 'open', autospec=True)
+    @mock.patch.object(vmedia.os, 'rename', autospec=True)
+    @mock.patch.object(vmedia, 'tempfile', autospec=True)
+    @mock.patch.object(vmedia, 'requests', autospec=True)
     def test_insert_image_no_local_file(self, mock_requests, mock_tempfile,
                                         mock_rename, mock_open,
                                         mock_get_device):
-        test_driver = StaticDriver.initialize(
-            self.CONFIG, mock.MagicMock())()
-
         device_info = {}
         mock_get_device.return_value = device_info
 
@@ -147,7 +125,7 @@ class StaticDriverTestCase(base.BaseTestCase):
         mock_rsp = mock_requests.get.return_value.__enter__.return_value
         mock_rsp.headers = {}
 
-        local_file = test_driver.insert_image(
+        local_file = self.test_driver.insert_image(
             self.UUID, 'Cd', 'http://fish.it/red.iso', inserted=True,
             write_protected=False)
 
@@ -162,23 +140,14 @@ class StaticDriverTestCase(base.BaseTestCase):
         self.assertTrue(device_info['Inserted'])
         self.assertFalse(device_info['WriteProtected'])
 
-    @mock.patch('sushy_tools.emulator.resources.vmedia'
-                '.staticdriver.StaticDriver._get_device',
-                autospec=True)
-    @mock.patch('sushy_tools.emulator.resources.vmedia'
-                '.staticdriver.open')
-    @mock.patch('sushy_tools.emulator.resources.vmedia'
-                '.staticdriver.os.rename', autospec=True)
-    @mock.patch('sushy_tools.emulator.resources.vmedia'
-                '.staticdriver.tempfile', autospec=True)
-    @mock.patch('sushy_tools.emulator.resources.vmedia'
-                '.staticdriver.requests', autospec=True)
+    @mock.patch.object(vmedia.StaticDriver, '_get_device', autospec=True)
+    @mock.patch.object(builtins, 'open', autospec=True)
+    @mock.patch.object(vmedia.os, 'rename', autospec=True)
+    @mock.patch.object(vmedia, 'tempfile', autospec=True)
+    @mock.patch.object(vmedia, 'requests', autospec=True)
     def test_insert_image_full_url_v6(self, mock_requests, mock_tempfile,
                                       mock_rename, mock_open,
                                       mock_get_device):
-        test_driver = StaticDriver.initialize(
-            self.CONFIG, mock.MagicMock())()
-
         device_info = {}
         mock_get_device.return_value = device_info
 
@@ -191,7 +160,7 @@ class StaticDriverTestCase(base.BaseTestCase):
         mock_rsp.headers = {}
 
         full_url = 'http://[::2]:80/redfish/boot-abc?filename=tmp.iso'
-        local_file = test_driver.insert_image(
+        local_file = self.test_driver.insert_image(
             self.UUID, 'Cd', full_url,
             inserted=True, write_protected=False)
 
@@ -205,21 +174,15 @@ class StaticDriverTestCase(base.BaseTestCase):
         self.assertTrue(device_info['Inserted'])
         self.assertFalse(device_info['WriteProtected'])
 
-    @mock.patch('sushy_tools.emulator.resources.vmedia'
-                '.staticdriver.StaticDriver._get_device',
-                autospec=True)
-    @mock.patch('sushy_tools.emulator.resources.vmedia'
-                '.staticdriver.os.unlink', autospec=True)
+    @mock.patch.object(vmedia.StaticDriver, '_get_device', autospec=True)
+    @mock.patch.object(vmedia.os, 'unlink', autospec=True)
     def test_eject_image(self, mock_unlink, mock_get_device):
-        test_driver = StaticDriver.initialize(
-            self.CONFIG, mock.MagicMock())()
-
         device_info = {
             '_local_file': '/tmp/fish.iso'
         }
         mock_get_device.return_value = device_info
 
-        test_driver.eject_image(self.UUID, 'Cd')
+        self.test_driver.eject_image(self.UUID, 'Cd')
 
         self.assertEqual('', device_info['Image'])
         self.assertEqual('', device_info['ImageName'])

@@ -15,14 +15,15 @@
 
 import uuid
 
-from sushy_tools.emulator.resources.chassis.base import AbstractChassisDriver
+from sushy_tools.emulator import base
 from sushy_tools import error
 
 
-class StaticDriver(AbstractChassisDriver):
+class StaticDriver(base.DriverBase):
     """Redfish chassis backed by configuration file"""
 
-    def __init__(self):
+    def __init__(self, config, logger):
+        super().__init__(config, logger)
 
         chassis = self._config.get('SUSHY_EMULATOR_CHASSIS')
         if not chassis:

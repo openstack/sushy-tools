@@ -16,7 +16,7 @@
 from oslotest import base
 from six.moves import mock
 
-from sushy_tools.emulator.resources.managers import fakedriver as fakemgrdriver
+from sushy_tools.emulator.resources import managers
 from sushy_tools import error
 
 
@@ -32,8 +32,8 @@ class FakeDriverTestCase(base.BaseTestCase):
                         'Id': self.identity,
                         'Name': 'name-Manager'}
         self.chassis = mock.Mock(chassis=[])
-        test_driver = fakemgrdriver.FakeDriver.initialize({}, mock.Mock())
-        self.test_driver = test_driver(self.systems, self.chassis)
+        self.test_driver = managers.FakeDriver({}, mock.Mock(),
+                                               self.systems, self.chassis)
 
     def test_get_manager_not_found(self):
         self.systems.uuid.side_effect = error.FishyError('boom')
@@ -45,8 +45,8 @@ class FakeDriverTestCase(base.BaseTestCase):
         self.assertEqual(self.manager, manager)
 
     def test_managers(self):
-        managers = self.test_driver.managers
-        self.assertEqual([self.identity], managers)
+        result = self.test_driver.managers
+        self.assertEqual([self.identity], result)
 
     def test_managed_systems(self):
         self.assertEqual(

@@ -17,21 +17,6 @@
 class DriverBase(object):
     """Common base for Redfish Systems, Managers and Chassis models"""
 
-    @classmethod
-    def initialize(cls, **kwargs):
-        """Initialize class attributes
-
-        Since drivers may need to cache thing short-term. The emulator
-        instantiates the driver every time it serves a client query.
-
-        Driver objects can cache whenever it makes sense for the duration
-        of a single session. It is guaranteed that the driver object will
-        never be reused for any other session.
-
-        The `initialize` method is provided to set up the driver in a way
-        that would affect all the subsequent sessions.
-
-        :params **kwargs: driver-specific parameters
-        :returns: initialized driver class
-        """
-        return cls
+    def __init__(self, config, logger):
+        self._config = config
+        self._logger = logger

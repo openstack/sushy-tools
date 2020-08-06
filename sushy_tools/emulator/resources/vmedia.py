@@ -21,27 +21,21 @@ from urllib import parse as urlparse
 import requests
 
 from sushy_tools.emulator import memoize
-from sushy_tools.emulator.resources.base import DriverBase
+from sushy_tools.emulator.resources import base
 from sushy_tools import error
 
 
-class StaticDriver(DriverBase):
-    """Redfish virtual media simulator
+class StaticDriver(base.DriverBase):
+    """Redfish virtual media simulator."""
 
-    """
+    def __init__(self, config, logger):
+        super().__init__(config, logger)
+        self._devices = memoize.PersistentDict()
+        if hasattr(self._devices, 'make_permanent'):
+            self._devices.make_permanent(
+                self._config.get('SUSHY_EMULATOR_STATE_DIR'), 'vmedia')
 
-    @classmethod
-    def initialize(cls, config, logger, *args, **kwargs):
-        cls._config = config
-        cls._logger = logger
-
-        cls._devices = memoize.PersistentDict()
-
-        if hasattr(cls._devices, 'make_permanent'):
-            cls._devices.make_permanent(
-                cls._config.get('SUSHY_EMULATOR_STATE_DIR'), 'vmedia')
-
-        device_types = cls._config.get(
+        device_types = self._config.get(
             'SUSHY_EMULATOR_VMEDIA_DEVICES')
         if device_types is None:
             device_types = {
@@ -61,9 +55,7 @@ class StaticDriver(DriverBase):
                 }
             }
 
-        cls._device_types = device_types
-
-        return cls
+        self._device_types = device_types
 
     def _get_device(self, identity, device):
         try:
