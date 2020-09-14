@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Adds the ``Volumes`` navigation property to the ``Storage`` emulator
+    template.
