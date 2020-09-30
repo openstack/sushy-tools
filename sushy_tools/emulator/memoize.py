@@ -78,8 +78,7 @@ class PersistentDict(MutableMapping):
 
     def make_permanent(self, dbpath, dbfile):
         dbpath = dbpath or self.DBPATH
-        if not os.path.exists(dbpath):
-            os.makedirs(dbpath)
+        os.makedirs(dbpath, exist_ok=True)
 
         self._dbpath = os.path.join(dbpath, dbfile) + '.sqlite'
 
