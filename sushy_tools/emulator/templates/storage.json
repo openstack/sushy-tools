@@ -47,6 +47,9 @@
         {% endfor -%}
     ],
     {% endif -%}
+    "Volumes": {
+        "@odata.id": {{ "/redfish/v1/Systems/%s/Storage/%s/Volumes"|format(identity, storage['Id'])|tojson }}
+    },
     "@odata.context": "/redfish/v1/$metadata#Storage.Storage",
     "@odata.id": {{ "/redfish/v1/Systems/%s/Storage/%s"|format(identity, storage['Id'])|tojson }}
 }
