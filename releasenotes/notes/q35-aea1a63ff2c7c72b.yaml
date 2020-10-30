@@ -1,0 +1,4 @@
+---
+fixes:
+  - |
+    No longer tries to use IDE controllers on q35 machines.

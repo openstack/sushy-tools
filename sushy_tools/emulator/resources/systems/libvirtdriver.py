@@ -842,6 +842,18 @@ class LibvirtDriver(AbstractSystemsDriver):
 
         return image_path
 
+    def _default_controller(self, domain_tree):
+        os_element = domain_tree.find('os')
+        if os_element is not None:
+            type_element = os_element.find('type')
+            if type_element is not None:
+                machine = type_element.attrib.get('machine')
+                if machine and 'q35' in machine:
+                    # No IDE support for newer q35 machine types
+                    return 'sata'
+
+        return 'ide'
+
     def _add_boot_image(self, domain, domain_tree, device,
                         boot_image, write_protected):
 
@@ -852,6 +864,8 @@ class LibvirtDriver(AbstractSystemsDriver):
             msg = ('Missing "devices" tag in the libvirt domain '
                    '"%(identity)s" configuration' % {'identity': identity})
             raise error.FishyError(msg)
+
+        controller_type = self._default_controller(domain_tree)
 
         with libvirt_open(self._uri) as conn:
 
@@ -865,7 +879,6 @@ class LibvirtDriver(AbstractSystemsDriver):
                     'Unknown device %s at %s' % (device, identity))
 
             disk_elements = device_element.findall('disk')
-            controller_type = 'ide'
             for disk_element in disk_elements:
                 target_element = disk_element.find('target')
                 if target_element is None:
