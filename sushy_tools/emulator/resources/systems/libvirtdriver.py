@@ -439,6 +439,8 @@ class LibvirtDriver(AbstractSystemsDriver):
     def get_boot_mode(self, identity):
         """Get computer system boot mode.
 
+        :param identity: libvirt domain name or ID
+
         :returns: either *UEFI* or *Legacy* as `str` or `None` if
             current boot mode can't be determined
         """
@@ -458,6 +460,8 @@ class LibvirtDriver(AbstractSystemsDriver):
 
     def set_boot_mode(self, identity, boot_mode):
         """Set computer system boot mode.
+
+        :param identity: libvirt domain name or ID
 
         :param boot_mode: string literal requesting boot mode
             change on the system. Valid values are: *UEFI*, *Legacy*.
@@ -572,11 +576,8 @@ class LibvirtDriver(AbstractSystemsDriver):
         :returns: available CPU count as `int` or `None` if CPU count
             can't be determined
         """
-        domain = self._get_domain(identity, readonly=True)
-
-        tree = ET.fromstring(domain.XMLDesc(libvirt.VIR_DOMAIN_XML_INACTIVE))
-
         total_cpus = 0
+        domain = self._get_domain(identity, readonly=True)
 
         if domain.isActive():
             total_cpus = domain.maxVcpus()
@@ -584,7 +585,10 @@ class LibvirtDriver(AbstractSystemsDriver):
         # If we can't get it from maxVcpus() try to find it by
         # inspecting the domain XML
         if total_cpus <= 0:
+            tree = ET.fromstring(
+                domain.XMLDesc(libvirt.VIR_DOMAIN_XML_INACTIVE))
             vcpu_element = tree.find('.//vcpu')
+
             if vcpu_element is not None:
                 total_cpus = int(vcpu_element.text)
 
@@ -747,10 +751,45 @@ class LibvirtDriver(AbstractSystemsDriver):
                 for iface in tree.findall(
                 ".//devices/interface[@type='network']/mac")]
 
+    def get_processors(self, identity):
+        """Get list of processors
+
+        :param identity: libvirt domain name or ID
+
+        :returns: list of processors dict with their attributes
+        """
+        domain = self._get_domain(identity, readonly=True)
+        processors_count = self.get_total_cpus(identity)
+
+        # NOTE(rpittau) not a lot we can provide if the domain is not active
+        processors = [{'id': 'CPU{0}'.format(x),
+                       'socket': 'CPU {0}'.format(x)}
+                      for x in range(processors_count)]
+
+        if domain.isActive():
+            tree = ET.fromstring(domain.XMLDesc())
+
+            model = tree.find('.//cpu/model').text
+            vendor = tree.find('.//cpu/vendor').text
+            try:
+                cores = tree.find('.//cpu/topology').get('cores')
+                threads = tree.find('.//cpu/topology').get('threads')
+            except AttributeError:
+                cores = 'N/A'
+                threads = 'N/A'
+
+            for processor in processors:
+                processor['model'] = model
+                processor['vendor'] = vendor
+                processor['cores'] = cores
+                processor['threads'] = threads
+
+        return processors
+
     def get_boot_image(self, identity, device):
         """Get backend VM boot image info
 
-        :param identity: node name or ID
+        :param identity: libvirt domain name or ID
         :param device: device type (from
             `sushy_tools.emulator.constants`)
         :returns: a `tuple` of (boot_image, write_protected, inserted)
@@ -981,7 +1020,7 @@ class LibvirtDriver(AbstractSystemsDriver):
                        write_protected=True):
         """Set backend VM boot image
 
-        :param identity: node name or ID
+        :param identity: libvirt domain name or ID
         :param device: device type (from
             `sushy_tools.emulator.constants`)
         :param boot_image: path to the image file or `None` to remove

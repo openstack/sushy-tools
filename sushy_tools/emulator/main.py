@@ -568,6 +568,33 @@ def ethernet_interface(identity, nic_id):
     return 'Not found', 404
 
 
+@app.route('/redfish/v1/Systems/<identity>/Processors',
+           methods=['GET'])
+@ensure_instance_access
+@returns_json
+def processors_collection(identity):
+    processors = app.systems.get_processors(identity)
+
+    return flask.render_template(
+        'processors_collection.json', identity=identity,
+        processors=processors)
+
+
+@app.route('/redfish/v1/Systems/<identity>/Processors/<processor_id>',
+           methods=['GET'])
+@ensure_instance_access
+@returns_json
+def processor(identity, processor_id):
+    processors = app.systems.get_processors(identity)
+
+    for proc in processors:
+        if proc['id'] == processor_id:
+            return flask.render_template(
+                'processor.json', identity=identity, processor=proc)
+
+    return 'Not found', 404
+
+
 @app.route('/redfish/v1/Systems/<identity>/Actions/ComputerSystem.Reset',
            methods=['POST'])
 @ensure_instance_access

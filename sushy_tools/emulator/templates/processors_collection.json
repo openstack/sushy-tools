@@ -1,0 +1,15 @@
+{
+    "@odata.type": "#ProcessorCollection.ProcessorCollection",
+    "Name": "Processors Collection",
+    "Members@odata.count": {{ processors|length}},
+    "Members": [
+        {% for processor in processors %}
+            {
+                "@odata.id": {{ "/redfish/v1/Systems/%s/Processors/%s"|format(identity, processor.id)|tojson }}
+            }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ],
+    "@odata.context": "/redfish/v1/$metadata#ProcessorCollection.ProcessorCollection",
+    "@odata.id": {{ "/redfish/v1/Systems/%s/Processors/%s"|format(identity, processor)|tojson }},
+    "@Redfish.Copyright": "Copyright 2014-2020 DMTF. For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright"
+}

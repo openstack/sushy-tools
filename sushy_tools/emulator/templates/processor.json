@@ -1,0 +1,21 @@
+{
+    "@odata.type": "#Processor.v1_0_7.Processor",
+    "Id": {{ processor['id']|string|tojson }},
+    "Name": "Processor",
+    "Socket": {{ processor['socket']|string|tojson }},
+    "ProcessorType": "CPU",
+    "ProcessorArchitecture": "x86",
+    "InstructionSet": "x86-64",
+    "Manufacturer": {{ processor['vendor']|string|tojson }},
+    "Model": {{ processor['model']|string|tojson }},
+    "TotalCores": {{ processor['cores']|string|tojson }},
+    "TotalThreads": {{ processor['threads']|string|tojson }},
+    "Status": {
+        "@odata.type": "#Resource.Status",
+        "State": "Enabled",
+        "Health": "OK"
+    },
+    "@odata.context": "/redfish/v1/$metadata#Processor.Processor",
+    "@odata.id": {{ "/redfish/v1/Systems/%s/Processors/%s"|format(identity, processor['Id'])|tojson }},
+     "@Redfish.Copyright": "Copyright 2014-2019 DMTF. For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright"
+}
