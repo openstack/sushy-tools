@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Adds an option --debug to enable debug mode when running sushy-emulator.
+

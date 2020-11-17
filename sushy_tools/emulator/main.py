@@ -779,6 +779,8 @@ def parse_args():
                         type=str,
                         help='Config file path. Can also be set via '
                              'environment variable SUSHY_EMULATOR_CONFIG.')
+    parser.add_argument('--debug', action='store_true',
+                        help='Enables debug mode when running sushy-emulator.')
     parser.add_argument('-i', '--interface',
                         type=str,
                         help='IP address of the local interface to listen '
@@ -818,6 +820,8 @@ def parse_args():
 def main():
 
     args = parse_args()
+
+    app.debug = args.debug
 
     if args.config:
         app.config.from_pyfile(args.config)
