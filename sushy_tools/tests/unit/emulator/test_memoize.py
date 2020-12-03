@@ -12,6 +12,9 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+
+import pickle
+import sqlite3
 from unittest import mock
 
 from oslotest import base
@@ -82,112 +85,145 @@ class MemoizeTestCase(base.BaseTestCase):
         self.assertEqual(0, driver.call_count)
 
 
+@mock.patch.object(sqlite3, 'connect', autospec=True)
 class PersistentDictTestCase(base.BaseTestCase):
 
-    @mock.patch.object(memoize, 'sqlite3', autospec=True)
     def test_make_permanent(self, mock_sqlite3):
         pd = memoize.PersistentDict()
-
         pd.make_permanent('/', 'file')
+        mock_sqlite3.assert_called_once_with('/file.sqlite')
 
-        mock_sqlite3.connect.assert_called_with('/file.sqlite')
-
-    @mock.patch.object(memoize, 'pickle', autospec=True)
-    def test_encode(self, mock_pickle):
+    def test_encode(self, mock_sqlite3):
         pd = memoize.PersistentDict()
+        value = pd.encode({1: '2'})
+        self.assertEqual(pickle.dumps({1: '2'}), value)
 
-        pd.encode({1: '2'})
-
-        mock_pickle.dumps.assert_called_once_with({1: '2'})
-
-    @mock.patch.object(memoize, 'pickle', autospec=True)
-    def test_decode(self, mock_pickle):
+    def test_decode(self, mock_sqlite3):
         pd = memoize.PersistentDict()
+        value = pd.decode(pickle.dumps({1: '2'}))
+        self.assertEqual({1: '2'}, value)
 
-        pd.decode('blob')
-
-        mock_pickle.loads.assert_called_once_with('blob')
-
-    @mock.patch.object(memoize, 'pickle', autospec=True)
-    @mock.patch.object(memoize, 'sqlite3', autospec=True)
-    def test___getitem__(self, mock_sqlite3, mock_pickle):
+    def test___getitem__(self, mock_sqlite3):
         pd = memoize.PersistentDict()
         pd.make_permanent('/', 'file')
 
-        mock_pickle.dumps.return_value = 'pickled-key'
-        mock_connection = mock_sqlite3.connect.return_value
-        mock_cursor = mock_connection.cursor.return_value
-        mock_cursor.fetchone.return_value = ['pickled-value']
+        mock_conn = mock_sqlite3.return_value.__enter__.return_value
+        mock_cursor = mock_conn.cursor.return_value
+        mock_cursor.execute.reset_mock()
+        mock_cursor.fetchone.return_value = [pickle.dumps('pickled-value')]
 
-        pd[1]
+        result = pd[1]
+        self.assertEqual('pickled-value', result)
 
         mock_cursor.execute.assert_called_with(
-            'select value from cache where key=?', ('pickled-key',))
-        mock_pickle.loads.assert_called_once_with('pickled-value')
+            'select value from cache where key=?', (pickle.dumps(1),))
 
-    @mock.patch.object(memoize, 'pickle', autospec=True)
-    @mock.patch.object(memoize, 'sqlite3', autospec=True)
-    def test___setitem__(self, mock_sqlite3, mock_pickle):
+    def test___getitem__retries(self, mock_sqlite3):
         pd = memoize.PersistentDict()
         pd.make_permanent('/', 'file')
 
-        mock_pickle.dumps.side_effect = [
-            'pickled-key', 'pickled-value']
+        mock_conn = mock_sqlite3.return_value.__enter__.return_value
+        mock_cursor = mock_conn.cursor.return_value
+        mock_cursor.execute.reset_mock()
+        mock_cursor.execute.side_effect = [
+            sqlite3.OperationalError,
+            None
+        ]
+        mock_cursor.fetchone.return_value = [pickle.dumps('pickled-value')]
 
-        mock_connection = mock_sqlite3.connect.return_value
-        mock_cursor = mock_connection.cursor.return_value
+        result = pd[1]
+        self.assertEqual('pickled-value', result)
+
+        mock_cursor.execute.assert_called_with(
+            'select value from cache where key=?', (pickle.dumps(1),))
+        self.assertEqual(2, mock_cursor.execute.call_count)
+
+    def test___setitem__(self, mock_sqlite3):
+        pd = memoize.PersistentDict()
+        pd.make_permanent('/', 'file')
+
+        mock_conn = mock_sqlite3.return_value.__enter__.return_value
+        mock_cursor = mock_conn.cursor.return_value
+        mock_cursor.execute.reset_mock()
+
+        pd[1] = 2
+
+        mock_cursor.execute.assert_called_once_with(
+            'insert or replace into cache values (?, ?)',
+            (pickle.dumps(1), pickle.dumps(2)))
+
+    def test___setitem__retries(self, mock_sqlite3):
+        pd = memoize.PersistentDict()
+        pd.make_permanent('/', 'file')
+
+        mock_conn = mock_sqlite3.return_value.__enter__.return_value
+        mock_cursor = mock_conn.cursor.return_value
+        mock_cursor.execute.reset_mock()
+        mock_cursor.execute.side_effect = [
+            sqlite3.OperationalError,
+            None
+        ]
 
         pd[1] = 2
 
         mock_cursor.execute.assert_called_with(
             'insert or replace into cache values (?, ?)',
-            ('pickled-key', 'pickled-value'))
+            (pickle.dumps(1), pickle.dumps(2)))
+        self.assertEqual(2, mock_cursor.execute.call_count)
 
-    @mock.patch.object(memoize, 'pickle', autospec=True)
-    @mock.patch.object(memoize, 'sqlite3', autospec=True)
-    def test___delitem__(self, mock_sqlite3, mock_pickle):
+    def test___delitem__(self, mock_sqlite3):
         pd = memoize.PersistentDict()
         pd.make_permanent('/', 'file')
 
-        mock_pickle.dumps.return_value = 'pickled-key'
-        mock_connection = mock_sqlite3.connect.return_value
-        mock_cursor = mock_connection.cursor.return_value
+        mock_conn = mock_sqlite3.return_value.__enter__.return_value
+        mock_cursor = mock_conn.cursor.return_value
+        mock_cursor.execute.reset_mock()
 
         del pd[1]
 
-        mock_cursor.execute.assert_called_with(
-            'delete from cache where key=?', ('pickled-key',))
+        mock_cursor.execute.assert_called_once_with(
+            'delete from cache where key=?', (pickle.dumps(1),))
 
-    @mock.patch.object(memoize, 'pickle', autospec=True)
-    @mock.patch.object(memoize, 'sqlite3', autospec=True)
-    def test___iter__(self, mock_sqlite3, mock_pickle):
+    def test___delitem__fails(self, mock_sqlite3):
         pd = memoize.PersistentDict()
         pd.make_permanent('/', 'file')
 
-        mock_pickle.dumps.return_value = 'pickled-key'
-        mock_connection = mock_sqlite3.connect.return_value
-        mock_cursor = mock_connection.cursor.return_value
-        mock_cursor.fetchall.return_value = [['pickled-key']]
+        mock_conn = mock_sqlite3.return_value.__enter__.return_value
+        mock_cursor = mock_conn.cursor.return_value
+        mock_cursor.execute.reset_mock()
+        mock_cursor.rowcount = 0
 
-        for x in pd:
-            x += x
+        def _del():
+            del pd[1]
 
-        mock_cursor.execute.assert_called_with('select key from cache')
-        mock_pickle.loads.assert_called_once_with('pickled-key')
+        self.assertRaises(KeyError, _del)
 
-    @mock.patch.object(memoize, 'pickle', autospec=True)
-    @mock.patch.object(memoize, 'sqlite3', autospec=True)
-    def test___len__(self, mock_sqlite3, mock_pickle):
+        mock_cursor.execute.assert_called_once_with(
+            'delete from cache where key=?', (pickle.dumps(1),))
+
+    def test___iter__(self, mock_sqlite3):
         pd = memoize.PersistentDict()
         pd.make_permanent('/', 'file')
 
-        mock_connection = mock_sqlite3.connect.return_value
-        mock_cursor = mock_connection.cursor.return_value
+        mock_conn = mock_sqlite3.return_value.__enter__.return_value
+        mock_cursor = mock_conn.cursor.return_value
+        mock_cursor.execute.reset_mock()
+        mock_cursor.fetchall.return_value = [[pickle.dumps('pickled-key')]]
 
-        expected = 1
+        self.assertEqual(['pickled-key'], list(iter(pd)))
 
-        mock_cursor.fetchone.return_value = [expected]
+        mock_cursor.execute.assert_called_once_with('select key from cache')
 
-        self.assertEqual(expected, len(pd))
+    def test___len__(self, mock_sqlite3):
+        pd = memoize.PersistentDict()
+        pd.make_permanent('/', 'file')
 
-        mock_cursor.execute.assert_called_with('select count(*) from cache')
+        mock_conn = mock_sqlite3.return_value.__enter__.return_value
+        mock_cursor = mock_conn.cursor.return_value
+        mock_cursor.execute.reset_mock()
+        mock_cursor.fetchone.return_value = [42]
+
+        self.assertEqual(42, len(pd))
+
+        mock_cursor.execute.assert_called_once_with(
+            'select count(*) from cache')
