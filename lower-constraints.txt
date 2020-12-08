@@ -5,7 +5,7 @@ click==6.7
 coverage==4.0
 decorator==4.4.2
 deprecation==2.1.0
-docutils==0.11
+docutils==0.12
 dogpile.cache==0.9.1
 dulwich==0.15.0
 entrypoints==0.3
