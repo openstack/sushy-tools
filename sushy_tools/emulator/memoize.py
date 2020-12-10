@@ -26,6 +26,8 @@ import pickle
 import sqlite3
 import tempfile
 
+import tenacity
+
 # Python 3.8
 MutableMapping = getattr(collections, 'abc', collections).MutableMapping
 
@@ -71,6 +73,13 @@ def memoize(permanent_cache=None):
     return decorator
 
 
+_retry = tenacity.retry(
+    retry=tenacity.retry_if_exception_type(sqlite3.OperationalError),
+    wait=tenacity.wait_exponential(min=0.1, max=2, multiplier=1),
+    stop=tenacity.stop_after_delay(5),
+    reraise=True)
+
+
 class PersistentDict(MutableMapping):
     DBPATH = os.path.join(tempfile.gettempdir(), 'sushy-emulator')
 
@@ -88,8 +97,6 @@ class PersistentDict(MutableMapping):
                 '(key blob primary key not null, value blob not null)'
             )
 
-        self.update(dict(self))
-
     @staticmethod
     def encode(obj):
         return pickle.dumps(obj)
@@ -103,16 +110,10 @@ class PersistentDict(MutableMapping):
         if not self._dbpath:
             raise TypeError('Dict is not yet persistent')
 
-        connection = sqlite3.connect(self._dbpath)
-
-        try:
+        with sqlite3.connect(self._dbpath) as connection:
             yield connection.cursor()
 
-            connection.commit()
-
-        finally:
-            connection.close()
-
+    @_retry
     def __getitem__(self, key):
         key = self.encode(key)
 
@@ -128,6 +129,7 @@ class PersistentDict(MutableMapping):
 
         return self.decode(value[0])
 
+    @_retry
     def __setitem__(self, key, value):
         key = self.encode(key)
         value = self.encode(value)
@@ -138,23 +140,19 @@ class PersistentDict(MutableMapping):
                 (key, value)
             )
 
+    @_retry
     def __delitem__(self, key):
         key = self.encode(key)
 
         with self.connection() as cursor:
             cursor.execute(
-                'select count(*) from cache where key=?',
-                (key,)
-            )
-
-            if cursor.fetchone()[0] == 0:
-                raise KeyError(key)
-
-            cursor.execute(
                 'delete from cache where key=?',
                 (key,)
             )
+            if not cursor.rowcount:
+                raise KeyError(key)
 
+    @_retry
     def __iter__(self):
         with self.connection() as cursor:
             cursor.execute(
@@ -165,6 +163,7 @@ class PersistentDict(MutableMapping):
         for r in records:
             yield self.decode(r[0])
 
+    @_retry
     def __len__(self):
         with self.connection() as cursor:
             cursor.execute(
