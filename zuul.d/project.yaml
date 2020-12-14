@@ -2,7 +2,6 @@
     templates:
       - openstack-python3-wallaby-jobs
       - check-requirements
-      - openstack-lower-constraints-jobs
       - release-notes-jobs-python3
       - publish-openstack-docs-pti
     check:
