@@ -1,0 +1,4 @@
+---
+fixes:
+  - |
+    Fixes incorrect device name and bus when attaching a virtual floppy.
