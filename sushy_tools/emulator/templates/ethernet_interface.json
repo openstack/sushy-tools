@@ -2,6 +2,10 @@
     "@odata.type": "#EthernetInterface.v1_0_2.EthernetInterface",
     "Id": {{ nic['id']|string|tojson }},
     "Name": {{ "VNIC %s"|format(nic['id'])|tojson }},
+    "Status": {
+        "State": "Enabled",
+        "Health": "OK"
+    },
     "PermanentMACAddress": {{ nic['mac']|string|tojson }},
     "MACAddress": {{ nic['mac']|string|tojson }},
     "@odata.context": "/redfish/v1/$metadata#EthernetInterface.EthernetInterface",
