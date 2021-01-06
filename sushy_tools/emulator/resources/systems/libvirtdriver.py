@@ -890,6 +890,8 @@ class LibvirtDriver(AbstractSystemsDriver):
 
             if controller_type == 'ide':
                 tgt_dev, tgt_bus = self.DEVICE_TARGET_MAP[device]
+            elif lv_device == 'floppy':
+                tgt_dev, tgt_bus = ('fda', 'fdc')
             else:
                 tgt_dev, tgt_bus = ('sdc', controller_type)
 
