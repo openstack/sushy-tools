@@ -1,0 +1,32 @@
+<domain type='kvm' id='1'>
+  <name>test-node</name>
+  <uuid>da64d3a4-0b06-428b-9afb-73b4a4101bb3</uuid>
+  <memory unit='KiB'>1048576</memory>
+  <currentMemory unit='KiB'>1048576</currentMemory>
+  <vcpu placement='static'>2</vcpu>
+  <resource>
+    <partition>/machine</partition>
+  </resource>
+  <os>
+    <type arch='x86_64' machine='pc-q35-5.1'>hvm</type>
+    <boot dev='hd'/>
+  </os>
+  <features>
+    <acpi/>
+    <apic/>
+  </features>
+  <cpu match='exact'>
+    <model fallback='allow'>core2duo</model>
+    <vendor>Intel</vendor>
+    <topology sockets='1' cores='2' threads='1'/>
+    <feature policy='disable' name='lahf_lm'/>
+  </cpu>
+  <clock offset='utc'>
+    <timer name='rtc' tickpolicy='catchup'/>
+    <timer name='pit' tickpolicy='delay'/>
+    <timer name='hpet' present='no'/>
+  </clock>
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>destroy</on_crash>
+</domain>

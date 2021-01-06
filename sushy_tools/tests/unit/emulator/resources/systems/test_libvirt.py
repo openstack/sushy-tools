@@ -918,6 +918,32 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         self.assertEqual([], nics)
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_get_processors(self, libvirt_mock):
+        with open(
+                'sushy_tools/tests/unit/emulator/domain_processors.xml') as f:
+            domain_xml = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = domain_xml
+        domain_mock.maxVcpus.return_value = 2
+
+        processors = self.test_driver.get_processors(self.uuid)
+        self.assertEqual([{'cores': '2',
+                           'id': 'CPU0',
+                           'model': 'core2duo',
+                           'socket': 'CPU 0',
+                           'threads': '1',
+                           'vendor': 'Intel'},
+                          {'cores': '2',
+                           'id': 'CPU1',
+                           'model': 'core2duo',
+                           'socket': 'CPU 1',
+                           'threads': '1',
+                           'vendor': 'Intel'}],
+                         sorted(processors, key=lambda k: k['id']))
+
+    @mock.patch('libvirt.openReadOnly', autospec=True)
     def test_get_simple_storage_collection(self, libvirt_mock):
         with open('sushy_tools/tests/unit/emulator/'
                   'domain_simple_storage.xml', 'r') as f:
