@@ -3,6 +3,7 @@
     "Id": {{ identity|string|tojson }},
     "Name": {{ name|string|tojson }},
     "UUID": {{ uuid|string|tojson }},
+    "Manufacturer": "Sushy Emulator",
     "Status": {
         "State": "Enabled",
         "Health": "OK",
