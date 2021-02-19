@@ -155,6 +155,8 @@ class LibvirtDriver(AbstractSystemsDriver):
             'SUSHY_EMULATOR_BOOT_LOADER_MAP', cls.BOOT_LOADER_MAP)
         cls.KNOWN_BOOT_LOADERS = set(y for x in cls.BOOT_LOADER_MAP.values()
                                      for y in x.values())
+        cls.SUSHY_EMULATOR_IGNORE_BOOT_DEVICE = \
+            cls._config.get('SUSHY_EMULATOR_IGNORE_BOOT_DEVICE', False)
         return cls
 
     @memoize.memoize()
@@ -282,6 +284,11 @@ class LibvirtDriver(AbstractSystemsDriver):
         :returns: boot device name as `str` or `None` if device name
             can't be determined
         """
+
+        # If not setting Boot devices then just report HDD
+        if self.SUSHY_EMULATOR_IGNORE_BOOT_DEVICE:
+            return constants.DEVICE_TYPE_HDD
+
         domain = self._get_domain(identity, readonly=True)
 
         tree = ET.fromstring(domain.XMLDesc(libvirt.VIR_DOMAIN_XML_INACTIVE))
@@ -347,6 +354,15 @@ class LibvirtDriver(AbstractSystemsDriver):
 
         return boot_source_target
 
+    def _defineDomain(self, tree):
+        try:
+            with libvirt_open(self._uri) as conn:
+                conn.defineXML(ET.tostring(tree).decode('utf-8'))
+        except libvirt.libvirtError as e:
+            msg = ('Error changing boot device at libvirt URI "%(uri)s": '
+                   '%(error)s' % {'uri': self._uri, 'error': e})
+            raise error.FishyError(msg)
+
     def set_boot_device(self, identity, boot_source):
         """Get/Set computer system boot device name
 
@@ -371,6 +387,13 @@ class LibvirtDriver(AbstractSystemsDriver):
         for os_element in tree.findall('os'):
             for boot_element in os_element.findall('boot'):
                 os_element.remove(boot_element)
+
+            if self.SUSHY_EMULATOR_IGNORE_BOOT_DEVICE:
+                self._logger.warning('Ignoring setting of boot device')
+                boot_element = ET.SubElement(os_element, 'boot')
+                boot_element.set('dev', 'fd')
+                self._defineDomain(tree)
+                return
 
         target = self.DISK_DEVICE_MAP.get(boot_source)
 
@@ -426,15 +449,7 @@ class LibvirtDriver(AbstractSystemsDriver):
             boot_element = ET.SubElement(target_device_element, 'boot')
             boot_element.set('order', str(order + 1))
 
-        try:
-            with libvirt_open(self._uri) as conn:
-                conn.defineXML(ET.tostring(tree).decode('utf-8'))
-
-        except libvirt.libvirtError as e:
-            msg = ('Error changing boot device at libvirt URI "%(uri)s": '
-                   '%(error)s' % {'uri': self._uri, 'error': e})
-
-            raise error.FishyError(msg)
+        self._defineDomain(tree)
 
     def get_boot_mode(self, identity):
         """Get computer system boot mode.
