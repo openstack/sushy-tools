@@ -291,7 +291,8 @@ class LibvirtDriverTestCase(base.BaseTestCase):
                    '"52:54:00:da:ac:54" />\n      <source dev="tap-' \
                    'node-2i1" mode="vepa" />\n      <model type="vir' \
                    'tio" />\n      <address bus="0x01" domain="0x' \
-                   '0000" function="0x0" slot="0x01" type="pci" />'
+                   '0000" function="0x0" slot="0x01" type="pci" />\n    ' \
+                   '<boot order="1" /></interface>'
 
         # NOTE(rpittau): starting from Python 3.8 the tostring() function
         # preserves the attribute order specified by the user.
@@ -300,7 +301,8 @@ class LibvirtDriverTestCase(base.BaseTestCase):
                        '"52:54:00:da:ac:54" />\n      <source dev="tap-' \
                        'node-2i1" mode="vepa" />\n      <model type="vir' \
                        'tio" />\n      <address type="pci" domain="0x0000" ' \
-                       'bus="0x01" slot="0x01" function="0x0" />'
+                       'bus="0x01" slot="0x01" function="0x0" />\n    ' \
+                       '<boot order="1" /></interface>'
 
         self.assertIn(expected, conn_mock.defineXML.call_args[0][0])
 
