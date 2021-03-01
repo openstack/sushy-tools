@@ -214,6 +214,27 @@ class LibvirtDriverTestCase(base.BaseTestCase):
 
         conn_mock.defineXML.assert_called_once_with(mock.ANY)
 
+    @mock.patch('libvirt.open', autospec=True)
+    def test_set_boot_device_ignored(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/'
+                  'domain_boot_os.xml', 'r') as f:
+            data = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = data
+
+        self.test_driver.SUSHY_EMULATOR_IGNORE_BOOT_DEVICE = True
+
+        self.test_driver.set_boot_device(self.uuid, 'Hdd')
+
+        conn_mock.defineXML.assert_called_once_with(mock.ANY)
+        tree = ET.fromstring(conn_mock.defineXML.call_args[0][0])
+        self.assertEqual(1, len(tree.findall('.//boot')))
+        os_element = tree.find('os')
+        boot_element = os_element.find('boot')
+        self.assertEqual('fd', boot_element.get('dev'))
+
     @mock.patch('libvirt.openReadOnly', autospec=True)
     def test_get_boot_device_disk(self, libvirt_mock):
         with open('sushy_tools/tests/unit/emulator/'
