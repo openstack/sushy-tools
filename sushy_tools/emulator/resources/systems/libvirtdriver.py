@@ -776,28 +776,32 @@ class LibvirtDriver(AbstractSystemsDriver):
         domain = self._get_domain(identity, readonly=True)
         processors_count = self.get_total_cpus(identity)
 
-        # NOTE(rpittau) not a lot we can provide if the domain is not active
         processors = [{'id': 'CPU{0}'.format(x),
                        'socket': 'CPU {0}'.format(x)}
                       for x in range(processors_count)]
 
-        if domain.isActive():
-            tree = ET.fromstring(domain.XMLDesc())
-
+        tree = ET.fromstring(domain.XMLDesc())
+        try:
             model = tree.find('.//cpu/model').text
+        except AttributeError:
+            model = 'N/A'
+        try:
             vendor = tree.find('.//cpu/vendor').text
-            try:
-                cores = tree.find('.//cpu/topology').get('cores')
-                threads = tree.find('.//cpu/topology').get('threads')
-            except AttributeError:
-                cores = 'N/A'
-                threads = 'N/A'
+        except AttributeError:
+            vendor = 'N/A'
+        try:
+            cores = tree.find('.//cpu/topology').get('cores')
+            threads = tree.find('.//cpu/topology').get('threads')
+        except AttributeError:
+            # still return an integer as clients are expecting
+            cores = '1'
+            threads = '1'
 
-            for processor in processors:
-                processor['model'] = model
-                processor['vendor'] = vendor
-                processor['cores'] = cores
-                processor['threads'] = threads
+        for processor in processors:
+            processor['model'] = model
+            processor['vendor'] = vendor
+            processor['cores'] = cores
+            processor['threads'] = threads
 
         return processors
 
