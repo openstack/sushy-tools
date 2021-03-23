@@ -105,6 +105,7 @@ class StaticDriverTestCase(base.BaseTestCase):
         self.assertEqual('fish.iso', device_info['Image'])
         self.assertTrue(device_info['Inserted'])
         self.assertFalse(device_info['WriteProtected'])
+        self.assertEqual(local_file, device_info['_local_file'])
 
     @mock.patch.object(vmedia.StaticDriver, '_get_device', autospec=True)
     @mock.patch.object(builtins, 'open', autospec=True)

@@ -188,7 +188,7 @@ class StaticDriver(base.DriverBase):
         device_info['Image'] = local_file
         device_info['Inserted'] = inserted
         device_info['WriteProtected'] = write_protected
-        device_info['_local_file_path'] = local_file_path
+        device_info['_local_file'] = local_file_path
 
         self._devices.update({(identity, device): device_info})
 
