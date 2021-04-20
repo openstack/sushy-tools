@@ -967,6 +967,33 @@ class LibvirtDriverTestCase(base.BaseTestCase):
                          sorted(processors, key=lambda k: k['id']))
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_get_processors_notopology(self, libvirt_mock):
+        with open(
+                'sushy_tools/tests/unit/emulator/'
+                'domain_processors_notopology.xml') as f:
+            domain_xml = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = domain_xml
+        domain_mock.maxVcpus.return_value = 2
+
+        processors = self.test_driver.get_processors(self.uuid)
+        self.assertEqual([{'cores': '1',
+                           'id': 'CPU0',
+                           'model': 'N/A',
+                           'socket': 'CPU 0',
+                           'threads': '1',
+                           'vendor': 'N/A'},
+                          {'cores': '1',
+                           'id': 'CPU1',
+                           'model': 'N/A',
+                           'socket': 'CPU 1',
+                           'threads': '1',
+                           'vendor': 'N/A'}],
+                         sorted(processors, key=lambda k: k['id']))
+
+    @mock.patch('libvirt.openReadOnly', autospec=True)
     def test_get_simple_storage_collection(self, libvirt_mock):
         with open('sushy_tools/tests/unit/emulator/'
                   'domain_simple_storage.xml', 'r') as f:
