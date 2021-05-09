@@ -1,0 +1,62 @@
+{
+    "@odata.context" : "/redfish/v1/$metadata#MessageRegistry.MessageRegistry",
+    "@odata.id" : "/redfish/v1/Registries/Messages/Registry",
+    "@odata.type" : "#MessageRegistry.v1_1_1.MessageRegistry",
+    "Id": "1.1.1",
+    "Name": "Message Registry",
+    "Language": "en",
+    "RegistryVersion": "1.1.1",
+    "Description": "This registry defines the messages for Redfish",
+    "RegistryPrefix": "Msg",
+    "OwningEntity": "VendorA",
+    "Messages": {
+        "AMP0300": {
+            "Description": "None.",
+            "Message": "The system board %1 current is less than the lower warning threshold.",
+            "Severity": "Warning",
+            "NumberOfArgs": 1,
+            "ParamTypes": [
+                "string"
+             ],
+            "Resolution": "Review system power policy and review system configuration changes."
+        },
+        "BIOS001": {
+            "Description": "The command was successful.",
+            "Message": "The command was successful",
+            "Severity": "Informational",
+            "NumberOfArgs": 0,
+            "Resolution": "No response action is required."
+        },
+        "BIOS002": {
+            "Description": "Unable to allocate required memory to perform the requested operation",
+            "Message": "Resource allocation failure.",
+            "Severity": "Critical",
+            "NumberOfArgs": 0,
+            "Resolution": "Power cycle system."
+        },
+        "BIOS003": {
+            "Description": "An invalid number of arguments was passed to the method.",
+            "Message": "Missing required parameter. Refer to the inserted comment.",
+            "Severity": "Warning",
+            "NumberOfArgs": 0,
+            "Resolution": "Enter all the required command parameters. Check documentation and try again."
+        },
+        "BIOS004": {
+            "Description": "The value for the specified parameter is invalid.",
+            "Message": "Invalid parameter value for %1",
+            "Severity": "Warning",
+            "NumberOfArgs": 1,
+            "ParamTypes": [
+                "string"
+            ],
+            "Resolution": "Verify that parameter values passed to the method are entered as they appear in the enumeration and parameter data type matches the documentation."
+        },
+        "BIOS005": {
+            "Description": "The number of AttributeName and AttributeValue parameters do not match.",
+            "Message": "Mismatch in AttributeName and AttributeValue count",
+            "Severity": "Warning",
+            "NumberOfArgs": 0,
+            "Resolution": "Enter the same number of parameters for AttributeName and AttributeValue. Refer to documentation for method input parameter details."
+        }
+    }
+}

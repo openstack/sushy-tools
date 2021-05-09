@@ -26,4 +26,4 @@
     </interface>
     <graphics type='vnc' port='-1'/>
   </devices>
-<metadata><sushy:bios><sushy:attributes><sushy:attribute name="BootMode" value="Bios" /><sushy:attribute name="EmbeddedSata" value="Raid" /><sushy:attribute name="NicBoot1" value="NetworkBoot" /><sushy:attribute name="ProcTurboMode" value="Disabled" /></sushy:attributes></sushy:bios></metadata></domain>
+<metadata><sushy:bios><sushy:attributes><sushy:attribute name="BootMode" value="Bios" /><sushy:attribute name="EmbeddedSata" value="Raid" /><sushy:attribute name="NicBoot1" value="NetworkBoot" /><sushy:attribute name="ProcTurboMode" value="Disabled" /><sushy:attribute name="SecureBootStatus" value="Enabled" /><sushy:attribute name="SerialNumber" value="QPX12345" /></sushy:attributes></sushy:bios></metadata></domain>

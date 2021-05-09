@@ -800,6 +800,49 @@ def volume(identity, stg_id, vol_id):
     return 'Not Found', 404
 
 
+@app.route('/redfish/v1/Registries')
+@returns_json
+def registry_file_collection():
+    app.logger.debug('Serving registry file collection')
+
+    return flask.render_template(
+        'registry_file_collection.json')
+
+
+@app.route('/redfish/v1/Registries/BiosAttributeRegistry.v1_0_0')
+@returns_json
+def bios_attribute_registry_file():
+    app.logger.debug('Serving BIOS attribute registry file')
+
+    return flask.render_template(
+        'bios_attribute_registry_file.json')
+
+
+@app.route('/redfish/v1/Registries/Messages')
+@returns_json
+def message_registry_file():
+    app.logger.debug('Serving message registry file')
+
+    return flask.render_template(
+        'message_registry_file.json')
+
+
+@app.route('/redfish/v1/Systems/<identity>/Bios/BiosRegistry')
+@returns_json
+def bios_registry(identity):
+    app.logger.debug('Serving BIOS registry')
+
+    return flask.render_template('bios_registry.json', identity=identity)
+
+
+@app.route('/redfish/v1/Registries/Messages/Registry')
+@returns_json
+def message_registry():
+    app.logger.debug('Serving message registry')
+
+    return flask.render_template('message_registry.json')
+
+
 def parse_args():
     parser = argparse.ArgumentParser('sushy-emulator')
     parser.add_argument('--config',

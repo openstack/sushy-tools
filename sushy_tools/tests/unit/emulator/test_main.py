@@ -771,3 +771,86 @@ class StorageTestCase(EmulatorTestCase):
         self.assertEqual('Sample Volume 1', response.json['Name'])
         self.assertEqual('Mirrored', response.json['VolumeType'])
         self.assertEqual(23748, response.json['CapacityBytes'])
+
+
+class RegistryTestCase(EmulatorTestCase):
+
+    def test_registry_file_collection(self):
+        response = self.app.get('/redfish/v1/Registries')
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('/redfish/v1/Registries', response.json['@odata.id'])
+        self.assertEqual(
+            {'@odata.id': '/redfish/v1/Registries/Messages'},
+            response.json['Members'][0])
+        self.assertEqual(
+            {'@odata.id':
+                '/redfish/v1/Registries/BiosAttributeRegistry.v1_0_0'},
+            response.json['Members'][1])
+
+    def test_bios_attribute_registry_file(self):
+        response = self.app.get(
+            '/redfish/v1/Registries/BiosAttributeRegistry.v1_0_0')
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('/redfish/v1/Registries/BiosAttributeRegistry.v1_0_0',
+                         response.json['@odata.id'])
+        self.assertEqual(
+            {'Language': 'en',
+             'Uri': '/redfish/v1/Systems/Bios/BiosRegistry'},
+            response.json['Location'][0])
+
+    def test_message_registry_file(self):
+        response = self.app.get(
+            '/redfish/v1/Registries/Messages')
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('/redfish/v1/Registries/Messages',
+                         response.json['@odata.id'])
+        self.assertEqual({'Language': 'En',
+                          'Uri': '/redfish/v1/Registries/Messages/Registry'},
+                         response.json['Location'][0])
+
+    def test_bios_registry(self):
+        response = self.app.get(
+            '/redfish/v1/Systems/%s/Bios/BiosRegistry' % self.uuid)
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('/redfish/v1/Systems/%s/Bios/BiosRegistry'
+                         % self.uuid,
+                         response.json['@odata.id'])
+        self.assertEqual('BIOS Attribute Registry',
+                         response.json['Name'])
+        self.assertEqual('BiosAttributeRegistryP89.v1_0_0',
+                         response.json['Id'])
+        entries = response.json['RegistryEntries']
+        self.assertEqual(len(entries['Attributes']), 6)
+        self.assertEqual({'AttributeName': 'ProcTurboMode',
+                          'CurrentValue': None,
+                          'DisplayName': 'Turbo Boost',
+                          'HelpText': 'Governs the Turbo Boost Technology. '
+                          'This feature allows the processor cores to be '
+                          'automatically clocked up in frequency beyond the '
+                          'advertised processor speed.',
+                          'Hidden': False,
+                          'Immutable': False,
+                          'ReadOnly': False,
+                          'Type': 'Enumeration',
+                          'Value': [{'ValueDisplayName': 'Enabled',
+                                     'ValueName': 'Enabled'},
+                                    {'ValueDisplayName': 'Disabled',
+                                     'ValueName': 'Disabled'}],
+                          'WarningText': None,
+                          'WriteOnly': False},
+                         entries['Attributes'][0])
+
+    def test_message_registry(self):
+        response = self.app.get('/redfish/v1/Registries/Messages/Registry')
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('/redfish/v1/Registries/Messages/Registry',
+                         response.json['@odata.id'])
+        self.assertEqual('Message Registry', response.json['Name'])
+        self.assertEqual('1.1.1', response.json['Id'])
+        messages = response.json['Messages']
+        self.assertEqual({"Description": "The command was successful.",
+                          "Message": "The command was successful",
+                          "Severity": "Informational",
+                          "NumberOfArgs": 0,
+                          "Resolution": "No response action is required."},
+                         messages['BIOS001'])

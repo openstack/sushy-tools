@@ -1,0 +1,20 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#MessageRegistryFile.MessageRegistryFile",
+    "@odata.id": "/redfish/v1/Registries/Messages",
+    "@odata.type": "#MessageRegistryFile.v1_1_1.MessageRegistryFile",
+    "Description": "Message Registry File locations",
+    "Id": "Messages",
+    "Languages": [
+        "En"
+    ],
+    "Languages@odata.count": 1,
+    "Location": [
+        {
+            "Language": "En",
+            "Uri": "/redfish/v1/Registries/Messages/Registry"
+        }
+    ],
+    "Location@odata.count": 1,
+    "Name": "Message Registry File",
+    "Registry": "Base.1.0"
+}
