@@ -140,12 +140,16 @@ class StaticDriver(base.DriverBase):
         :raises: `FishyError` if image can't be manipulated
         """
         device_info = self._get_device(identity, device)
+        verify_media_cert = self._config.get(
+            'SUSHY_EMULATOR_VMEDIA_VERIFY_SSL', True)
 
         try:
             with tempfile.NamedTemporaryFile(
                     mode='w+b', delete=False) as tmp_file:
 
-                with requests.get(image_url, stream=True) as rsp:
+                with requests.get(image_url,
+                                  stream=True,
+                                  verify=verify_media_cert) as rsp:
 
                     with open(tmp_file.name, 'wb') as fl:
 
