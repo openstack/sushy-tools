@@ -602,7 +602,7 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         volume_mock.upload.assert_called_once_with(mock.ANY, 0, mock.ANY)
 
         expected_disk = ('<disk device="cdrom" type="file">'
-                         '<target bus="sata" dev="sdc" />'
+                         '<target bus="sata" dev="sdx" />'
                          '<address bus="0" controller="0" '
                          'target="0" type="drive" unit="0" />')
 
@@ -610,7 +610,7 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         # preserves the attribute order specified by the user.
         if sys.version_info[1] >= 8:
             expected_disk = ('<disk type="file" device="cdrom">'
-                             '<target dev="sdc" bus="sata" />'
+                             '<target dev="sdx" bus="sata" />'
                              '<address type="drive" controller="0"'
                              ' bus="0" target="0" unit="0" />')
         self.assertEqual(1, conn_mock.defineXML.call_count)
@@ -655,7 +655,7 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         volume_mock.upload.assert_called_once_with(mock.ANY, 0, mock.ANY)
 
         expected_disk = ('<disk device="cdrom" type="file">'
-                         '<target bus="sata" dev="sdc" />'
+                         '<target bus="sata" dev="sdx" />'
                          '<address bus="0" controller="0" '
                          'target="0" type="drive" unit="1" />')
 
@@ -663,7 +663,7 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         # preserves the attribute order specified by the user.
         if sys.version_info[1] >= 8:
             expected_disk = ('<disk type="file" device="cdrom">'
-                             '<target dev="sdc" bus="sata" />'
+                             '<target dev="sdx" bus="sata" />'
                              '<address type="drive" controller="0"'
                              ' bus="0" target="0" unit="1" />')
         self.assertEqual(1, conn_mock.defineXML.call_count)
@@ -708,7 +708,7 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         volume_mock.upload.assert_called_once_with(mock.ANY, 0, mock.ANY)
 
         expected_disk = ('<disk device="cdrom" type="file">'
-                         '<target bus="scsi" dev="sdc" />'
+                         '<target bus="scsi" dev="sdx" />'
                          '<address bus="0" controller="0" '
                          'target="0" type="drive" unit="1" />')
 
@@ -716,7 +716,7 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         # preserves the attribute order specified by the user.
         if sys.version_info[1] >= 8:
             expected_disk = ('<disk type="file" device="cdrom">'
-                             '<target dev="sdc" bus="scsi" />'
+                             '<target dev="sdx" bus="scsi" />'
                              '<address type="drive" controller="0"'
                              ' bus="0" target="0" unit="1" />')
 

@@ -951,7 +951,7 @@ class LibvirtDriver(AbstractSystemsDriver):
             elif lv_device == 'floppy':
                 tgt_dev, tgt_bus = ('fda', 'fdc')
             else:
-                tgt_dev, tgt_bus = ('sdc', controller_type)
+                tgt_dev, tgt_bus = ('sdx', controller_type)
 
             # Enumerate existing disks to find a free unit on the bus
 
