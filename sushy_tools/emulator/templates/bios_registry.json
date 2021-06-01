@@ -1,0 +1,137 @@
+{
+  "@odata.context": "/redfish/v1/$metadata#AttributeRegistry.AttributeRegistry",
+  "@odata.id": {{ "/redfish/v1/Systems/%s/Bios/BiosRegistry"|format(identity)|tojson }},
+  "@odata.type": "#AttributeRegistry.v1_1_1.AttributeRegistry",
+  "Description": "This registry defines a representation of BIOS Attribute instances",
+  "Id": "BiosAttributeRegistryP89.v1_0_0",
+  "Language": "en",
+  "Name": "BIOS Attribute Registry",
+  "OwningEntity": "VendorA",
+  "RegistryVersion": "1.1.1",
+  "RegistryEntries": {
+    "Attributes": [
+      {
+        "AttributeName": "ProcTurboMode",
+        "CurrentValue": null,
+        "DisplayName": "Turbo Boost",
+        "HelpText": "Governs the Turbo Boost Technology. This feature allows the processor cores to be automatically clocked up in frequency beyond the advertised processor speed.",
+        "Hidden": false,
+        "Immutable": false,
+        "ReadOnly": false,
+        "Type": "Enumeration",
+        "Value": [
+          {
+            "ValueDisplayName": "Enabled",
+            "ValueName": "Enabled"
+          },
+          {
+            "ValueDisplayName": "Disabled",
+            "ValueName": "Disabled"
+          }
+        ],
+        "WarningText": null,
+        "WriteOnly": false
+      },
+      {
+        "AttributeName": "BootMode",
+        "CurrentValue": null,
+        "DisplayName": "Boot Mode",
+        "HelpText": "This field determines the boot mode of the system.\n\nSelecting 'UEFI' enables booting to Unified Extensible Firmware Interface (UEFI) capable operating systems.\n\nSelecting 'BIOS' (the default) ensures compatibility with operating systems that do not support UEFI.",
+        "Hidden": false,
+        "Immutable": false,
+        "ReadOnly": false,
+        "Type": "Enumeration",
+        "Value": [
+          {
+            "ValueDisplayName": "BIOS",
+            "ValueName": "Bios"
+          },
+          {
+            "ValueDisplayName": "UEFI",
+            "ValueName": "Uefi"
+          }
+        ],
+        "WarningText": null,
+        "WriteOnly": false
+      },
+      {
+        "AttributeName": "EmbeddedSata",
+        "CurrentValue": null,
+        "DisplayName": "Embedded SATA",
+        "HelpText": "Allows the Embedded SATA to be set to Off, ATA, AHCI or RAID Mode.",
+        "Hidden": false,
+        "Immutable": false,
+        "ReadOnly": false,
+        "Type": "Enumeration",
+        "Value": [
+          {
+            "ValueDisplayName": "ATA Mode",
+            "ValueName": "Ata"
+          },
+          {
+            "ValueDisplayName": "AHCI Mode",
+            "ValueName": "Ahci"
+          },
+          {
+            "ValueDisplayName": "RAID Mode",
+            "ValueName": "Raid"
+          },
+          {
+            "ValueDisplayName": "Off",
+            "ValueName": "Off"
+          }
+        ],
+        "WarningText": null,
+        "WriteOnly": false
+      },
+      {
+        "AttributeName": "NicBoot1",
+        "DisplayName": "Embedded NIC 1 Boot",
+        "HelpText": "Use this option to enable or disable network boot (PXE, iSCSI, FCoE or UEFI HTTP) for the selected NIC. You might need to configure the NIC firmware for the boot option to be active.",
+        "ReadOnly": false,
+        "Type": "Enumeration",
+        "CurrentValue": null,
+        "Value": [
+          {
+            "ValueName": "NetworkBoot",
+            "ValueDisplayName": "Network Boot"
+          },
+          {
+            "ValueName": "Disabled",
+            "ValueDisplayName": "Disabled"
+          }
+        ]
+      },
+      {
+        "AttributeName": "SecureBootStatus",
+        "DisplayName": "Secure Boot Status",
+        "HelpText": "The current state of Secure Boot configuration.",
+        "ReadOnly": true,
+        "Immutable": true,
+        "Type": "Enumeration",
+        "CurrentValue": null,
+        "Value": [
+          {
+             "ValueName": "Enabled",
+             "ValueDisplayName": "Enabled"
+          },
+          {
+             "ValueName": "Disabled",
+             "ValueDisplayName": "Disabled"
+          }
+        ]
+      },
+      {
+        "AttributeName": "SerialNumber",
+        "DisplayName": "Serial Number",
+        "HelpText": "Use this option to set the system serial number.",
+        "ReadOnly": false,
+        "MaxLength": 16,
+        "MinLength": 0,
+        "Type": "String",
+        "CurrentValue": null,
+        "IsSystemUniqueProperty": true
+      }
+    ]
+  }
+}

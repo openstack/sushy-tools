@@ -127,7 +127,9 @@ class LibvirtDriver(AbstractSystemsDriver):
     DEFAULT_BIOS_ATTRIBUTES = {"BootMode": "Uefi",
                                "EmbeddedSata": "Raid",
                                "NicBoot1": "NetworkBoot",
-                               "ProcTurboMode": "Enabled"}
+                               "ProcTurboMode": "Enabled",
+                               "SecureBootStatus": "Enabled",
+                               "SerialNumber": "QPX12345"}
 
     STORAGE_POOL = 'default'
 

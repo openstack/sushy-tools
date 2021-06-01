@@ -805,7 +805,9 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         self.assertEqual({"BootMode": "Bios",
                           "EmbeddedSata": "Raid",
                           "NicBoot1": "NetworkBoot",
-                          "ProcTurboMode": "Disabled"},
+                          "ProcTurboMode": "Disabled",
+                          "SecureBootStatus": "Enabled",
+                          "SerialNumber": "QPX12345"},
                          bios_attributes)
         conn_mock.defineXML.assert_not_called()
 
@@ -871,7 +873,9 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         self.assertEqual({"BootMode": "Bios",
                           "EmbeddedSata": "Raid",
                           "NicBoot1": "NetworkBoot",
-                          "ProcTurboMode": "Disabled"},
+                          "ProcTurboMode": "Disabled",
+                          "SecureBootStatus": "Enabled",
+                          "SerialNumber": "QPX12345"},
                          result.bios_attributes)
         self._assert_bios_xml(result.tree)
 
