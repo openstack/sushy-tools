@@ -810,10 +810,9 @@ class RegistryTestCase(EmulatorTestCase):
 
     def test_bios_registry(self):
         response = self.app.get(
-            '/redfish/v1/Systems/%s/Bios/BiosRegistry' % self.uuid)
+            '/redfish/v1/Systems/Bios/BiosRegistry')
         self.assertEqual(200, response.status_code)
-        self.assertEqual('/redfish/v1/Systems/%s/Bios/BiosRegistry'
-                         % self.uuid,
+        self.assertEqual('/redfish/v1/Systems/Bios/BiosRegistry',
                          response.json['@odata.id'])
         self.assertEqual('BIOS Attribute Registry',
                          response.json['Name'])

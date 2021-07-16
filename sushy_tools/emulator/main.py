@@ -827,12 +827,12 @@ def message_registry_file():
         'message_registry_file.json')
 
 
-@app.route('/redfish/v1/Systems/<identity>/Bios/BiosRegistry')
+@app.route('/redfish/v1/Systems/Bios/BiosRegistry')
 @returns_json
-def bios_registry(identity):
+def bios_registry():
     app.logger.debug('Serving BIOS registry')
 
-    return flask.render_template('bios_registry.json', identity=identity)
+    return flask.render_template('bios_registry.json')
 
 
 @app.route('/redfish/v1/Registries/Messages/Registry')

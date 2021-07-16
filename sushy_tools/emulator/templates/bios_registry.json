@@ -1,6 +1,6 @@
 {
   "@odata.context": "/redfish/v1/$metadata#AttributeRegistry.AttributeRegistry",
-  "@odata.id": {{ "/redfish/v1/Systems/%s/Bios/BiosRegistry"|format(identity)|tojson }},
+  "@odata.id": "/redfish/v1/Systems/Bios/BiosRegistry",
   "@odata.type": "#AttributeRegistry.v1_1_1.AttributeRegistry",
   "Description": "This registry defines a representation of BIOS Attribute instances",
   "Id": "BiosAttributeRegistryP89.v1_0_0",

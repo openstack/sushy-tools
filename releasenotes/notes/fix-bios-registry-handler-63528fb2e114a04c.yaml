@@ -1,0 +1,7 @@
+---
+fixes:
+  - |
+    Fixes a bug in the handler for Bios/BiosRegistry - it should not include
+    identity in order to match the url returned from
+    bios_attribute_registry_file.json and be consistent with actual vendor
+    responses.
