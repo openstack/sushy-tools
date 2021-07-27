@@ -16,6 +16,7 @@ from unittest import mock
 from oslotest import base
 
 from sushy_tools.emulator import main
+from sushy_tools.emulator.resources import vmedia
 from sushy_tools import error
 
 
@@ -491,19 +492,42 @@ class VirtualMediaTestCase(EmulatorTestCase):
         vmedia_mock.get_device_name.return_value = 'CD'
         vmedia_mock.get_device_media_types.return_value = [
             'CD', 'DVD']
-        vmedia_mock.get_device_image_info.return_value = [
-            'image-of-a-fish', 'fishy.iso', True, True]
+        vmedia_mock.get_device_image_info.return_value = vmedia.DeviceInfo(
+            'image-of-a-fish', 'fishy.iso', True, True, '', '')
 
         response = self.app.get(
             '/redfish/v1/Managers/%s/VirtualMedia/CD' % self.uuid)
 
-        self.assertEqual(200, response.status_code)
+        self.assertEqual(200, response.status_code, response.json)
         self.assertEqual('CD', response.json['Id'])
         self.assertEqual(['CD', 'DVD'], response.json['MediaTypes'])
         self.assertEqual('fishy.iso', response.json['Image'])
         self.assertEqual('image-of-a-fish', response.json['ImageName'])
         self.assertTrue(response.json['Inserted'])
         self.assertTrue(response.json['WriteProtected'])
+        self.assertEqual('', response.json['UserName'])
+        self.assertEqual('', response.json['Password'])
+
+    def test_virtual_media_with_auth(self, managers_mock, vmedia_mock):
+        vmedia_mock = vmedia_mock.return_value
+        vmedia_mock.get_device_name.return_value = 'CD'
+        vmedia_mock.get_device_media_types.return_value = [
+            'CD', 'DVD']
+        vmedia_mock.get_device_image_info.return_value = vmedia.DeviceInfo(
+            'image-of-a-fish', 'fishy.iso', True, True, 'Admin', 'Secret')
+
+        response = self.app.get(
+            '/redfish/v1/Managers/%s/VirtualMedia/CD' % self.uuid)
+
+        self.assertEqual(200, response.status_code, response.json)
+        self.assertEqual('CD', response.json['Id'])
+        self.assertEqual(['CD', 'DVD'], response.json['MediaTypes'])
+        self.assertEqual('fishy.iso', response.json['Image'])
+        self.assertEqual('image-of-a-fish', response.json['ImageName'])
+        self.assertTrue(response.json['Inserted'])
+        self.assertTrue(response.json['WriteProtected'])
+        self.assertEqual('Admin', response.json['UserName'])
+        self.assertEqual('******', response.json['Password'])
 
     def test_virtual_media_not_found(self, managers_mock, vmedia_mock):
         vmedia_mock.return_value.get_device_name.side_effect = error.FishyError
