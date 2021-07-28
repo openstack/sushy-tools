@@ -85,6 +85,17 @@
         "WriteOnly": false
       },
       {
+        "AttributeName": "L2Cache",
+        "DisplayName": "Serial Number",
+        "HelpText": "This field displays the amount of memory in the corresponding processor cache.",
+        "ReadOnly": false,
+        "MaxLength": 16,
+        "MinLength": 0,
+        "Type": "String",
+        "CurrentValue": null,
+        "IsSystemUniqueProperty": false
+      },
+      {
         "AttributeName": "NicBoot1",
         "DisplayName": "Embedded NIC 1 Boot",
         "HelpText": "Use this option to enable or disable network boot (PXE, iSCSI, FCoE or UEFI HTTP) for the selected NIC. You might need to configure the NIC firmware for the boot option to be active.",
@@ -101,6 +112,26 @@
             "ValueDisplayName": "Disabled"
           }
         ]
+      },
+      {
+        "AttributeName": "NumCores",
+        "DisplayName": "Number Cores",
+        "HelpText": "This field displays the number of cores in the processor package.",
+        "ReadOnly": true,
+        "LowerBound": 10,
+        "UpperBound": 20,
+        "Type": "Integer",
+        "CurrentValue": null,
+        "IsSystemUniqueProperty": false
+      },
+      {
+        "AttributeName": "QuietBoot",
+        "DisplayName": "Quiet Boot",
+        "HelpText": "Set the option for Quiet Boot.",
+        "ReadOnly": false,
+        "Type": "Boolean",
+        "CurrentValue": null,
+        "IsSystemUniqueProperty": false
       },
       {
         "AttributeName": "SecureBootStatus",
@@ -131,6 +162,15 @@
         "Type": "String",
         "CurrentValue": null,
         "IsSystemUniqueProperty": true
+      },
+      {
+        "AttributeName": "SysPassword",
+        "DisplayName": "System Password",
+        "HelpText": "The system password is the password that must be entered to allow the system to boot to an operating system.",
+        "ReadOnly": false,
+        "Type": "Password",
+        "CurrentValue": null,
+        "IsSystemUniqueProperty": false
       }
     ]
   }

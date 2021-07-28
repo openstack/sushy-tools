@@ -819,7 +819,7 @@ class RegistryTestCase(EmulatorTestCase):
         self.assertEqual('BiosAttributeRegistryP89.v1_0_0',
                          response.json['Id'])
         entries = response.json['RegistryEntries']
-        self.assertEqual(len(entries['Attributes']), 6)
+        self.assertEqual(len(entries['Attributes']), 10)
         self.assertEqual({'AttributeName': 'ProcTurboMode',
                           'CurrentValue': None,
                           'DisplayName': 'Turbo Boost',
