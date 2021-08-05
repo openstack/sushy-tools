@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Supports HTTP basic authentication of Redfish endpoints. Set the new
+    ``SUSHY_EMULATOR_AUTH_FILE`` variable to the path of an htpasswd file.
