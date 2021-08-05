@@ -1,0 +1,4 @@
+---
+fixes:
+  - |
+    Returns the correct status code (404) when a URL is not found.

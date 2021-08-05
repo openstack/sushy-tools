@@ -167,6 +167,7 @@ def all_exception_handler(message):
         url = flask.url_for(flask.request.endpoint, identity=message.args[0])
         return flask.redirect(url, code=307, Response=flask.Response)
 
+    code = getattr(message, 'code', 500)
     if (isinstance(message, error.FishyError)
             or isinstance(message, wz_exc.HTTPException)):
         app.logger.debug(
@@ -175,7 +176,7 @@ def all_exception_handler(message):
         app.logger.exception(
             'Unexpected %s: %s', message.__class__.__name__, message)
 
-    return flask.render_template('error.json', message=message), 500
+    return flask.render_template('error.json', message=message), code
 
 
 @app.route('/redfish/v1/')
