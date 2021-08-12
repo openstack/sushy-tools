@@ -1,0 +1,14 @@
+Flask==1.0.2
+coverage==4.0
+ironic-lib==4.6.1
+libvirt-python==6.0.0
+munch==2.1.0
+openstacksdk==0.13.0
+oslotest==3.2.0
+pbr==2.0.0
+python-subunit==1.0.0
+requests==2.14.2
+stestr==1.0.0
+tenacity==6.2.0
+testscenarios==0.4
+testtools==2.2.0
