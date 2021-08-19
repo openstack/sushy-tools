@@ -17,6 +17,10 @@
 class FishyError(Exception):
     """Create generic sushy-tools exception object"""
 
+    def __init__(self, msg='Unknown error', code=500):
+        super().__init__(msg)
+        self.code = code
+
 
 class AliasAccessError(FishyError):
     """Node access attempted via an alias, not UUID"""
