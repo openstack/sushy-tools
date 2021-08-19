@@ -9,6 +9,8 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+
+import tempfile
 from unittest import mock
 
 from oslotest import base
@@ -49,6 +51,37 @@ class CommonTestCase(EmulatorTestCase):
         response = self.app.get('/redfish/v1/')
         self.assertEqual(200, response.status_code)
         self.assertEqual('RedvirtService', response.json['Id'])
+
+
+TEST_PASSWD = \
+    b"admin:$2y$05$mYl8KMwM94l4LR/sw1teIeA6P2u8gfX16e8wvT7NmGgAM5r9jgLl."
+
+
+class AuthenticatedTestCase(base.BaseTestCase):
+
+    def setUp(self):
+        super().setUp()
+        self.auth_file = tempfile.NamedTemporaryFile()
+        self.auth_file.write(TEST_PASSWD)
+        self.auth_file.flush()
+        self.addCleanup(self.auth_file.close)
+        app = main.Application({
+            'SUSHY_EMULATOR_AUTH_FILE': self.auth_file.name})
+        self.app = app.test_client()
+
+    def test_root_resource(self):
+        response = self.app.get('/redfish/v1/')
+        # 404 because this application does not have any routes
+        self.assertEqual(404, response.status_code, response.data)
+
+    def test_authenticated_resource(self):
+        response = self.app.get('/redfish/v1/Systems/',
+                                auth=('admin', 'password'))
+        self.assertEqual(404, response.status_code, response.data)
+
+    def test_authentication_failed(self):
+        response = self.app.get('/redfish/v1/Systems/')
+        self.assertEqual(401, response.status_code, response.data)
 
 
 class ChassisTestCase(EmulatorTestCase):

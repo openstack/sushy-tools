@@ -22,6 +22,7 @@ import ssl
 import sys
 
 import flask
+from ironic_lib import auth_basic
 from werkzeug import exceptions as wz_exc
 
 from sushy_tools.emulator import memoize
@@ -38,15 +39,54 @@ from sushy_tools import error
 from sushy_tools.error import FishyError
 
 
+def _render_error(message):
+    return {
+        "error": {
+            "code": "Base.1.0.GeneralError",
+            "message": message,
+            "@Message.ExtendedInfo": [
+                {
+                    "@odata.type": ("/redfish/v1/$metadata"
+                                    "#Message.1.0.0.Message"),
+                    "MessageId": "Base.1.0.GeneralError"
+                }
+            ]
+        }
+    }
+
+
+class RedfishAuthMiddleware(auth_basic.BasicAuthMiddleware):
+
+    _EXCLUDE_PATHS = frozenset(['', 'redfish', 'redfish/v1'])
+
+    def __call__(self, env, start_response):
+        path = env.get('PATH_INFO', '')
+        if path.strip('/') in self._EXCLUDE_PATHS:
+            return self.app(env, start_response)
+        else:
+            return super().__call__(env, start_response)
+
+    def format_exception(self, e):
+        response = super().format_exception(e)
+        response.json_body = _render_error(str(e))
+        return response
+
+
 class Application(flask.Flask):
 
-    def __init__(self):
+    def __init__(self, extra_config=None):
         super().__init__(__name__)
         # Turn off strict_slashes on all routes
         self.url_map.strict_slashes = False
         config_file = os.environ.get('SUSHY_EMULATOR_CONFIG')
         if config_file:
             self.config.from_pyfile(config_file)
+        if extra_config:
+            self.config.update(extra_config)
+
+        auth_file = self.config.get("SUSHY_EMULATOR_AUTH_FILE")
+        if auth_file:
+            self.wsgi_app = RedfishAuthMiddleware(self.wsgi_app, auth_file)
 
     @property
     @memoize.memoize()
