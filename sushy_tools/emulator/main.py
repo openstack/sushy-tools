@@ -434,7 +434,64 @@ def virtual_media_resource(identity, device):
         write_protected=device_info.write_protected,
         username=device_info.username,
         password=device_info.password,
+        verify_certificate=device_info.verify,
     )
+
+
+@app.route(
+    '/redfish/v1/Managers/<identity>/VirtualMedia/<device>',
+    methods=['PATCH'])
+@returns_json
+def virtual_media_patch(identity, device):
+    if not flask.request.json:
+        raise error.BadRequest("Empty or malformed patch")
+
+    app.logger.debug('Updating virtual media %s at manager "%s"',
+                     device, identity)
+
+    verify = flask.request.json.get('VerifyCertificate')
+    if verify is not None:
+        if not isinstance(verify, bool):
+            raise error.BadRequest("VerifyCertificate must be a boolean")
+
+        try:
+            app.vmedia.update_device_info(identity, device, verify=verify)
+        except error.FishyError as ex:
+            app.logger.warning(
+                'Virtual media %s at manager %s error: '
+                '%s', device, identity, ex)
+            raise error.NotFound("Virtual media device not found")
+
+        return '', 204
+    else:
+        raise error.BadRequest("Empty or malformed patch")
+
+
+@app.route(
+    '/redfish/v1/Managers/<identity>/VirtualMedia/<device>/Certificates',
+    methods=['GET'])
+@returns_json
+def virtual_media_certificates(identity, device):
+    location = \
+        f'/redfish/v1/Managers/{identity}/VirtualMedia/{device}/Certificates'
+    return flask.render_template(
+        'certificate_collection.json',
+        location=location,
+        # TODO(dtantsur): implement
+        certificates=[],
+    )
+
+
+@app.route(
+    '/redfish/v1/Managers/<identity>/VirtualMedia/<device>/Certificates',
+    methods=['POST'])
+@returns_json
+def virtual_media_add_certificate(identity, device):
+    if not flask.request.json:
+        raise error.BadRequest("Empty or malformed certificate")
+
+    # TODO(dtantsur): implement
+    raise error.NotSupportedError("Not implemented")
 
 
 @app.route('/redfish/v1/Managers/<identity>/VirtualMedia/<device>'

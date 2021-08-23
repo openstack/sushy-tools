@@ -1,0 +1,18 @@
+{
+    "@odata.type": "#CertificateCollection.CertificateCollection",
+    "Name": "Certificate Collection",
+    "Members@odata.count": {{ certificates|length }},
+    "Members": [
+        {% for item in certificates %}
+            {
+                "@odata.id": {{ "%s/%s"|format(location, item)|tojson }}
+            }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ],
+    "@Redfish.SupportedCertificates": [
+        "PEM"
+    ],
+    "Oem": {},
+    "@odata.id": {{ location|tojson }},
+    "@Redfish.Copyright": "Copyright 2014-2021 DMTF. For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+}

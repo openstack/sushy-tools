@@ -29,7 +29,7 @@ from sushy_tools import error
 DeviceInfo = collections.namedtuple(
     'DeviceInfo',
     ['image_name', 'image_url', 'inserted', 'write_protected',
-     'username', 'password'])
+     'username', 'password', 'verify'])
 
 
 class StaticDriver(base.DriverBase):
@@ -135,7 +135,20 @@ class StaticDriver(base.DriverBase):
                           device_info.get('Inserted', False),
                           device_info.get('WriteProtected', False),
                           device_info.get('UserName', ''),
-                          device_info.get('Password', ''))
+                          device_info.get('Password', ''),
+                          device_info.get('Verify', False))
+
+    def update_device_info(self, identity, device, verify=False):
+        """Update the virtual media device
+
+        :param identity: parent resource ID
+        :param device: device name
+        :param verify: new value for VerifyCertificate
+        :raises: `error.FishyError`
+        """
+        device_info = self._get_device(identity, device)
+        device_info['Verify'] = verify
+        self._devices[(identity, device)] = device_info
 
     def _write_from_response(self, image_url, rsp, tmp_file):
         with open(tmp_file.name, 'wb') as fl:
@@ -175,8 +188,11 @@ class StaticDriver(base.DriverBase):
         :raises: `FishyError` if image can't be manipulated
         """
         device_info = self._get_device(identity, device)
-        verify_media_cert = self._config.get(
-            'SUSHY_EMULATOR_VMEDIA_VERIFY_SSL', True)
+        verify_media_cert = device_info.get(
+            'Verify',
+            # NOTE(dtantsur): it's de facto standard for Redfish to default
+            # to no certificate validation.
+            self._config.get('SUSHY_EMULATOR_VMEDIA_VERIFY_SSL', False))
         auth = (username, password) if (username and password) else None
 
         try:
