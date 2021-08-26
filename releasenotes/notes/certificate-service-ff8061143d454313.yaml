@@ -1,0 +1,4 @@
+---
+features:
+  - |
+    Adds basic support for custom TLS certificates with virtual media.

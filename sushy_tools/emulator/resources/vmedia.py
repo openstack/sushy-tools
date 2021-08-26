@@ -30,6 +30,11 @@ DeviceInfo = collections.namedtuple(
     'DeviceInfo',
     ['image_name', 'image_url', 'inserted', 'write_protected',
      'username', 'password', 'verify'])
+Certificate = collections.namedtuple(
+    'Certificate',
+    ['id', 'string', 'type_'])
+
+_CERT_ID = "Default"
 
 
 class StaticDriver(base.DriverBase):
@@ -150,6 +155,47 @@ class StaticDriver(base.DriverBase):
         device_info['Verify'] = verify
         self._devices[(identity, device)] = device_info
 
+    def add_certificate(self, identity, device, cert_string, cert_type):
+        device_info = self._get_device(identity, device)
+
+        if "Certificate" in device_info:
+            raise error.FishyError("Virtual media certificate already exists",
+                                   code=409)
+
+        device_info["Certificate"] = {'Type': cert_type, 'String': cert_string}
+        self._devices[(identity, device)] = device_info
+
+        return Certificate(_CERT_ID, cert_string, cert_type)
+
+    def replace_certificate(self, identity, device, cert_id,
+                            cert_string, cert_type):
+        device_info = self._get_device(identity, device)
+        if cert_id != _CERT_ID or "Certificate" not in device_info:
+            raise error.NotFound(f"Certificate {cert_id} not found")
+
+        device_info["Certificate"] = {'Type': cert_type, 'String': cert_string}
+        self._devices[(identity, device)] = device_info
+
+        return Certificate(_CERT_ID, cert_string, cert_type)
+
+    def list_certificates(self, identity, device):
+        device_info = self._get_device(identity, device)
+        try:
+            certificate = device_info["Certificate"]
+        except KeyError:
+            return []
+
+        return [Certificate(_CERT_ID, certificate['String'],
+                            certificate['Type'])]
+
+    def delete_certificate(self, identity, device, cert_id):
+        device_info = self._get_device(identity, device)
+        if cert_id != _CERT_ID or "Certificate" not in device_info:
+            raise error.NotFound(f"Certificate {cert_id} not found")
+
+        del device_info["Certificate"]
+        self._devices[(identity, device)] = device_info
+
     def _write_from_response(self, image_url, rsp, tmp_file):
         with open(tmp_file.name, 'wb') as fl:
             for chunk in rsp.iter_content(chunk_size=8192):
@@ -193,7 +239,27 @@ class StaticDriver(base.DriverBase):
             # NOTE(dtantsur): it's de facto standard for Redfish to default
             # to no certificate validation.
             self._config.get('SUSHY_EMULATOR_VMEDIA_VERIFY_SSL', False))
+        custom_cert = None
+        if verify_media_cert:
+            try:
+                custom_cert = device_info['Certificate']['String']
+            except KeyError:
+                self._logger.debug(
+                    'TLS verification is enabled but not custom certificate '
+                    'is provided, using built-in CA for manager %s, virtual '
+                    'media device %s', identity, device)
+            else:
+                self._logger.debug(
+                    'Using a custom TLS certificate for manager %s, virtual '
+                    'media device %s', identity, device)
+
         auth = (username, password) if (username and password) else None
+
+        if custom_cert is not None:
+            custom_cert_file = tempfile.NamedTemporaryFile(mode='wt')
+            custom_cert_file.write(custom_cert)
+            custom_cert_file.flush()
+            verify_media_cert = custom_cert_file.name
 
         try:
             with requests.get(image_url,
@@ -229,6 +295,9 @@ class StaticDriver(base.DriverBase):
             msg = 'Failed fetching image from URL %s: %s' % (image_url, ex)
             self._logger.exception(msg)
             raise error.FishyError(msg)
+        finally:
+            if custom_cert is not None:
+                custom_cert_file.close()
 
         self._logger.debug(
             'Fetched image %(file)s for %(identity)s' % {

@@ -1,8 +1,8 @@
 {
-    "@odata.type": "#ServiceRoot.v1_0_2.ServiceRoot",
+    "@odata.type": "#ServiceRoot.v1_5_0.ServiceRoot",
     "Id": "RedvirtService",
     "Name": "Redvirt Service",
-    "RedfishVersion": "1.0.2",
+    "RedfishVersion": "1.5.0",
     "UUID": "85775665-c110-4b85-8989-e6162170b3ec",
     "Systems": {
         "@odata.id": "/redfish/v1/Systems"
@@ -12,6 +12,9 @@
     },
     "Registries": {
         "@odata.id": "/redfish/v1/Registries"
+    },
+    "CertificateService": {
+        "@odata.id": "/redfish/v1/CertificateService"
     },
     "@odata.id": "/redfish/v1/",
     "@Redfish.Copyright": "Copyright 2014-2016 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."

@@ -1,0 +1,10 @@
+{
+    "@odata.type": "#Certificate.v1_3_0.Certificate",
+    "Id": {{ cert_id|string|tojson }},
+    "Name": "HTTPS Certificate {{ cert_id }}",
+    "CertificateString": {{ cert_string|string|tojson }},
+    "CertificateType": {{ cert_type|string|tojson }},
+    "Oem": {},
+    "@odata.id": {{ location|string|tojson }},
+    "@Redfish.Copyright": "Copyright 2014-2021 DMTF. For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+}
