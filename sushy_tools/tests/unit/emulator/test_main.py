@@ -536,7 +536,7 @@ class VirtualMediaTestCase(EmulatorTestCase):
         self.assertFalse(response.json['VerifyCertificate'])
 
     def test_virtual_media_not_found(self, managers_mock, vmedia_mock):
-        vmedia_mock.return_value.get_device_name.side_effect = error.FishyError
+        vmedia_mock.return_value.get_device_name.side_effect = error.NotFound
 
         response = self.app.get(
             '/redfish/v1/Managers/%s/VirtualMedia/DVD-ROM' % self.uuid)
@@ -555,7 +555,7 @@ class VirtualMediaTestCase(EmulatorTestCase):
 
     def test_virtual_media_update_not_found(self, managers_mock, vmedia_mock):
         vmedia_mock = vmedia_mock.return_value
-        vmedia_mock.update_device_info.side_effect = error.FishyError
+        vmedia_mock.update_device_info.side_effect = error.NotFound
 
         response = self.app.patch(
             '/redfish/v1/Managers/%s/VirtualMedia/DVD-ROM' % self.uuid,

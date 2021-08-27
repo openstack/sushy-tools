@@ -26,16 +26,18 @@ class FakeDriver(base.DriverBase):
         """Get a manager by its identity
 
         :returns: Redfish manager UUID.
+        :raises: NotFound if the manager cannot be found
         """
         try:
             system_uuid = self._systems.uuid(identity)
             system_name = self._systems.name(identity)
         except error.AliasAccessError:
             raise
-        except error.FishyError:
+        except error.NotFound:
+            # Re-raise hiding the fact that managers are backed by systems
             msg = 'Manager with UUID %s was not found' % identity
             self._logger.error(msg)
-            raise error.FishyError(msg)
+            raise error.NotFound(msg)
         else:
             result = {'Id': system_uuid,
                       'UUID': system_uuid,
