@@ -13,6 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import collections
 import os
 import re
 import tempfile
@@ -23,6 +24,12 @@ import requests
 from sushy_tools.emulator import memoize
 from sushy_tools.emulator.resources import base
 from sushy_tools import error
+
+
+DeviceInfo = collections.namedtuple(
+    'DeviceInfo',
+    ['image_name', 'image_url', 'inserted', 'write_protected',
+     'username', 'password'])
 
 
 class StaticDriver(base.DriverBase):
@@ -116,16 +123,19 @@ class StaticDriver(base.DriverBase):
 
         :param identity: parent resource ID
         :param device: device name
-        :returns: a `tuple` of: image name, image path, `True` is media is
-            inserted, `True` if media is write-protected
+        :returns: a `DeviceInfo` with: image name, image path,
+            `True` is media is inserted, `True` if media is write-protected,
+            user name and password
         :raises: `error.FishyError`
         """
         device_info = self._get_device(identity, device)
 
-        return (device_info.get('ImageName', ''),
-                device_info.get('Image', ''),
-                device_info.get('Inserted', False),
-                device_info.get('WriteProtected', False))
+        return DeviceInfo(device_info.get('ImageName', ''),
+                          device_info.get('Image', ''),
+                          device_info.get('Inserted', False),
+                          device_info.get('WriteProtected', False),
+                          device_info.get('UserName', ''),
+                          device_info.get('Password', ''))
 
     def _write_from_response(self, image_url, rsp, tmp_file):
         with open(tmp_file.name, 'wb') as fl:
@@ -152,7 +162,8 @@ class StaticDriver(base.DriverBase):
         return local_file
 
     def insert_image(self, identity, device, image_url,
-                     inserted=True, write_protected=True):
+                     inserted=True, write_protected=True,
+                     username=None, password=None):
         """Upload, remove or insert virtual media
 
         :param identity: parent resource ID
@@ -166,10 +177,12 @@ class StaticDriver(base.DriverBase):
         device_info = self._get_device(identity, device)
         verify_media_cert = self._config.get(
             'SUSHY_EMULATOR_VMEDIA_VERIFY_SSL', True)
+        auth = (username, password) if (username and password) else None
 
         try:
             with requests.get(image_url,
                               stream=True,
+                              auth=auth,
                               verify=verify_media_cert) as rsp:
                 if rsp.status_code >= 400:
                     self._logger.error(
@@ -208,6 +221,8 @@ class StaticDriver(base.DriverBase):
         device_info['Image'] = local_file
         device_info['Inserted'] = inserted
         device_info['WriteProtected'] = write_protected
+        device_info['UserName'] = username or ''
+        device_info['Password'] = password or ''
         device_info['_local_file'] = local_file_path
 
         self._devices.update({(identity, device): device_info})
@@ -227,6 +242,8 @@ class StaticDriver(base.DriverBase):
         device_info['ImageName'] = ''
         device_info['Inserted'] = False
         device_info['WriteProtected'] = False
+        device_info['UserName'] = ''
+        device_info['Password'] = ''
 
         self._devices.update({(identity, device): device_info})
 

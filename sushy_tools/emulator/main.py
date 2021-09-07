@@ -411,9 +411,7 @@ def virtual_media_resource(identity, device):
         media_types = app.vmedia.get_device_media_types(
             identity, device)
 
-        (image_name, image_url, inserted,
-         write_protected) = app.vmedia.get_device_image_info(
-            identity, device)
+        device_info = app.vmedia.get_device_image_info(identity, device)
 
     except error.FishyError as ex:
         app.logger.warning(
@@ -430,10 +428,12 @@ def virtual_media_resource(identity, device):
         device=device,
         name=device_name,
         media_types=media_types,
-        image_url=image_url,
-        image_name=image_name,
-        inserted=inserted,
-        write_protected=write_protected
+        image_url=device_info.image_url,
+        image_name=device_info.image_name,
+        inserted=device_info.inserted,
+        write_protected=device_info.write_protected,
+        username=device_info.username,
+        password=device_info.password,
     )
 
 
@@ -444,7 +444,13 @@ def virtual_media_resource(identity, device):
 def virtual_media_insert(identity, device):
     image = flask.request.json.get('Image')
     inserted = flask.request.json.get('Inserted', True)
-    write_protected = flask.request.json.get('WriteProtected', False)
+    write_protected = flask.request.json.get('WriteProtected', True)
+    username = flask.request.json.get('UserName', '')
+    password = flask.request.json.get('Password', '')
+
+    if (not username and password) or (username and not password):
+        message = "UserName and Password must be passed together"
+        return flask.render_template('error.json', message=message), 400
 
     manager = app.managers.get_manager(identity)
     systems = app.managers.get_managed_systems(manager)
@@ -453,7 +459,8 @@ def virtual_media_insert(identity, device):
         return '', 204
 
     image_path = app.vmedia.insert_image(
-        identity, device, image, inserted, write_protected)
+        identity, device, image, inserted, write_protected,
+        username=username, password=password)
 
     for system in systems:
         try:
