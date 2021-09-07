@@ -19,6 +19,7 @@ from unittest import mock
 from oslotest import base
 
 from sushy_tools.emulator.resources import vmedia
+from sushy_tools import error
 
 
 class StaticDriverTestCase(base.BaseTestCase):
@@ -90,6 +91,7 @@ class StaticDriverTestCase(base.BaseTestCase):
         mock_rsp.headers = {
             'content-disposition': 'attachment; filename="fish.iso"'
         }
+        mock_rsp.status_code = 200
 
         local_file = self.test_driver.insert_image(
             self.UUID, 'Cd', 'http://fish.it/red.iso', inserted=True,
@@ -125,6 +127,7 @@ class StaticDriverTestCase(base.BaseTestCase):
         mock_tmp_file.name = 'alphabet.soup'
         mock_rsp = mock_requests.get.return_value.__enter__.return_value
         mock_rsp.headers = {}
+        mock_rsp.status_code = 200
 
         local_file = self.test_driver.insert_image(
             self.UUID, 'Cd', 'http://fish.it/red.iso', inserted=True,
@@ -159,6 +162,7 @@ class StaticDriverTestCase(base.BaseTestCase):
         mock_tmp_file.name = 'alphabet.soup'
         mock_rsp = mock_requests.get.return_value.__enter__.return_value
         mock_rsp.headers = {}
+        mock_rsp.status_code = 200
 
         full_url = 'http://[::2]:80/redfish/boot-abc?filename=tmp.iso'
         local_file = self.test_driver.insert_image(
@@ -196,6 +200,7 @@ class StaticDriverTestCase(base.BaseTestCase):
         mock_rsp.headers = {
             'content-disposition': 'attachment; filename="fish.iso"'
         }
+        mock_rsp.status_code = 200
 
         ssl_conf_key = 'SUSHY_EMULATOR_VMEDIA_VERIFY_SSL'
         default_ssl_verify = self.test_driver._config.get(ssl_conf_key)
@@ -219,6 +224,36 @@ class StaticDriverTestCase(base.BaseTestCase):
         self.assertTrue(device_info['Inserted'])
         self.assertFalse(device_info['WriteProtected'])
         self.assertEqual(local_file, device_info['_local_file'])
+
+    @mock.patch.object(vmedia.StaticDriver, '_get_device', autospec=True)
+    @mock.patch.object(builtins, 'open', autospec=True)
+    @mock.patch.object(vmedia.os, 'rename', autospec=True)
+    @mock.patch.object(vmedia, 'tempfile', autospec=True)
+    @mock.patch.object(vmedia, 'requests', autospec=True)
+    def test_insert_image_fail(self, mock_requests, mock_tempfile, mock_rename,
+                               mock_open, mock_get_device):
+        device_info = {}
+        mock_get_device.return_value = device_info
+
+        mock_tempfile.mkdtemp.return_value = '/alphabet/soup'
+        mock_tempfile.gettempdir.return_value = '/tmp'
+        mock_tmp_file = (mock_tempfile.NamedTemporaryFile
+                         .return_value.__enter__.return_value)
+        mock_tmp_file.name = 'alphabet.soup'
+        mock_rsp = mock_requests.get.return_value.__enter__.return_value
+        mock_rsp.headers = {
+            'content-disposition': 'attachment; filename="fish.iso"'
+        }
+        mock_rsp.status_code = 401
+
+        self.assertRaises(error.FishyError,
+                          self.test_driver.insert_image,
+                          self.UUID, 'Cd', 'http://fish.it/red.iso',
+                          inserted=True, write_protected=False)
+        mock_requests.get.assert_called_once_with(
+            'http://fish.it/red.iso', stream=True, verify=True)
+        mock_open.assert_not_called()
+        self.assertEqual({}, device_info)
 
     @mock.patch.object(vmedia.StaticDriver, '_get_device', autospec=True)
     @mock.patch.object(vmedia.os, 'unlink', autospec=True)

@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Fixes handling HTTP errors on downloading virtual media files. Error codes
+    are no longer silently ignored.

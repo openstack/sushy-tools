@@ -127,6 +127,30 @@ class StaticDriver(base.DriverBase):
                 device_info.get('Inserted', False),
                 device_info.get('WriteProtected', False))
 
+    def _write_from_response(self, image_url, rsp, tmp_file):
+        with open(tmp_file.name, 'wb') as fl:
+            for chunk in rsp.iter_content(chunk_size=8192):
+                if chunk:
+                    fl.write(chunk)
+
+        local_file = None
+
+        content_dsp = rsp.headers.get('content-disposition')
+        if content_dsp:
+            local_file = re.findall('filename="(.+)"', content_dsp)
+
+        if local_file:
+            local_file = local_file[0]
+
+        if not local_file:
+            parsed_url = urlparse.urlparse(image_url)
+            local_file = os.path.basename(parsed_url.path)
+
+        if not local_file:
+            local_file = 'image.iso'
+
+        return local_file
+
     def insert_image(self, identity, device, image_url,
                      inserted=True, write_protected=True):
         """Upload, remove or insert virtual media
@@ -144,42 +168,34 @@ class StaticDriver(base.DriverBase):
             'SUSHY_EMULATOR_VMEDIA_VERIFY_SSL', True)
 
         try:
-            with tempfile.NamedTemporaryFile(
-                    mode='w+b', delete=False) as tmp_file:
+            with requests.get(image_url,
+                              stream=True,
+                              verify=verify_media_cert) as rsp:
+                if rsp.status_code >= 400:
+                    self._logger.error(
+                        'Failed fetching image from URL %s: '
+                        'got HTTP error %s:\n%s',
+                        image_url, rsp.status_code, rsp.text)
+                    target_code = 502 if rsp.status_code >= 500 else 400
+                    raise error.FishyError(
+                        "Cannot download virtual media: got error %s "
+                        "from the server" % rsp.status_code,
+                        code=target_code)
 
-                with requests.get(image_url,
-                                  stream=True,
-                                  verify=verify_media_cert) as rsp:
+                with tempfile.NamedTemporaryFile(
+                        mode='w+b', delete=False) as tmp_file:
 
-                    with open(tmp_file.name, 'wb') as fl:
-
-                        for chunk in rsp.iter_content(chunk_size=8192):
-                            if chunk:
-                                fl.write(chunk)
-
-                    local_file = None
-
-                    content_dsp = rsp.headers.get('content-disposition')
-                    if content_dsp:
-                        local_file = re.findall('filename="(.+)"', content_dsp)
-
-                    if local_file:
-                        local_file = local_file[0]
-
-                    if not local_file:
-                        parsed_url = urlparse.urlparse(image_url)
-                        local_file = os.path.basename(parsed_url.path)
-
-                    if not local_file:
-                        local_file = 'image.iso'
-
+                    local_file = self._write_from_response(image_url,
+                                                           rsp, tmp_file)
                     temp_dir = tempfile.mkdtemp(
                         dir=os.path.dirname(tmp_file.name))
-
                     local_file_path = os.path.join(temp_dir, local_file)
 
                 os.rename(tmp_file.name, local_file_path)
-
+        except error.FishyError as ex:
+            msg = 'Failed fetching image from URL %s: %s' % (image_url, ex)
+            self._logger.error(msg)
+            raise  # leave the original error intact (code, etc)
         except Exception as ex:
             msg = 'Failed fetching image from URL %s: %s' % (image_url, ex)
             self._logger.exception(msg)
