@@ -76,7 +76,7 @@ class StaticDriver(base.DriverBase):
             return self._devices[(identity, device)]
 
         except KeyError:
-            raise error.FishyError(
+            raise error.NotFound(
                 'No such virtual media device %s owned by resource '
                 '%s' % (device, identity))
 

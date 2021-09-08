@@ -76,7 +76,7 @@ class OpenStackDriver(AbstractSystemsDriver):
 
         self._logger.debug(msg)
 
-        raise error.FishyError(msg)
+        raise error.NotFound(msg)
 
     @memoize.memoize(permanent_cache=PERMANENT_CACHE)
     def _get_flavor(self, identity):
@@ -188,7 +188,7 @@ class OpenStackDriver(AbstractSystemsDriver):
         # NOTE(etingof) can't support `state == "Nmi"` as
         # openstacksdk does not seem to support that
         else:
-            raise error.FishyError(
+            raise error.BadRequest(
                 'Unknown ResetType "%(state)s"' % {'state': state})
 
     def get_boot_device(self, identity):
@@ -234,7 +234,7 @@ class OpenStackDriver(AbstractSystemsDriver):
             msg = ('Unknown power state requested: '
                    '%(boot_source)s' % {'boot_source': boot_source})
 
-            raise error.FishyError(msg)
+            raise error.BadRequest(msg)
 
         # NOTE(etingof): the following probably only works with
         # libvirt-backed compute nodes
@@ -271,7 +271,7 @@ class OpenStackDriver(AbstractSystemsDriver):
         msg = ('The cloud driver %(driver)s does not allow changing boot '
                'mode through Redfish' % {'driver': self.driver})
 
-        raise error.FishyError(msg)
+        raise error.NotSupportedError(msg)
 
     def get_total_memory(self, identity):
         """Get computer system total memory
@@ -307,17 +307,17 @@ class OpenStackDriver(AbstractSystemsDriver):
 
     def get_bios(self, identity):
         """Not supported as Openstack SDK does not expose API for BIOS"""
-        raise error.FishyError(
+        raise error.NotSupportedError(
             'Operation not supported by the virtualization driver')
 
     def set_bios(self, identity, attributes):
         """Not supported as Openstack SDK does not expose API for BIOS"""
-        raise error.FishyError(
+        raise error.NotSupportedError(
             'Operation not supported by the virtualization driver')
 
     def reset_bios(self, identity):
         """Not supported as Openstack SDK does not expose API for BIOS"""
-        raise error.FishyError(
+        raise error.NotSupportedError(
             'Operation not supported by the virtualization driver')
 
     def get_nics(self, identity):

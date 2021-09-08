@@ -36,7 +36,6 @@ from sushy_tools.emulator.resources.systems import novadriver
 from sushy_tools.emulator.resources import vmedia as vmddriver
 from sushy_tools.emulator.resources import volumes as voldriver
 from sushy_tools import error
-from sushy_tools.error import FishyError
 
 
 def _render_error(message):
@@ -177,7 +176,7 @@ def ensure_instance_access(decorated_func):
     @functools.wraps(decorated_func)
     def decorator(*args, **kwargs):
         if instance_denied(**kwargs):
-            raise FishyError('Error finding instance')
+            raise error.NotFound()
 
         return decorated_func(*args, **kwargs)
 
@@ -340,11 +339,7 @@ def jsonify(obj_type, obj_version, obj):
 def manager_resource(identity):
     app.logger.debug('Serving resources for manager "%s"', identity)
 
-    try:
-        manager = app.managers.get_manager(identity)
-    except error.FishyError as exc:
-        return str(exc), 404
-
+    manager = app.managers.get_manager(identity)
     systems = app.managers.get_managed_systems(manager)
     chassis = app.managers.get_managed_chassis(manager)
 
@@ -404,20 +399,13 @@ def virtual_media_collection_resource(identity):
            methods=['GET'])
 @returns_json
 def virtual_media_resource(identity, device):
-    try:
-        device_name = app.vmedia.get_device_name(
-            identity, device)
+    device_name = app.vmedia.get_device_name(
+        identity, device)
 
-        media_types = app.vmedia.get_device_media_types(
-            identity, device)
+    media_types = app.vmedia.get_device_media_types(
+        identity, device)
 
-        device_info = app.vmedia.get_device_image_info(identity, device)
-
-    except error.FishyError as ex:
-        app.logger.warning(
-            'Virtual media %s at manager %s error: '
-            '%s', device, identity, ex)
-        return 'Not found', 404
+    device_info = app.vmedia.get_device_image_info(identity, device)
 
     app.logger.debug('Serving virtual media %s at '
                      'manager "%s"', device, identity)
@@ -454,14 +442,7 @@ def virtual_media_patch(identity, device):
         if not isinstance(verify, bool):
             raise error.BadRequest("VerifyCertificate must be a boolean")
 
-        try:
-            app.vmedia.update_device_info(identity, device, verify=verify)
-        except error.FishyError as ex:
-            app.logger.warning(
-                'Virtual media %s at manager %s error: '
-                '%s', device, identity, ex)
-            raise error.NotFound("Virtual media device not found")
-
+        app.vmedia.update_device_info(identity, device, verify=verify)
         return '', 204
     else:
         raise error.BadRequest("Empty or malformed patch")
@@ -670,7 +651,7 @@ def ethernet_interface(identity, nic_id):
             return flask.render_template(
                 'ethernet_interface.json', identity=identity, nic=nic)
 
-    return 'Not found', 404
+    raise error.NotFound()
 
 
 @app.route('/redfish/v1/Systems/<identity>/Processors',
@@ -697,7 +678,7 @@ def processor(identity, processor_id):
             return flask.render_template(
                 'processor.json', identity=identity, processor=proc)
 
-    return 'Not found', 404
+    raise error.NotFound()
 
 
 @app.route('/redfish/v1/Systems/<identity>/Actions/ComputerSystem.Reset',
@@ -791,7 +772,7 @@ def simple_storage(identity, simple_storage_id):
         storage_controller = simple_storage_controllers[simple_storage_id]
     except KeyError:
         app.logger.debug('"%s" Simple Storage resource was not found')
-        return 'Not found', 404
+        raise error.NotFound()
     return flask.render_template('simple_storage.json', identity=identity,
                                  simple_storage=storage_controller)
 
@@ -823,7 +804,7 @@ def storage(identity, storage_id):
             return flask.render_template(
                 'storage.json', identity=identity, storage=stg)
 
-    return 'Not found', 404
+    raise error.NotFound()
 
 
 @app.route('/redfish/v1/Systems/<identity>/Storage/<stg_id>/Drives/<drv_id>',
@@ -839,7 +820,7 @@ def drive_resource(identity, stg_id, drv_id):
             return flask.render_template(
                 'drive.json', identity=identity, storage_id=stg_id, drive=drv)
 
-    return 'Not found', 404
+    raise error.NotFound()
 
 
 @app.route('/redfish/v1/Systems/<identity>/Storage/<storage_id>/Volumes',
@@ -902,7 +883,7 @@ def volume(identity, stg_id, vol_id):
                     'volume.json', identity=identity, storage_id=stg_id,
                     volume=vol)
 
-    return 'Not Found', 404
+    raise error.NotFound()
 
 
 @app.route('/redfish/v1/Registries')

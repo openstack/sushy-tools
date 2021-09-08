@@ -33,7 +33,7 @@ class NotSupportedError(FishyError):
 class NotFound(FishyError):
     """Entity not found."""
 
-    def __init__(self, msg, code=404):
+    def __init__(self, msg='Not found', code=404):
         super().__init__(msg, code)
 
 

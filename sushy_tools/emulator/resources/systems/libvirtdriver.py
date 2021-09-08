@@ -185,7 +185,7 @@ class LibvirtDriver(AbstractSystemsDriver):
 
                     self._logger.debug(msg)
 
-                    raise error.FishyError(msg)
+                    raise error.NotFound(msg)
 
             raise error.AliasAccessError(domain.UUIDString())
 
@@ -213,7 +213,7 @@ class LibvirtDriver(AbstractSystemsDriver):
         in place of system name if there are duplicates.
 
         :param identity: libvirt domain name or UUID
-
+        :raises: NotFound if the system cannot be found
         :returns: computer system UUID
         """
         domain = self._get_domain(identity, readonly=True)
@@ -223,7 +223,7 @@ class LibvirtDriver(AbstractSystemsDriver):
         """Get computer system name by name
 
         :param identity: libvirt domain name or UUID
-
+        :raises: NotFound if the system cannot be found
         :returns: computer system name
         """
         domain = self._get_domain(identity, readonly=True)
@@ -501,7 +501,7 @@ class LibvirtDriver(AbstractSystemsDriver):
             msg = ('Unknown boot mode requested: '
                    '%(boot_mode)s' % {'boot_mode': boot_mode})
 
-            raise error.FishyError(msg)
+            raise error.BadRequest(msg)
 
         os_elements = tree.findall('os')
         if len(os_elements) != 1:
@@ -939,7 +939,7 @@ class LibvirtDriver(AbstractSystemsDriver):
                 lv_device = self.BOOT_DEVICE_MAP[device]
 
             except KeyError:
-                raise error.FishyError(
+                raise error.BadRequest(
                     'Unknown device %s at %s' % (device, identity))
 
             disk_elements = device_element.findall('disk')
@@ -1026,7 +1026,7 @@ class LibvirtDriver(AbstractSystemsDriver):
             lv_device = self.BOOT_DEVICE_MAP[device]
 
         except KeyError:
-            raise error.FishyError(
+            raise error.BadRequest(
                 'Unknown device %s at %s' % (device, identity))
 
         device_element = domain_tree.find('devices')
