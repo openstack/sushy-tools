@@ -1,0 +1,9 @@
+---
+features:
+  - |
+    Supports reading and changing ``VerifyCertificate`` in ``VirtualMedia``
+    resources.
+upgrade:
+  - |
+    The default value of ``SUSHY_EMULATOR_VMEDIA_VERIFY_SSL`` has been changed
+    to ``False`` to match the actual bare metal hardware.

@@ -493,7 +493,7 @@ class VirtualMediaTestCase(EmulatorTestCase):
         vmedia_mock.get_device_media_types.return_value = [
             'CD', 'DVD']
         vmedia_mock.get_device_image_info.return_value = vmedia.DeviceInfo(
-            'image-of-a-fish', 'fishy.iso', True, True, '', '')
+            'image-of-a-fish', 'fishy.iso', True, True, '', '', False)
 
         response = self.app.get(
             '/redfish/v1/Managers/%s/VirtualMedia/CD' % self.uuid)
@@ -507,6 +507,10 @@ class VirtualMediaTestCase(EmulatorTestCase):
         self.assertTrue(response.json['WriteProtected'])
         self.assertEqual('', response.json['UserName'])
         self.assertEqual('', response.json['Password'])
+        self.assertFalse(response.json['VerifyCertificate'])
+        self.assertEqual(
+            '/redfish/v1/Managers/%s/VirtualMedia/CD/Certificates' % self.uuid,
+            response.json['Certificates']['@odata.id'])
 
     def test_virtual_media_with_auth(self, managers_mock, vmedia_mock):
         vmedia_mock = vmedia_mock.return_value
@@ -514,7 +518,8 @@ class VirtualMediaTestCase(EmulatorTestCase):
         vmedia_mock.get_device_media_types.return_value = [
             'CD', 'DVD']
         vmedia_mock.get_device_image_info.return_value = vmedia.DeviceInfo(
-            'image-of-a-fish', 'fishy.iso', True, True, 'Admin', 'Secret')
+            'image-of-a-fish', 'fishy.iso', True, True, 'Admin', 'Secret',
+            False)
 
         response = self.app.get(
             '/redfish/v1/Managers/%s/VirtualMedia/CD' % self.uuid)
@@ -528,6 +533,7 @@ class VirtualMediaTestCase(EmulatorTestCase):
         self.assertTrue(response.json['WriteProtected'])
         self.assertEqual('Admin', response.json['UserName'])
         self.assertEqual('******', response.json['Password'])
+        self.assertFalse(response.json['VerifyCertificate'])
 
     def test_virtual_media_not_found(self, managers_mock, vmedia_mock):
         vmedia_mock.return_value.get_device_name.side_effect = error.FishyError
@@ -536,6 +542,39 @@ class VirtualMediaTestCase(EmulatorTestCase):
             '/redfish/v1/Managers/%s/VirtualMedia/DVD-ROM' % self.uuid)
 
         self.assertEqual(404, response.status_code)
+
+    def test_virtual_media_update(self, managers_mock, vmedia_mock):
+        response = self.app.patch(
+            '/redfish/v1/Managers/%s/VirtualMedia/CD' % self.uuid,
+            json={'VerifyCertificate': True})
+
+        self.assertEqual(204, response.status_code)
+        vmedia_mock = vmedia_mock.return_value
+        vmedia_mock.update_device_info.assert_called_once_with(
+            self.uuid, 'CD', verify=True)
+
+    def test_virtual_media_update_not_found(self, managers_mock, vmedia_mock):
+        vmedia_mock = vmedia_mock.return_value
+        vmedia_mock.update_device_info.side_effect = error.FishyError
+
+        response = self.app.patch(
+            '/redfish/v1/Managers/%s/VirtualMedia/DVD-ROM' % self.uuid,
+            json={'VerifyCertificate': True})
+
+        self.assertEqual(404, response.status_code)
+
+    def test_virtual_media_update_invalid(self, managers_mock, vmedia_mock):
+        response = self.app.patch(
+            '/redfish/v1/Managers/%s/VirtualMedia/CD' % self.uuid,
+            json={'VerifyCertificate': 'banana'})
+
+        self.assertEqual(400, response.status_code)
+
+    def test_virtual_media_update_empty(self, managers_mock, vmedia_mock):
+        response = self.app.patch(
+            '/redfish/v1/Managers/%s/VirtualMedia/CD' % self.uuid)
+
+        self.assertEqual(400, response.status_code)
 
     def test_virtual_media_insert(self, managers_mock, vmedia_mock):
         response = self.app.post(
@@ -557,6 +596,16 @@ class VirtualMediaTestCase(EmulatorTestCase):
         self.assertEqual(204, response.status_code)
 
         vmedia_mock.return_value.eject_image.called_once_with('CD')
+
+    def test_virtual_media_certificates(self, managers_mock, vmedia_mock):
+        response = self.app.get(
+            '/redfish/v1/Managers/%s/VirtualMedia/CD/Certificates' % self.uuid)
+
+        self.assertEqual(200, response.status_code, response.json)
+        self.assertEqual(0, response.json['Members@odata.count'])
+        self.assertEqual([], response.json['Members'])
+        self.assertEqual(['PEM'],
+                         response.json['@Redfish.SupportedCertificates'])
 
 
 @patch_resource('systems')

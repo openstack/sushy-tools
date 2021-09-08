@@ -1,5 +1,5 @@
 {
-    "@odata.type": "#VirtualMedia.v1_3_0.VirtualMedia",
+    "@odata.type": "#VirtualMedia.v1_4_0.VirtualMedia",
     "Id": {{ device|string|tojson }},
     "Name": {{ name|string|tojson }},
     "MediaTypes": [
@@ -23,6 +23,10 @@
     },
     "UserName": {{ username|string|tojson }},
     "Password": "{{ '******' if password else '' }}",
+    "Certificates": {
+        "@odata.id": {{ "/redfish/v1/Managers/%s/VirtualMedia/%s/Certificates"|format(identity, device)|tojson }}
+    },
+    "VerifyCertificate": {{ verify_certificate|tojson }},
     "@odata.context": "/redfish/v1/$metadata#VirtualMedia.VirtualMedia",
     "@odata.id": {{ "/redfish/v1/Managers/%s/VirtualMedia/%s"|format(identity, device)|string|tojson }},
     "@Redfish.Copyright": "Copyright 2014-2017 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."

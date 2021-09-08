@@ -28,3 +28,17 @@ class AliasAccessError(FishyError):
 
 class NotSupportedError(FishyError):
     """Feature not supported by resource driver"""
+
+
+class NotFound(FishyError):
+    """Entity not found."""
+
+    def __init__(self, msg, code=404):
+        super().__init__(msg, code)
+
+
+class BadRequest(FishyError):
+    """Malformed request."""
+
+    def __init__(self, msg, code=400):
+        super().__init__(msg, code)
