@@ -15,7 +15,6 @@
 
 import argparse
 from datetime import datetime
-import functools
 import json
 import os
 import ssl
@@ -25,6 +24,8 @@ import flask
 from ironic_lib import auth_basic
 from werkzeug import exceptions as wz_exc
 
+from sushy_tools.emulator import api_utils
+from sushy_tools.emulator.controllers import virtual_media as vmctl
 from sushy_tools.emulator import memoize
 from sushy_tools.emulator.resources import chassis as chsdriver
 from sushy_tools.emulator.resources import drives as drvdriver
@@ -152,55 +153,11 @@ class Application(flask.Flask):
 
 
 app = Application()
-
-
-def instance_denied(**kwargs):
-    deny = True
-
-    try:
-        deny = (kwargs['identity'] not in
-                app.config['SUSHY_EMULATOR_ALLOWED_INSTANCES'])
-
-    except KeyError:
-        deny = False
-
-    finally:
-        if deny:
-            app.logger.warning('Instance %s access denied',
-                               kwargs.get('identity'))
-
-        return deny
-
-
-def ensure_instance_access(decorated_func):
-    @functools.wraps(decorated_func)
-    def decorator(*args, **kwargs):
-        if instance_denied(**kwargs):
-            raise error.NotFound()
-
-        return decorated_func(*args, **kwargs)
-
-    return decorator
-
-
-def returns_json(decorated_func):
-    @functools.wraps(decorated_func)
-    def decorator(*args, **kwargs):
-        response = decorated_func(*args, **kwargs)
-        if isinstance(response, flask.Response):
-            return response
-        if isinstance(response, tuple):
-            contents, status = response
-        else:
-            contents, status = response, 200
-        return flask.Response(response=contents, status=status,
-                              content_type='application/json')
-
-    return decorator
+app.register_blueprint(vmctl.virtual_media)
 
 
 @app.errorhandler(Exception)
-@returns_json
+@api_utils.returns_json
 def all_exception_handler(message):
     if isinstance(message, error.AliasAccessError):
         url = flask.url_for(flask.request.endpoint, identity=message.args[0])
@@ -219,13 +176,13 @@ def all_exception_handler(message):
 
 
 @app.route('/redfish/v1/')
-@returns_json
+@api_utils.returns_json
 def root_resource():
     return flask.render_template('root.json')
 
 
 @app.route('/redfish/v1/Chassis')
-@returns_json
+@api_utils.returns_json
 def chassis_collection_resource():
     app.logger.debug('Serving chassis list')
 
@@ -236,7 +193,7 @@ def chassis_collection_resource():
 
 
 @app.route('/redfish/v1/Chassis/<identity>', methods=['GET', 'PATCH'])
-@returns_json
+@api_utils.returns_json
 def chassis_resource(identity):
     chassis = app.chassis
 
@@ -288,7 +245,7 @@ def chassis_resource(identity):
 
 
 @app.route('/redfish/v1/Chassis/<identity>/Thermal', methods=['GET'])
-@returns_json
+@api_utils.returns_json
 def thermal_resource(identity):
     chassis = app.chassis
 
@@ -312,7 +269,7 @@ def thermal_resource(identity):
 
 
 @app.route('/redfish/v1/Managers')
-@returns_json
+@api_utils.returns_json
 def manager_collection_resource():
     app.logger.debug('Serving managers list')
 
@@ -335,7 +292,7 @@ def jsonify(obj_type, obj_version, obj):
 
 
 @app.route('/redfish/v1/Managers/<identity>', methods=['GET'])
-@returns_json
+@api_utils.returns_json
 def manager_resource(identity):
     app.logger.debug('Serving resources for manager "%s"', identity)
 
@@ -381,179 +338,11 @@ def manager_resource(identity):
     })
 
 
-@app.route('/redfish/v1/Managers/<identity>/VirtualMedia', methods=['GET'])
-@returns_json
-def virtual_media_collection_resource(identity):
-    app.logger.debug('Serving virtual media resources for '
-                     'manager "%s"', identity)
-
-    return flask.render_template(
-        'virtual_media_collection.json',
-        identity=identity,
-        uuid=app.managers.get_manager(identity)['UUID'],
-        devices=app.vmedia.devices
-    )
-
-
-@app.route('/redfish/v1/Managers/<identity>/VirtualMedia/<device>',
-           methods=['GET'])
-@returns_json
-def virtual_media_resource(identity, device):
-    device_name = app.vmedia.get_device_name(
-        identity, device)
-
-    media_types = app.vmedia.get_device_media_types(
-        identity, device)
-
-    device_info = app.vmedia.get_device_image_info(identity, device)
-
-    app.logger.debug('Serving virtual media %s at '
-                     'manager "%s"', device, identity)
-
-    return flask.render_template(
-        'virtual_media.json',
-        identity=identity,
-        device=device,
-        name=device_name,
-        media_types=media_types,
-        image_url=device_info.image_url,
-        image_name=device_info.image_name,
-        inserted=device_info.inserted,
-        write_protected=device_info.write_protected,
-        username=device_info.username,
-        password=device_info.password,
-        verify_certificate=device_info.verify,
-    )
-
-
-@app.route(
-    '/redfish/v1/Managers/<identity>/VirtualMedia/<device>',
-    methods=['PATCH'])
-@returns_json
-def virtual_media_patch(identity, device):
-    if not flask.request.json:
-        raise error.BadRequest("Empty or malformed patch")
-
-    app.logger.debug('Updating virtual media %s at manager "%s"',
-                     device, identity)
-
-    verify = flask.request.json.get('VerifyCertificate')
-    if verify is not None:
-        if not isinstance(verify, bool):
-            raise error.BadRequest("VerifyCertificate must be a boolean")
-
-        app.vmedia.update_device_info(identity, device, verify=verify)
-        return '', 204
-    else:
-        raise error.BadRequest("Empty or malformed patch")
-
-
-@app.route(
-    '/redfish/v1/Managers/<identity>/VirtualMedia/<device>/Certificates',
-    methods=['GET'])
-@returns_json
-def virtual_media_certificates(identity, device):
-    location = \
-        f'/redfish/v1/Managers/{identity}/VirtualMedia/{device}/Certificates'
-    return flask.render_template(
-        'certificate_collection.json',
-        location=location,
-        # TODO(dtantsur): implement
-        certificates=[],
-    )
-
-
-@app.route(
-    '/redfish/v1/Managers/<identity>/VirtualMedia/<device>/Certificates',
-    methods=['POST'])
-@returns_json
-def virtual_media_add_certificate(identity, device):
-    if not flask.request.json:
-        raise error.BadRequest("Empty or malformed certificate")
-
-    # TODO(dtantsur): implement
-    raise error.NotSupportedError("Not implemented")
-
-
-@app.route('/redfish/v1/Managers/<identity>/VirtualMedia/<device>'
-           '/Actions/VirtualMedia.InsertMedia',
-           methods=['POST'])
-@returns_json
-def virtual_media_insert(identity, device):
-    image = flask.request.json.get('Image')
-    inserted = flask.request.json.get('Inserted', True)
-    write_protected = flask.request.json.get('WriteProtected', True)
-    username = flask.request.json.get('UserName', '')
-    password = flask.request.json.get('Password', '')
-
-    if (not username and password) or (username and not password):
-        message = "UserName and Password must be passed together"
-        return flask.render_template('error.json', message=message), 400
-
-    manager = app.managers.get_manager(identity)
-    systems = app.managers.get_managed_systems(manager)
-    if not systems:
-        app.logger.warning('Manager %s manages no systems', identity)
-        return '', 204
-
-    image_path = app.vmedia.insert_image(
-        identity, device, image, inserted, write_protected,
-        username=username, password=password)
-
-    for system in systems:
-        try:
-            app.systems.set_boot_image(
-                system, device, boot_image=image_path,
-                write_protected=write_protected)
-
-        except error.NotSupportedError as ex:
-            app.logger.warning(
-                'System %s failed to set boot image %s on device %s: '
-                '%s', system, image_path, device, ex)
-
-    app.logger.info(
-        'Virtual media placed into device %(dev)s of manager %(mgr)s for '
-        'systems %(sys)s. Image %(img)s inserted %(ins)s',
-        {'dev': device, 'mgr': identity, 'sys': systems,
-         'img': image or '<empty>', 'ins': inserted})
-
-    return '', 204
-
-
-@app.route('/redfish/v1/Managers/<identity>/VirtualMedia/<device>'
-           '/Actions/VirtualMedia.EjectMedia',
-           methods=['POST'])
-@returns_json
-def virtual_media_eject(identity, device):
-    app.vmedia.eject_image(identity, device)
-
-    manager = app.managers.get_manager(identity)
-    systems = app.managers.get_managed_systems(manager)
-    if not systems:
-        app.logger.warning('Manager %s manages no systems', identity)
-        return '', 204
-
-    for system in systems:
-        try:
-            app.systems.set_boot_image(system, device)
-
-        except error.NotSupportedError as ex:
-            app.logger.warning(
-                'System %s failed to remove boot image from device %s: '
-                '%s', system, device, ex)
-
-    app.logger.info(
-        'Virtual media ejected from device %s manager %s systems %s',
-        device, identity, systems)
-
-    return '', 204
-
-
 @app.route('/redfish/v1/Systems')
-@returns_json
+@api_utils.returns_json
 def system_collection_resource():
     systems = [system for system in app.systems.systems
-               if not instance_denied(identity=system)]
+               if not api_utils.instance_denied(identity=system)]
 
     app.logger.debug('Serving systems list')
 
@@ -562,8 +351,8 @@ def system_collection_resource():
 
 
 @app.route('/redfish/v1/Systems/<identity>', methods=['GET', 'PATCH'])
-@ensure_instance_access
-@returns_json
+@api_utils.ensure_instance_access
+@api_utils.returns_json
 def system_resource(identity):
     if flask.request.method == 'GET':
 
@@ -629,8 +418,8 @@ def system_resource(identity):
 
 @app.route('/redfish/v1/Systems/<identity>/EthernetInterfaces',
            methods=['GET'])
-@ensure_instance_access
-@returns_json
+@api_utils.ensure_instance_access
+@api_utils.returns_json
 def ethernet_interfaces_collection(identity):
     nics = app.systems.get_nics(identity)
 
@@ -641,8 +430,8 @@ def ethernet_interfaces_collection(identity):
 
 @app.route('/redfish/v1/Systems/<identity>/EthernetInterfaces/<nic_id>',
            methods=['GET'])
-@ensure_instance_access
-@returns_json
+@api_utils.ensure_instance_access
+@api_utils.returns_json
 def ethernet_interface(identity, nic_id):
     nics = app.systems.get_nics(identity)
 
@@ -656,8 +445,8 @@ def ethernet_interface(identity, nic_id):
 
 @app.route('/redfish/v1/Systems/<identity>/Processors',
            methods=['GET'])
-@ensure_instance_access
-@returns_json
+@api_utils.ensure_instance_access
+@api_utils.returns_json
 def processors_collection(identity):
     processors = app.systems.get_processors(identity)
 
@@ -668,8 +457,8 @@ def processors_collection(identity):
 
 @app.route('/redfish/v1/Systems/<identity>/Processors/<processor_id>',
            methods=['GET'])
-@ensure_instance_access
-@returns_json
+@api_utils.ensure_instance_access
+@api_utils.returns_json
 def processor(identity, processor_id):
     processors = app.systems.get_processors(identity)
 
@@ -683,8 +472,8 @@ def processor(identity, processor_id):
 
 @app.route('/redfish/v1/Systems/<identity>/Actions/ComputerSystem.Reset',
            methods=['POST'])
-@ensure_instance_access
-@returns_json
+@api_utils.ensure_instance_access
+@api_utils.returns_json
 def system_reset_action(identity):
     reset_type = flask.request.json.get('ResetType')
 
@@ -697,8 +486,8 @@ def system_reset_action(identity):
 
 
 @app.route('/redfish/v1/Systems/<identity>/BIOS', methods=['GET'])
-@ensure_instance_access
-@returns_json
+@api_utils.ensure_instance_access
+@api_utils.returns_json
 def bios(identity):
     bios = app.systems.get_bios(identity)
 
@@ -712,8 +501,8 @@ def bios(identity):
 
 @app.route('/redfish/v1/Systems/<identity>/BIOS/Settings',
            methods=['GET', 'PATCH'])
-@ensure_instance_access
-@returns_json
+@api_utils.ensure_instance_access
+@api_utils.returns_json
 def bios_settings(identity):
 
     if flask.request.method == 'GET':
@@ -738,8 +527,8 @@ def bios_settings(identity):
 
 @app.route('/redfish/v1/Systems/<identity>/BIOS/Actions/Bios.ResetBios',
            methods=['POST'])
-@ensure_instance_access
-@returns_json
+@api_utils.ensure_instance_access
+@api_utils.returns_json
 def system_reset_bios(identity):
     app.systems.reset_bios(identity)
 
@@ -750,8 +539,8 @@ def system_reset_bios(identity):
 
 @app.route('/redfish/v1/Systems/<identity>/SimpleStorage',
            methods=['GET'])
-@ensure_instance_access
-@returns_json
+@api_utils.ensure_instance_access
+@api_utils.returns_json
 def simple_storage_collection(identity):
     simple_storage_controllers = (
         app.systems.get_simple_storage_collection(identity))
@@ -763,8 +552,8 @@ def simple_storage_collection(identity):
 
 @app.route('/redfish/v1/Systems/<identity>/SimpleStorage/<simple_storage_id>',
            methods=['GET'])
-@ensure_instance_access
-@returns_json
+@api_utils.ensure_instance_access
+@api_utils.returns_json
 def simple_storage(identity, simple_storage_id):
     simple_storage_controllers = (
         app.systems.get_simple_storage_collection(identity))
@@ -779,8 +568,8 @@ def simple_storage(identity, simple_storage_id):
 
 @app.route('/redfish/v1/Systems/<identity>/Storage',
            methods=['GET'])
-@ensure_instance_access
-@returns_json
+@api_utils.ensure_instance_access
+@api_utils.returns_json
 def storage_collection(identity):
     uuid = app.systems.uuid(identity)
 
@@ -793,8 +582,8 @@ def storage_collection(identity):
 
 @app.route('/redfish/v1/Systems/<identity>/Storage/<storage_id>',
            methods=['GET'])
-@ensure_instance_access
-@returns_json
+@api_utils.ensure_instance_access
+@api_utils.returns_json
 def storage(identity, storage_id):
     uuid = app.systems.uuid(identity)
     storage_col = app.storage.get_storage_col(uuid)
@@ -809,8 +598,8 @@ def storage(identity, storage_id):
 
 @app.route('/redfish/v1/Systems/<identity>/Storage/<stg_id>/Drives/<drv_id>',
            methods=['GET'])
-@ensure_instance_access
-@returns_json
+@api_utils.ensure_instance_access
+@api_utils.returns_json
 def drive_resource(identity, stg_id, drv_id):
     uuid = app.systems.uuid(identity)
     drives = app.drives.get_drives(uuid, stg_id)
@@ -825,8 +614,8 @@ def drive_resource(identity, stg_id, drv_id):
 
 @app.route('/redfish/v1/Systems/<identity>/Storage/<storage_id>/Volumes',
            methods=['GET', 'POST'])
-@ensure_instance_access
-@returns_json
+@api_utils.ensure_instance_access
+@api_utils.returns_json
 def volumes_collection(identity, storage_id):
     uuid = app.systems.uuid(identity)
 
@@ -867,8 +656,8 @@ def volumes_collection(identity, storage_id):
 
 @app.route('/redfish/v1/Systems/<identity>/Storage/<stg_id>/Volumes/<vol_id>',
            methods=['GET'])
-@ensure_instance_access
-@returns_json
+@api_utils.ensure_instance_access
+@api_utils.returns_json
 def volume(identity, stg_id, vol_id):
     uuid = app.systems.uuid(identity)
     vol_col = app.volumes.get_volumes_col(uuid, stg_id)
@@ -887,7 +676,7 @@ def volume(identity, stg_id, vol_id):
 
 
 @app.route('/redfish/v1/Registries')
-@returns_json
+@api_utils.returns_json
 def registry_file_collection():
     app.logger.debug('Serving registry file collection')
 
@@ -896,7 +685,7 @@ def registry_file_collection():
 
 
 @app.route('/redfish/v1/Registries/BiosAttributeRegistry.v1_0_0')
-@returns_json
+@api_utils.returns_json
 def bios_attribute_registry_file():
     app.logger.debug('Serving BIOS attribute registry file')
 
@@ -905,7 +694,7 @@ def bios_attribute_registry_file():
 
 
 @app.route('/redfish/v1/Registries/Messages')
-@returns_json
+@api_utils.returns_json
 def message_registry_file():
     app.logger.debug('Serving message registry file')
 
@@ -914,7 +703,7 @@ def message_registry_file():
 
 
 @app.route('/redfish/v1/Systems/Bios/BiosRegistry')
-@returns_json
+@api_utils.returns_json
 def bios_registry():
     app.logger.debug('Serving BIOS registry')
 
@@ -922,7 +711,7 @@ def bios_registry():
 
 
 @app.route('/redfish/v1/Registries/Messages/Registry')
-@returns_json
+@api_utils.returns_json
 def message_registry():
     app.logger.debug('Serving message registry')
 
