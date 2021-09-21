@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Fixes authentication when the configuration is provided via the
+    ``--config`` option (as opposed to the environment).

@@ -65,8 +65,9 @@ class AuthenticatedTestCase(base.BaseTestCase):
         self.auth_file.write(TEST_PASSWD)
         self.auth_file.flush()
         self.addCleanup(self.auth_file.close)
-        app = main.Application({
-            'SUSHY_EMULATOR_AUTH_FILE': self.auth_file.name})
+        app = main.Application()
+        app.configure(
+            extra_config={'SUSHY_EMULATOR_AUTH_FILE': self.auth_file.name})
         self.app = app.test_client()
 
     def test_root_resource(self):

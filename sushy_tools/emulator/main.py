@@ -74,18 +74,20 @@ class RedfishAuthMiddleware(auth_basic.BasicAuthMiddleware):
 
 class Application(flask.Flask):
 
-    def __init__(self, extra_config=None):
+    def __init__(self):
         super().__init__(__name__)
         # Turn off strict_slashes on all routes
         self.url_map.strict_slashes = False
-        config_file = os.environ.get('SUSHY_EMULATOR_CONFIG')
+
+    def configure(self, config_file=None, extra_config=None):
+        config_file = config_file or os.environ.get('SUSHY_EMULATOR_CONFIG')
         if config_file:
             self.config.from_pyfile(config_file)
         if extra_config:
             self.config.update(extra_config)
 
         auth_file = self.config.get("SUSHY_EMULATOR_AUTH_FILE")
-        if auth_file:
+        if auth_file and not isinstance(self.wsgi_app, RedfishAuthMiddleware):
             self.wsgi_app = RedfishAuthMiddleware(self.wsgi_app, auth_file)
 
     @property
@@ -768,8 +770,7 @@ def main():
 
     app.debug = args.debug
 
-    if args.config:
-        app.config.from_pyfile(args.config)
+    app.configure(config_file=args.config)
 
     if args.os_cloud:
         app.config['SUSHY_EMULATOR_OS_CLOUD'] = args.os_cloud
