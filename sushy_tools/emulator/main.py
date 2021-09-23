@@ -78,9 +78,10 @@ class Application(flask.Flask):
         super().__init__(__name__)
         # Turn off strict_slashes on all routes
         self.url_map.strict_slashes = False
+        # This is needed for WSGI since it cannot process argv
+        self.configure(config_file=os.environ.get('SUSHY_EMULATOR_CONFIG'))
 
     def configure(self, config_file=None, extra_config=None):
-        config_file = config_file or os.environ.get('SUSHY_EMULATOR_CONFIG')
         if config_file:
             self.config.from_pyfile(config_file)
         if extra_config:

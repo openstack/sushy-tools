@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Fixes configuring the emulator via environment parameters when ``main``
+    is not invoked (e.g. when using WSGI).
