@@ -71,7 +71,7 @@ class StaticDriverTestCase(base.BaseTestCase):
         self.test_driver.add_volume(self.SYSTEM_UUID, self.STORAGE_ID, vol)
         vol_col = self.test_driver.get_volumes_col(self.SYSTEM_UUID,
                                                    self.STORAGE_ID)
-        self.assertTrue(vol in vol_col)
+        self.assertIn(vol, vol_col)
 
     def test_delete_volume(self):
         vol = {
@@ -85,4 +85,4 @@ class StaticDriverTestCase(base.BaseTestCase):
         self.test_driver.delete_volume(self.SYSTEM_UUID, self.STORAGE_ID, vol)
         vol_col = self.test_driver.get_volumes_col(self.SYSTEM_UUID,
                                                    self.STORAGE_ID)
-        self.assertFalse(vol in vol_col)
+        self.assertNotIn(vol, vol_col)
