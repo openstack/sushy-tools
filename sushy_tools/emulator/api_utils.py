@@ -66,10 +66,11 @@ def returns_json(decorated_func):
         if isinstance(response, flask.Response):
             return response
         if isinstance(response, tuple):
-            contents, status = response
+            contents, status, *headers = response
         else:
-            contents, status = response, 200
+            contents, status, headers = response, 200, ()
+        kwargs = {'headers': headers[0]} if headers else {}
         return flask.Response(response=contents, status=status,
-                              content_type='application/json')
+                              content_type='application/json', **kwargs)
 
     return decorator

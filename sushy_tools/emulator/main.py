@@ -25,6 +25,7 @@ from ironic_lib import auth_basic
 from werkzeug import exceptions as wz_exc
 
 from sushy_tools.emulator import api_utils
+from sushy_tools.emulator.controllers import certificate_service as certctl
 from sushy_tools.emulator.controllers import virtual_media as vmctl
 from sushy_tools.emulator import memoize
 from sushy_tools.emulator.resources import chassis as chsdriver
@@ -156,6 +157,7 @@ class Application(flask.Flask):
 
 
 app = Application()
+app.register_blueprint(certctl.certificate_service)
 app.register_blueprint(vmctl.virtual_media)
 
 

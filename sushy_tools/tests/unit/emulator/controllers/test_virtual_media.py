@@ -158,11 +158,97 @@ class VirtualMediaTestCase(test_main.EmulatorTestCase):
         vmedia_mock.return_value.eject_image.called_once_with('CD')
 
     def test_virtual_media_certificates(self, managers_mock, vmedia_mock):
+        vmedia_mock.return_value.list_certificates.return_value = [
+            vmedia.Certificate('1', 'PEM', 'abcd'),
+            vmedia.Certificate('2', 'PEM', 'dcba'),
+        ]
         response = self.app.get(
-            '/redfish/v1/Managers/%s/VirtualMedia/CD/Certificates' % self.uuid)
+            f'/redfish/v1/Managers/{self.uuid}/VirtualMedia/CD/Certificates')
 
         self.assertEqual(200, response.status_code, response.json)
-        self.assertEqual(0, response.json['Members@odata.count'])
-        self.assertEqual([], response.json['Members'])
+        self.assertEqual(2, response.json['Members@odata.count'])
+        for index, member in enumerate(response.json['Members']):
+            self.assertTrue(member['@odata.id'].endswith(
+                f'/redfish/v1/Managers/{self.uuid}/VirtualMedia/CD'
+                f'/Certificates/{index+1}'), member['@odata.id'])
         self.assertEqual(['PEM'],
                          response.json['@Redfish.SupportedCertificates'])
+
+    def test_virtual_media_certificates_manager_not_found(self, managers_mock,
+                                                          vmedia_mock):
+        managers_mock.return_value.get_manager.side_effect = error.NotFound
+        response = self.app.get(
+            f'/redfish/v1/Managers/{self.uuid}/VirtualMedia/CD/Certificates')
+
+        self.assertEqual(404, response.status_code, response.json)
+
+    def test_virtual_media_add_certificate(self, managers_mock, vmedia_mock):
+        vmedia_mock.return_value.add_certificate.return_value = \
+            vmedia.Certificate('9', 'abcd', 'PEM')
+
+        response = self.app.post(
+            f'/redfish/v1/Managers/{self.uuid}/VirtualMedia/CD/Certificates',
+            json={'CertificateString': 'abcd', 'CertificateType': 'PEM'})
+
+        self.assertEqual(204, response.status_code, response.data)
+        self.assertIn(
+            f'/redfish/v1/Managers/{self.uuid}/VirtualMedia/CD/Certificates/9',
+            response.headers['Location'])
+
+    def test_virtual_media_add_certificate_no_string(self, managers_mock,
+                                                     vmedia_mock):
+        response = self.app.post(
+            f'/redfish/v1/Managers/{self.uuid}/VirtualMedia/CD/Certificates',
+            json={'CertificateType': 'PEM'})
+
+        self.assertEqual(400, response.status_code, response.data)
+
+    def test_virtual_media_add_certificate_bad_type(self, managers_mock,
+                                                    vmedia_mock):
+        response = self.app.post(
+            f'/redfish/v1/Managers/{self.uuid}/VirtualMedia/CD/Certificates',
+            json={'CertificateString': 'abcd', 'CertificateType': 'non-PEM'})
+
+        self.assertEqual(400, response.status_code, response.data)
+
+    def test_virtual_media_get_certificate(self, managers_mock, vmedia_mock):
+        vmedia_mock.return_value.list_certificates.return_value = [
+            vmedia.Certificate('1', 'abcd', 'PEM'),
+            vmedia.Certificate('2', 'dcba', 'PEM'),
+        ]
+        response = self.app.get(
+            f'/redfish/v1/Managers/{self.uuid}/VirtualMedia/CD/Certificates/2')
+
+        self.assertEqual(200, response.status_code, response.json)
+        self.assertIn('Id', response.json)
+        self.assertEqual('2', response.json['Id'])
+        self.assertEqual('dcba', response.json['CertificateString'])
+        self.assertEqual('PEM', response.json['CertificateType'])
+
+    def test_virtual_media_get_certificate_manager_not_found(self,
+                                                             managers_mock,
+                                                             vmedia_mock):
+        managers_mock.return_value.get_manager.side_effect = error.NotFound
+        response = self.app.get(
+            f'/redfish/v1/Managers/{self.uuid}/VirtualMedia/CD/Certificates/2')
+
+        self.assertEqual(404, response.status_code, response.json)
+
+    def test_virtual_media_delete_certificate(self, managers_mock,
+                                              vmedia_mock):
+        response = self.app.delete(
+            f'/redfish/v1/Managers/{self.uuid}/VirtualMedia/CD/Certificates/2')
+
+        self.assertEqual(204, response.status_code, response.data)
+        vmedia_mock.return_value.delete_certificate.assert_called_once_with(
+            self.uuid, 'CD', '2')
+
+    def test_virtual_media_delete_certificate_manager_not_found(self,
+                                                                managers_mock,
+                                                                vmedia_mock):
+        managers_mock.return_value.get_manager.side_effect = error.NotFound
+        response = self.app.delete(
+            f'/redfish/v1/Managers/{self.uuid}/VirtualMedia/CD/Certificates/2')
+
+        self.assertEqual(404, response.status_code, response.json)
+        vmedia_mock.return_value.delete_certificate.assert_not_called()

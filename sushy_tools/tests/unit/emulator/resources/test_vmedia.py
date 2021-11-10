@@ -318,6 +318,48 @@ class StaticDriverTestCase(base.BaseTestCase):
     @mock.patch.object(vmedia.os, 'rename', autospec=True)
     @mock.patch.object(vmedia, 'tempfile', autospec=True)
     @mock.patch.object(vmedia, 'requests', autospec=True)
+    def test_insert_image_verify_ssl_custom(self, mock_requests,
+                                            mock_tempfile,
+                                            mock_rename, mock_open,
+                                            mock_get_device):
+        device_info = {'Verify': True,
+                       'Certificate': {'String': 'abcd'}}
+        mock_get_device.return_value = device_info
+
+        mock_tempfile.mkdtemp.return_value = '/alphabet/soup'
+        mock_tempfile.gettempdir.return_value = '/tmp'
+        mock_tmp_file = (mock_tempfile.NamedTemporaryFile
+                         .return_value.__enter__.return_value)
+        mock_tmp_file.name = 'alphabet.soup'
+        mock_rsp = mock_requests.get.return_value.__enter__.return_value
+        mock_rsp.headers = {
+            'content-disposition': 'attachment; filename="fish.iso"'
+        }
+        mock_rsp.status_code = 200
+
+        local_file = self.test_driver.insert_image(
+            self.UUID, 'Cd', 'https://fish.it/red.iso', inserted=True,
+            write_protected=False)
+
+        self.assertEqual('/alphabet/soup/fish.iso', local_file)
+        mock_requests.get.assert_called_once_with(
+            'https://fish.it/red.iso', stream=True,
+            verify=mock_tempfile.NamedTemporaryFile.return_value.name,
+            auth=None)
+        mock_open.assert_called_once_with(mock.ANY, 'wb')
+        mock_rename.assert_called_once_with(
+            'alphabet.soup', '/alphabet/soup/fish.iso')
+
+        self.assertEqual('fish.iso', device_info['Image'])
+        self.assertTrue(device_info['Inserted'])
+        self.assertFalse(device_info['WriteProtected'])
+        self.assertEqual(local_file, device_info['_local_file'])
+
+    @mock.patch.object(vmedia.StaticDriver, '_get_device', autospec=True)
+    @mock.patch.object(builtins, 'open', autospec=True)
+    @mock.patch.object(vmedia.os, 'rename', autospec=True)
+    @mock.patch.object(vmedia, 'tempfile', autospec=True)
+    @mock.patch.object(vmedia, 'requests', autospec=True)
     def test_insert_image_fail(self, mock_requests, mock_tempfile, mock_rename,
                                mock_open, mock_get_device):
         device_info = {}
@@ -359,3 +401,90 @@ class StaticDriverTestCase(base.BaseTestCase):
         self.assertFalse(device_info['WriteProtected'])
 
         mock_unlink.assert_called_once_with('/tmp/fish.iso')
+
+    @mock.patch.object(vmedia.StaticDriver, '_get_device', autospec=True)
+    def test_list_certificates(self, mock_get_device):
+        mock_get_device.return_value = {
+            'Certificate': {'Type': 'PEM', 'String': 'abcd'},
+        }
+        result = self.test_driver.list_certificates(self.UUID, 'Cd')
+        self.assertEqual([vmedia.Certificate('Default', 'abcd', 'PEM')],
+                         result)
+
+    def test_list_certificates_empty(self):
+        result = self.test_driver.list_certificates(self.UUID, 'Cd')
+        self.assertEqual([], result)
+
+    @mock.patch.object(vmedia.StaticDriver, '_get_device', autospec=True)
+    def test_add_certificate(self, mock_get_device):
+        device_info = {}
+        mock_get_device.return_value = device_info
+
+        result = self.test_driver.add_certificate(self.UUID, 'Cd',
+                                                  'abcd', 'PEM')
+        self.assertEqual(vmedia.Certificate('Default', 'abcd', 'PEM'), result)
+        self.assertEqual({'Certificate': {'Type': 'PEM', 'String': 'abcd'}},
+                         device_info)
+
+    @mock.patch.object(vmedia.StaticDriver, '_get_device', autospec=True)
+    def test_add_certificate_exists(self, mock_get_device):
+        device_info = {
+            'Certificate': {'Type': 'PEM', 'String': 'abcd'},
+        }
+        mock_get_device.return_value = device_info
+
+        self.assertRaises(error.FishyError,
+                          self.test_driver.add_certificate,
+                          self.UUID, 'Cd', 'defg', 'PEM')
+
+    @mock.patch.object(vmedia.StaticDriver, '_get_device', autospec=True)
+    def test_replace_certificate(self, mock_get_device):
+        device_info = {
+            'Certificate': {'Type': 'PEM', 'String': 'abcd'},
+        }
+        mock_get_device.return_value = device_info
+
+        result = self.test_driver.replace_certificate(self.UUID, 'Cd',
+                                                      'Default', 'defg', 'PEM')
+        self.assertEqual(vmedia.Certificate('Default', 'defg', 'PEM'), result)
+        self.assertEqual({'Certificate': {'Type': 'PEM', 'String': 'defg'}},
+                         device_info)
+
+    @mock.patch.object(vmedia.StaticDriver, '_get_device', autospec=True)
+    def test_replace_certificate_wrong_id(self, mock_get_device):
+        device_info = {
+            'Certificate': {'Type': 'PEM', 'String': 'abcd'},
+        }
+        mock_get_device.return_value = device_info
+
+        self.assertRaises(error.NotFound,
+                          self.test_driver.replace_certificate,
+                          self.UUID, 'Cd', 'Other', 'defg', 'PEM')
+
+    @mock.patch.object(vmedia.StaticDriver, '_get_device', autospec=True)
+    def test_replace_certificate_not_found(self, mock_get_device):
+        device_info = {}
+        mock_get_device.return_value = device_info
+
+        self.assertRaises(error.NotFound,
+                          self.test_driver.replace_certificate,
+                          self.UUID, 'Cd', 'Default', 'defg', 'PEM')
+
+    @mock.patch.object(vmedia.StaticDriver, '_get_device', autospec=True)
+    def test_delete_certificate(self, mock_get_device):
+        device_info = {
+            'Certificate': {'Type': 'PEM', 'String': 'abcd'},
+        }
+        mock_get_device.return_value = device_info
+
+        self.test_driver.delete_certificate(self.UUID, 'Cd', 'Default')
+        self.assertEqual({}, device_info)
+
+    @mock.patch.object(vmedia.StaticDriver, '_get_device', autospec=True)
+    def test_delete_certificate_not_found(self, mock_get_device):
+        device_info = {}
+        mock_get_device.return_value = device_info
+
+        self.assertRaises(error.NotFound,
+                          self.test_driver.delete_certificate,
+                          self.UUID, 'Cd', 'Default')

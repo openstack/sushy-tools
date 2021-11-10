@@ -69,6 +69,7 @@ def virtual_media_resource(identity, device):
 @virtual_media.route('/<device>', methods=['PATCH'])
 @api_utils.returns_json
 def virtual_media_patch(identity, device):
+    flask.current_app.managers.get_manager(identity)
     if not flask.request.json:
         raise error.BadRequest("Empty or malformed patch")
 
@@ -90,24 +91,78 @@ def virtual_media_patch(identity, device):
 @virtual_media.route('/<device>/Certificates', methods=['GET'])
 @api_utils.returns_json
 def virtual_media_certificates(identity, device):
+    flask.current_app.managers.get_manager(identity)
     location = \
         f'/redfish/v1/Managers/{identity}/VirtualMedia/{device}/Certificates'
+    certificates = flask.current_app.vmedia.list_certificates(identity, device)
     return flask.render_template(
         'certificate_collection.json',
         location=location,
-        # TODO(dtantsur): implement
-        certificates=[],
+        certificates=[cert.id for cert in certificates],
     )
 
 
 @virtual_media.route('/<device>/Certificates', methods=['POST'])
 @api_utils.returns_json
 def virtual_media_add_certificate(identity, device):
+    flask.current_app.managers.get_manager(identity)
     if not flask.request.json:
         raise error.BadRequest("Empty or malformed certificate")
 
-    # TODO(dtantsur): implement
-    raise error.NotSupportedError("Not implemented")
+    try:
+        cert_string = flask.request.json['CertificateString']
+        cert_type = flask.request.json['CertificateType']
+    except KeyError as exc:
+        raise error.BadRequest(f"Missing required parameter {exc}")
+
+    if cert_type != 'PEM':
+        raise error.BadRequest(
+            f"Only PEM certificates are supported, got {cert_type}")
+
+    api_utils.debug('Adding certificate for virtual media %s at '
+                    'manager "%s"', device, identity)
+
+    cert = flask.current_app.vmedia.add_certificate(
+        identity, device, cert_string, cert_type)
+
+    location = (
+        f'/redfish/v1/Managers/{identity}/VirtualMedia/{device}'
+        f'/Certificates/{cert.id}'
+    )
+    return '', 204, {'Location': location}
+
+
+@virtual_media.route('/<device>/Certificates/<cert_id>', methods=['GET'])
+@api_utils.returns_json
+def virtual_media_get_certificate(identity, device, cert_id):
+    flask.current_app.managers.get_manager(identity)
+    location = (
+        f'/redfish/v1/Managers/{identity}/VirtualMedia/{device}'
+        f'/Certificates/{cert_id}'
+    )
+    certificates = flask.current_app.vmedia.list_certificates(identity, device)
+    try:
+        cert = next(c for c in certificates if c.id == cert_id)
+    except StopIteration:
+        raise error.NotFound()
+
+    return flask.render_template(
+        'certificate.json',
+        location=location,
+        cert_id=cert.id,
+        cert_string=cert.string,
+        cert_type=cert.type_,
+    )
+
+
+@virtual_media.route('/<device>/Certificates/<cert_id>', methods=['DELETE'])
+@api_utils.returns_json
+def virtual_media_delete_certificate(identity, device, cert_id):
+    flask.current_app.managers.get_manager(identity)
+    api_utils.debug('Removing certificate %s for virtual media %s at '
+                    'manager "%s"', cert_id, device, identity)
+    flask.current_app.vmedia.delete_certificate(identity, device, cert_id)
+    return '', 204
 
 
 @virtual_media.route('/<device>/Actions/VirtualMedia.InsertMedia',
