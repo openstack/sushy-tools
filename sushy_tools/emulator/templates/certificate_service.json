@@ -8,6 +8,9 @@
             "@Redfish.ActionInfo": "/redfish/v1/CertificateService/ReplaceCertificateActionInfo"
         }
     },
+    "CertificateLocations": {
+        "@odata.id": "/redfish/v1/CertificateService/CertificateLocations"
+    },
     "Oem": {},
     "@odata.id": "/redfish/v1/CertificateService",
     "@Redfish.Copyright": "Copyright 2014-2021 DMTF. For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."

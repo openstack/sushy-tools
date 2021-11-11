@@ -35,6 +35,30 @@ def certificate_service_resource():
     return flask.render_template('certificate_service.json')
 
 
+@certificate_service.route('/CertificateLocations', methods=['GET'])
+@api_utils.returns_json
+def certificate_service_locations():
+    api_utils.debug('Serving certificate locations')
+    locations = []
+    for mgr in flask.current_app.managers.managers:
+        for dev in flask.current_app.vmedia.devices:
+            try:
+                certs = flask.current_app.vmedia.list_certificates(mgr, dev)
+            except error.NotFound:
+                api_utils.debug('No certificates for manager %s, virtual '
+                                'media device %s', mgr, dev)
+                continue
+
+            for cert in certs:
+                locations.append(
+                    f'/redfish/v1/Managers/{mgr}/VirtualMedia/{dev}'
+                    f'/Certificates/{cert.id}'
+                )
+
+    return flask.render_template('certificate_locations.json',
+                                 certificates=locations)
+
+
 @certificate_service.route('/Actions/CertificateService.ReplaceCertificate',
                            methods=['POST'])
 @api_utils.ensure_instance_access
