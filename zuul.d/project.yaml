@@ -2,14 +2,23 @@
     templates:
       - check-requirements
       - openstack-lower-constraints-master-branch-jobs
-      - openstack-python3-xena-jobs
       - publish-openstack-docs-pti
       - release-notes-jobs-python3
     check:
       jobs:
         - sushy-tools-tempest-partition-bios-redfish-pxe
         - sushy-tools-tempest-partition-uefi-redfish-vmedia
+        - openstack-tox-pep8
+        - openstack-tox-py36
+        - openstack-tox-py37
+        - openstack-tox-py38
+        - openstack-tox-py39
     gate:
       jobs:
         - sushy-tools-tempest-partition-bios-redfish-pxe
         - sushy-tools-tempest-partition-uefi-redfish-vmedia
+        - openstack-tox-pep8
+        - openstack-tox-py36
+        - openstack-tox-py37
+        - openstack-tox-py38
+        - openstack-tox-py39
