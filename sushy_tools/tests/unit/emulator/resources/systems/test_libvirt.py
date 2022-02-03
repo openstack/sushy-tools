@@ -901,6 +901,18 @@ class LibvirtDriverTestCase(base.BaseTestCase):
                          result.bios_attributes)
         self._assert_bios_xml(result.tree)
 
+    def test__process_bios_attributes_update_non_string(self):
+        with open('sushy_tools/tests/unit/emulator/domain_bios.xml') as f:
+            domain_xml = f.read()
+        result = self.test_driver._process_bios_attributes(
+            domain_xml,
+            {"NumCores": 11},
+            True)
+        self.assertTrue(result.attributes_written)
+        self.assertEqual({"NumCores": "11"},
+                         result.bios_attributes)
+        self._assert_bios_xml(result.tree)
+
     def _assert_bios_xml(self, tree):
         ns = {'sushy': 'http://openstack.org/xmlns/libvirt/sushy'}
         self.assertIsNotNone(tree.find('metadata')

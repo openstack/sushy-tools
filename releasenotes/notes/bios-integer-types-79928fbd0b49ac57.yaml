@@ -1,0 +1,4 @@
+---
+fixes:
+  - |
+    Allow non-string types to be configured for BIOS settings.

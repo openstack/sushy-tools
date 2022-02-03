@@ -671,6 +671,8 @@ class LibvirtDriver(AbstractSystemsDriver):
             bios = ET.SubElement(metadata, '{%s}bios' % (namespace))
             attributes = ET.SubElement(bios, '{%s}attributes' % (namespace))
             for key, value in sorted(bios_attributes.items()):
+                if not isinstance(value, str):
+                    value = str(value)
                 ET.SubElement(attributes,
                               '{%s}attribute' % (namespace),
                               name=key,
