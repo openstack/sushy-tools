@@ -300,10 +300,11 @@ class StaticDriver(base.DriverBase):
                 custom_cert_file.close()
 
         self._logger.debug(
-            'Fetched image %(file)s for %(identity)s' % {
-                'identity': identity, 'file': local_file})
+            'Fetched image %(url)s for %(identity)s' % {
+                'identity': identity, 'url': image_url})
 
-        device_info['Image'] = local_file
+        device_info['Image'] = image_url
+        device_info['ImageName'] = local_file
         device_info['Inserted'] = inserted
         device_info['WriteProtected'] = write_protected
         device_info['UserName'] = username or ''

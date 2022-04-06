@@ -112,7 +112,8 @@ class StaticDriverTestCase(base.BaseTestCase):
         mock_rename.assert_called_once_with(
             'alphabet.soup', '/alphabet/soup/fish.iso')
 
-        self.assertEqual('fish.iso', device_info['Image'])
+        self.assertEqual('http://fish.it/red.iso', device_info['Image'])
+        self.assertEqual('fish.iso', device_info['ImageName'])
         self.assertTrue(device_info['Inserted'])
         self.assertFalse(device_info['WriteProtected'])
         self.assertEqual('', device_info['UserName'])
@@ -152,7 +153,8 @@ class StaticDriverTestCase(base.BaseTestCase):
         mock_rename.assert_called_once_with(
             'alphabet.soup', '/alphabet/soup/fish.iso')
 
-        self.assertEqual('fish.iso', device_info['Image'])
+        self.assertEqual('http://fish.it/red.iso', device_info['Image'])
+        self.assertEqual('fish.iso', device_info['ImageName'])
         self.assertTrue(device_info['Inserted'])
         self.assertFalse(device_info['WriteProtected'])
         self.assertEqual('Admin', device_info['UserName'])
@@ -190,7 +192,8 @@ class StaticDriverTestCase(base.BaseTestCase):
         mock_rename.assert_called_once_with(
             'alphabet.soup', '/alphabet/soup/red.iso')
 
-        self.assertEqual('red.iso', device_info['Image'])
+        self.assertEqual('http://fish.it/red.iso', device_info['Image'])
+        self.assertEqual('red.iso', device_info['ImageName'])
         self.assertTrue(device_info['Inserted'])
         self.assertFalse(device_info['WriteProtected'])
 
@@ -226,7 +229,8 @@ class StaticDriverTestCase(base.BaseTestCase):
         mock_rename.assert_called_once_with(
             'alphabet.soup', '/alphabet/soup/boot-abc')
 
-        self.assertEqual('boot-abc', device_info['Image'])
+        self.assertEqual(full_url, device_info['Image'])
+        self.assertEqual('boot-abc', device_info['ImageName'])
         self.assertTrue(device_info['Inserted'])
         self.assertFalse(device_info['WriteProtected'])
 
@@ -269,7 +273,8 @@ class StaticDriverTestCase(base.BaseTestCase):
         mock_rename.assert_called_once_with(
             'alphabet.soup', '/alphabet/soup/fish.iso')
 
-        self.assertEqual('fish.iso', device_info['Image'])
+        self.assertEqual('https://fish.it/red.iso', device_info['Image'])
+        self.assertEqual('fish.iso', device_info['ImageName'])
         self.assertTrue(device_info['Inserted'])
         self.assertFalse(device_info['WriteProtected'])
         self.assertEqual(local_file, device_info['_local_file'])
@@ -308,7 +313,8 @@ class StaticDriverTestCase(base.BaseTestCase):
         mock_rename.assert_called_once_with(
             'alphabet.soup', '/alphabet/soup/fish.iso')
 
-        self.assertEqual('fish.iso', device_info['Image'])
+        self.assertEqual('https://fish.it/red.iso', device_info['Image'])
+        self.assertEqual('fish.iso', device_info['ImageName'])
         self.assertTrue(device_info['Inserted'])
         self.assertFalse(device_info['WriteProtected'])
         self.assertEqual(local_file, device_info['_local_file'])
@@ -350,7 +356,8 @@ class StaticDriverTestCase(base.BaseTestCase):
         mock_rename.assert_called_once_with(
             'alphabet.soup', '/alphabet/soup/fish.iso')
 
-        self.assertEqual('fish.iso', device_info['Image'])
+        self.assertEqual('https://fish.it/red.iso', device_info['Image'])
+        self.assertEqual('fish.iso', device_info['ImageName'])
         self.assertTrue(device_info['Inserted'])
         self.assertFalse(device_info['WriteProtected'])
         self.assertEqual(local_file, device_info['_local_file'])
