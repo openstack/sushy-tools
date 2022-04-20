@@ -1,6 +1,6 @@
 - job:
-    name: sushy-tools-tempest-partition-bios-redfish-pxe
-    parent: ironic-tempest-partition-bios-redfish-pxe
+    name: sushy-tools-tempest-bios-redfish-netboot
+    parent: ironic-tempest-bios-redfish-netboot
     irrelevant-files:
       - ^test-requirements.txt$
       - ^sushy_tools/tests/.*$
@@ -8,8 +8,8 @@
       - openstack/sushy-tools
 
 - job:
-    name: sushy-tools-tempest-partition-uefi-redfish-vmedia
-    parent: ironic-tempest-partition-uefi-redfish-vmedia
+    name: sushy-tools-tempest-uefi-redfish-vmedia
+    parent: ironic-tempest-uefi-redfish-vmedia
     irrelevant-files:
       - ^test-requirements.txt$
       - ^sushy_tools/tests/.*$
