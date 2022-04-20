@@ -1,4 +1,5 @@
 libvirt-dev [platform:dpkg]
+libvirt-devel [platform:rpm]
 pkg-config [platform:dpkg]
 # fonts-freefont-otf is needed for pdf docs builds with the 'xelatex' engine
 fonts-freefont-otf [doc]
