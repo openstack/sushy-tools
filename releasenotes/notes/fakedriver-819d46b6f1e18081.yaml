@@ -1,0 +1,9 @@
+---
+features:
+  - |
+    Adds a fake system driver (actived using the ``--fake`` argument) that
+    does not have an actual backend and works by storing all values in
+    the cache.
+
+    It is currently functional enough for the Ironic's ``ramdisk`` deploy
+    (and undeploy) to finish successfully.

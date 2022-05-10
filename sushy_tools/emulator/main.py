@@ -33,6 +33,7 @@ from sushy_tools.emulator.resources import drives as drvdriver
 from sushy_tools.emulator.resources import indicators as inddriver
 from sushy_tools.emulator.resources import managers as mgrdriver
 from sushy_tools.emulator.resources import storage as stgdriver
+from sushy_tools.emulator.resources.systems import fakedriver
 from sushy_tools.emulator.resources.systems import libvirtdriver
 from sushy_tools.emulator.resources.systems import novadriver
 from sushy_tools.emulator.resources import vmedia as vmddriver
@@ -95,9 +96,14 @@ class Application(flask.Flask):
     @property
     @memoize.memoize()
     def systems(self):
+        fake = self.config.get('SUSHY_EMULATOR_FAKE_DRIVER')
         os_cloud = self.config.get('SUSHY_EMULATOR_OS_CLOUD')
 
-        if os_cloud:
+        if fake:
+            result = fakedriver.FakeDriver.initialize(
+                self.config, self.logger)()
+
+        elif os_cloud:
             if not novadriver.is_loaded:
                 self.logger.error('Nova driver not loaded')
                 sys.exit(1)
@@ -769,6 +775,10 @@ def parse_args():
                                     'environment variable '
                                     'SUSHY_EMULATOR_LIBVIRT_URI. '
                                     'Default is qemu:///system')
+    backend_group.add_argument('--fake', action='store_true',
+                               help='Use the fake driver. Can also be set '
+                                    'via environmnet variable '
+                                    'SUSHY_EMULATOR_FAKE_DRIVER.')
 
     return parser.parse_args()
 
@@ -786,6 +796,9 @@ def main():
 
     if args.libvirt_uri:
         app.config['SUSHY_EMULATOR_LIBVIRT_URI'] = args.libvirt_uri
+
+    if args.fake:
+        app.config['SUSHY_EMULATOR_FAKE_DRIVER'] = True
 
     else:
         for envvar in ('SUSHY_EMULATOR_LIBVIRT_URL',  # backward compatibility
