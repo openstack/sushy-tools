@@ -363,16 +363,22 @@ def system_resource(identity):
 
         app.logger.debug('Serving resources for system "%s"', identity)
 
+        def try_get(call):
+            try:
+                return call(identity)
+            except error.NotSupportedError:
+                return None
+
         return flask.render_template(
             'system.json',
             identity=identity,
             name=app.systems.name(identity),
             uuid=app.systems.uuid(identity),
             power_state=app.systems.get_power_state(identity),
-            total_memory_gb=app.systems.get_total_memory(identity),
-            total_cpus=app.systems.get_total_cpus(identity),
+            total_memory_gb=try_get(app.systems.get_total_memory),
+            total_cpus=try_get(app.systems.get_total_cpus),
             boot_source_target=app.systems.get_boot_device(identity),
-            boot_source_mode=app.systems.get_boot_mode(identity),
+            boot_source_mode=try_get(app.systems.get_boot_mode),
             managers=app.managers.get_managers_for_system(identity),
             chassis=app.chassis.chassis[:1],
             indicator_led=app.indicators.get_indicator_state(

@@ -305,21 +305,6 @@ class OpenStackDriver(AbstractSystemsDriver):
 
         return flavor.vcpus
 
-    def get_bios(self, identity):
-        """Not supported as Openstack SDK does not expose API for BIOS"""
-        raise error.NotSupportedError(
-            'Operation not supported by the virtualization driver')
-
-    def set_bios(self, identity, attributes):
-        """Not supported as Openstack SDK does not expose API for BIOS"""
-        raise error.NotSupportedError(
-            'Operation not supported by the virtualization driver')
-
-    def reset_bios(self, identity):
-        """Not supported as Openstack SDK does not expose API for BIOS"""
-        raise error.NotSupportedError(
-            'Operation not supported by the virtualization driver')
-
     def get_nics(self, identity):
         """Get server's network interfaces
 
@@ -343,43 +328,3 @@ class OpenStackDriver(AbstractSystemsDriver):
                         'Could not find MAC address in %s', adr)
         return [{'id': mac, 'mac': mac}
                 for mac in macs]
-
-    def get_boot_image(self, identity, device):
-        """Get backend VM boot image info
-
-        :param identity: node name or ID
-        :param device: device type (from
-            `sushy_tools.emulator.constants`)
-        :returns: a `tuple` of (boot_image, write_protected, inserted)
-        :raises: `error.FishyError` if boot device can't be accessed
-        """
-        raise error.NotSupportedError('Not implemented')
-
-    def set_boot_image(self, identity, device, boot_image=None,
-                       write_protected=True):
-        """Set backend VM boot image
-
-        :param identity: node name or ID
-        :param device: device type (from
-            `sushy_tools.emulator.constants`)
-        :param boot_image: path to the image file or `None` to remove
-            configured image entirely
-        :param write_protected: expose media as read-only or writable
-
-        :raises: `error.FishyError` if boot device can't be set
-        """
-        raise error.NotSupportedError('Not implemented')
-
-    def get_simple_storage_collection(self, identity):
-        raise error.NotSupportedError('Not implemented')
-
-    def find_or_create_storage_volume(self, data):
-        """Find/create volume based on existence in the virtualization backend
-
-        :param data: data about the volume in dict form with values for `Id`,
-                     `Name`, `CapacityBytes`, `VolumeType`, `libvirtPoolName`
-                     and `libvirtVolName`
-
-        :returns: Id of the volume if successfully found/created else None
-        """
-        raise error.NotSupportedError('Not implemented')

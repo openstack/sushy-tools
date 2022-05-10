@@ -15,6 +15,8 @@
 
 import abc
 
+from sushy_tools import error
+
 
 class AbstractSystemsDriver(metaclass=abc.ABCMeta):
     """Base class for all virtualization drivers"""
@@ -110,6 +112,7 @@ class AbstractSystemsDriver(metaclass=abc.ABCMeta):
         :returns: either *UEFI* or *Legacy* as `str` or `None` if
             current boot mode can't be determined
         """
+        raise error.NotSupportedError('Not implemented')
 
     def set_boot_mode(self, identity, boot_mode):
         """Set computer system boot mode.
@@ -119,24 +122,24 @@ class AbstractSystemsDriver(metaclass=abc.ABCMeta):
 
         :raises: `FishyError` if boot mode can't be set
         """
+        raise error.NotSupportedError('Not implemented')
 
-    @abc.abstractmethod
     def get_total_memory(self, identity):
         """Get computer system total memory
 
         :returns: available RAM in GiB as `int` or `None` if total memory
             count can't be determined
         """
+        raise error.NotSupportedError('Not implemented')
 
-    @abc.abstractmethod
     def get_total_cpus(self, identity):
         """Get computer system total count of available CPUs
 
         :returns: available CPU count as `int` or `None` if CPU count
             can't be determined
         """
+        raise error.NotSupportedError('Not implemented')
 
-    @abc.abstractmethod
     def get_bios(self, identity):
         """Get BIOS attributes for the system
 
@@ -144,8 +147,8 @@ class AbstractSystemsDriver(metaclass=abc.ABCMeta):
 
         :raises: `FishyError` if BIOS attributes cannot be processed
         """
+        raise error.NotSupportedError('Not implemented')
 
-    @abc.abstractmethod
     def set_bios(self, identity, attributes):
         """Update BIOS attributes
 
@@ -153,22 +156,22 @@ class AbstractSystemsDriver(metaclass=abc.ABCMeta):
 
         :raises: `FishyError` if BIOS attributes cannot be processed
         """
+        raise error.NotSupportedError('Not implemented')
 
-    @abc.abstractmethod
     def reset_bios(self, identity):
         """Reset BIOS attributes to default
 
         :raises: `FishyError` if BIOS attributes cannot be processed
         """
+        raise error.NotSupportedError('Not implemented')
 
-    @abc.abstractmethod
     def get_nics(self, identity):
         """Get list of NICs and their attributes
 
         :returns: list of dictionaries of NICs and their attributes
         """
+        raise error.NotSupportedError('Not implemented')
 
-    @abc.abstractmethod
     def get_boot_image(self, identity, device):
         """Get backend VM boot image info
 
@@ -178,8 +181,8 @@ class AbstractSystemsDriver(metaclass=abc.ABCMeta):
         :returns: a `tuple` of (boot_image, write_protected, inserted)
         :raises: `error.FishyError` if boot device can't be accessed
         """
+        raise error.NotSupportedError('Not implemented')
 
-    @abc.abstractmethod
     def set_boot_image(self, identity, device, boot_image=None,
                        write_protected=True):
         """Set backend VM boot image
@@ -193,13 +196,14 @@ class AbstractSystemsDriver(metaclass=abc.ABCMeta):
 
         :raises: `error.FishyError` if boot device can't be set
         """
+        raise error.NotSupportedError('Not implemented')
 
-    @abc.abstractmethod
     def get_simple_storage_collection(self, identity):
         """Get a dict of Simple Storage Controllers and their devices
 
         :returns: dict of Simple Storage Controllers and their atributes
         """
+        raise error.NotSupportedError('Not implemented')
 
     def find_or_create_storage_volume(self, data):
         """Find/create volume based on existence in the virtualization backend
@@ -210,3 +214,4 @@ class AbstractSystemsDriver(metaclass=abc.ABCMeta):
 
         :returns: Id of the volume if successfully found/created else None
         """
+        raise error.NotSupportedError('Not implemented')
