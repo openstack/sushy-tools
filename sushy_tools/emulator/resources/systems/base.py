@@ -124,6 +124,24 @@ class AbstractSystemsDriver(metaclass=abc.ABCMeta):
         """
         raise error.NotSupportedError('Not implemented')
 
+    def get_secure_boot(self, identity):
+        """Get computer system secure boot state for UEFI boot mode.
+
+        :returns: boolean of the current secure boot state
+
+        :raises: `FishyError` if the state can't be fetched
+        """
+        raise error.NotSupportedError('Not implemented')
+
+    def set_secure_boot(self, identity, secure):
+        """Set computer system secure boot state for UEFI boot mode.
+
+        :param secure: boolean requesting the secure boot state
+
+        :raises: `FishyError` if the can't be set
+        """
+        raise error.NotSupportedError('Not implemented')
+
     def get_total_memory(self, identity):
         """Get computer system total memory
 

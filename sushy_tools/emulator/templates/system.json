@@ -67,6 +67,9 @@
     "EthernetInterfaces": {
         "@odata.id": {{ "/redfish/v1/Systems/%s/EthernetInterfaces"|format(identity)|tojson }}
     },
+    "SecureBoot": {
+        "@odata.id": {{ "/redfish/v1/Systems/%s/SecureBoot"|format(identity)|tojson }}
+    },
     "SimpleStorage": {
         "@odata.id": {{ "/redfish/v1/Systems/%s/SimpleStorage"|format(identity)|tojson }}
     },

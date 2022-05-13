@@ -29,6 +29,9 @@ class AliasAccessError(FishyError):
 class NotSupportedError(FishyError):
     """Feature not supported by resource driver"""
 
+    def __init__(self, msg='Unsupported'):
+        super().__init__(msg)
+
 
 class NotFound(FishyError):
     """Entity not found."""

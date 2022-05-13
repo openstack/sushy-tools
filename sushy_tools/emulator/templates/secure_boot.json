@@ -1,0 +1,12 @@
+{
+    "@odata.type": "#SecureBoot.v1_1_0.SecureBoot",
+    "Id": "SecureBoot",
+    "Name": "UEFI Secure Boot",
+    "Actions": {},
+    "SecureBootEnable": {{ 'true' if secure_boot_enable else 'false' }},
+    "SecureBootCurrentBoot": {{ secure_boot_current_boot|string|tojson }},
+    "SecureBootMode": "DeployedMode",
+    "@odata.id": {{ "/redfish/v1/Systems/%s/SecureBoot"|format(identity)|tojson }},
+    "@odata.context": "/redfish/v1/$metadata#SecureBoot.SecureBoot",
+    "@Redfish.Copyright": "Copyright 2014-2017 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+}

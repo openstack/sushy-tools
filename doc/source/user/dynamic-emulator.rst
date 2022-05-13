@@ -152,8 +152,8 @@ On the host you need to have OVMF firmware binaries installed. Fedora users
 could pull them as `edk2-ovmf` RPM. On Ubuntu, `apt-get install ovmf` should
 do the job.
 
-Then you need to create a VM by running `virt-install` with the `--boot uefi`
-option:
+Then you need to create a VM by running `virt-install` with the UEFI specific
+`--boot` options:
 
 Example:
 
@@ -163,7 +163,11 @@ Example:
    virt-install \
       --name vbmc-node \
       --ram 1024 \
-      --boot uefi \
+      --boot loader.readonly=yes \
+      --boot loader.type=pflash \
+      --boot loader.secure=no \
+      --boot loader=/usr/share/OVMF/OVMF_CODE.secboot.fd \
+      --boot nvram.template=/usr/share/OVMF/OVMF_VARS.fd \
       --disk size=1 \
       --vcpus 2 \
       --os-type linux \
@@ -174,16 +178,27 @@ Example:
    rm $tmpfile
 
 This will create a new `libvirt` domain with path to OVMF images properly
-configured. Let's take a note on the path to the blob:
+configured. Let's take a note on the path to the blob by running `virsh dumpxml vbmc-node`:
 
-.. code-block:: bash
+Example:
 
-    $ virsh dumpxml vbmc-node | grep loader
-    <loader readonly='yes' type='pflash'>/usr/share/edk2/ovmf/OVMF_CODE.fd</loader>
+.. code-block:: xml
 
-Because now we need to add this path to emulator's configuration matching
-VM architecture we are running. Make a copy of stock configuration file
-and edit it accordingly:
+   <domain type="kvm">
+     ...
+     <os>
+       <type arch="x86_64" machine="q35">hvm</type>
+       <loader readonly="yes" type="pflash" secure="no">/usr/share/edk2/ovmf/OVMF_CODE.secboot.fd</loader>
+       <nvram template="/usr/share/edk2/ovmf/OVMF_VARS.fd"/>
+       <boot dev="hd"/>
+     </os>
+     ...
+   </domain>
+
+Because now we need to add this path to emulator's configuration matching VM
+architecture we are running. It is also possible to make Redfish calls to enable
+or disable Secure Boot by specifying which nvram template to load in each case.
+Make a copy of stock configuration file and edit it accordingly:
 
 .. code-block:: bash
 
@@ -191,9 +206,11 @@ and edit it accordingly:
     ...
     SUSHY_EMULATOR_BOOT_LOADER_MAP = {
         'Uefi': {
-            'x86_64': '/usr/share/edk2/ovmf/OVMF_CODE.fd',
+            'x86_64': '/usr/share/OVMF/OVMF_CODE.secboot.fd',
             ...
     }
+    SUSHY_EMULATOR_SECURE_BOOT_ENABLED_NVRAM = '/usr/share/OVMF/OVMF_VARS.secboot.fd'
+    SUSHY_EMULATOR_SECURE_BOOT_DISABLED_NVRAM = '/usr/share/OVMF/OVMF_VARS.fd'
     ...
 
 Now you can run `sushy-emulator` with the updated configuration file:

@@ -262,3 +262,28 @@ class NovaDriverTestCase(base.BaseTestCase):
         self.assertRaises(
             error.FishyError,
             self.test_driver.get_simple_storage_collection, self.uuid)
+
+    def test_get_secure_boot_off(self):
+        server = mock.Mock(id=self.uuid, image=dict(id=self.uuid))
+        self.nova_mock.return_value.get_server.return_value = server
+
+        image = mock.Mock()
+
+        self.nova_mock.return_value.image.find_image.return_value = image
+
+        self.assertFalse(self.test_driver.get_secure_boot(self.uuid))
+
+    def test_get_secure_boot_on(self):
+        server = mock.Mock(id=self.uuid, image=dict(id=self.uuid))
+        self.nova_mock.return_value.get_server.return_value = server
+
+        image = mock.Mock(os_secure_boot='required')
+
+        self.nova_mock.return_value.image.find_image.return_value = image
+
+        self.assertTrue(self.test_driver.get_secure_boot(self.uuid))
+
+    def test_set_secure_boot(self):
+        self.assertRaises(
+            error.NotSupportedError, self.test_driver.set_secure_boot,
+            self.uuid, True)
