@@ -772,7 +772,7 @@ class LibvirtDriver(AbstractSystemsDriver):
         tree = ET.fromstring(domain.XMLDesc(libvirt.VIR_DOMAIN_XML_INACTIVE))
         return [{'id': iface.get('address'), 'mac': iface.get('address')}
                 for iface in tree.findall(
-                ".//devices/interface[@type='network']/mac")]
+                ".//devices/interface/mac")]
 
     def get_processors(self, identity):
         """Get list of processors
