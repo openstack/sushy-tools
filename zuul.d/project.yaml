@@ -6,11 +6,9 @@
       - release-notes-jobs-python3
     check:
       jobs:
-        - openstack-tox-py36
         - sushy-tools-tempest-bios-redfish-netboot
         - sushy-tools-tempest-uefi-redfish-vmedia
     gate:
       jobs:
-        - openstack-tox-py36
         - sushy-tools-tempest-bios-redfish-netboot
         - sushy-tools-tempest-uefi-redfish-vmedia
