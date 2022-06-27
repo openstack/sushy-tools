@@ -913,11 +913,13 @@ class LibvirtDriver(AbstractSystemsDriver):
         if os_element is not None:
             type_element = os_element.find('type')
             if type_element is not None:
+                arch = type_element.attrib.get('arch')
                 machine = type_element.attrib.get('machine')
                 if machine and 'q35' in machine:
                     # No IDE support for newer q35 machine types
                     return 'sata'
-
+                if arch and 'aarch64' in arch:
+                    return 'scsi'
         return 'ide'
 
     def _add_boot_image(self, domain, domain_tree, device,
