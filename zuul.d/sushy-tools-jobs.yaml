@@ -1,6 +1,6 @@
 - job:
-    name: sushy-tools-tempest-bios-redfish-netboot
-    parent: ironic-tempest-bios-redfish-netboot
+    name: sushy-tools-tempest-bios-redfish-pxe
+    parent: ironic-tempest-bios-redfish-pxe
     irrelevant-files:
       - ^test-requirements.txt$
       - ^sushy_tools/tests/.*$

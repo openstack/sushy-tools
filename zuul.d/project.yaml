@@ -6,9 +6,9 @@
       - release-notes-jobs-python3
     check:
       jobs:
-        - sushy-tools-tempest-bios-redfish-netboot
+        - sushy-tools-tempest-bios-redfish-pxe
         - sushy-tools-tempest-uefi-redfish-vmedia
     gate:
       jobs:
-        - sushy-tools-tempest-bios-redfish-netboot
+        - sushy-tools-tempest-bios-redfish-pxe
         - sushy-tools-tempest-uefi-redfish-vmedia
