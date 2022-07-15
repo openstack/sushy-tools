@@ -81,7 +81,7 @@ class OpenStackDriver(AbstractSystemsDriver):
     @memoize.memoize(permanent_cache=PERMANENT_CACHE)
     def _get_flavor(self, identity):
         instance = self._get_instance(identity)
-        return self._cc.get_flavor(instance.flavor.id)
+        return self._cc.get_flavor(instance.flavor.original_name)
 
     @memoize.memoize(permanent_cache=PERMANENT_CACHE)
     def _get_image_info(self, identity):
