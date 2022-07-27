@@ -21,7 +21,7 @@ virtual_media = flask.Blueprint(
     url_prefix='/redfish/v1/Managers/<identity>/VirtualMedia')
 
 
-@virtual_media.route('/', methods=['GET'])
+@virtual_media.route('', methods=['GET'])
 @api_utils.returns_json
 def virtual_media_collection_resource(identity):
     api_utils.debug('Serving virtual media resources for manager "%s"',

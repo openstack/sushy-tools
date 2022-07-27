@@ -20,7 +20,7 @@ from sushy_tools.tests.unit.emulator import test_main
 class CertificateServiceTestCase(test_main.EmulatorTestCase):
 
     def test_root(self, managers_mock, vmedia_mock):
-        response = self.app.get('redfish/v1/CertificateService/')
+        response = self.app.get('redfish/v1/CertificateService')
 
         self.assertEqual(200, response.status_code)
         self.assertIn('#CertificateService.ReplaceCertificate',

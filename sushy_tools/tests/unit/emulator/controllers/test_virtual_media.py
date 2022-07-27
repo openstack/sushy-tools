@@ -26,7 +26,7 @@ class VirtualMediaTestCase(test_main.EmulatorTestCase):
         vmedia_mock.return_value.devices = ['CD', 'Floppy']
 
         response = self.app.get(
-            '/redfish/v1/Managers/%s/VirtualMedia/' % self.uuid)
+            '/redfish/v1/Managers/%s/VirtualMedia' % self.uuid)
 
         self.assertEqual(200, response.status_code)
         self.assertEqual('Virtual Media Services', response.json['Name'])
@@ -40,7 +40,7 @@ class VirtualMediaTestCase(test_main.EmulatorTestCase):
         vmedia_mock.return_value.get_devices.return_value = []
 
         response = self.app.get(
-            'redfish/v1/Managers/' + self.uuid + '/VirtualMedia/')
+            'redfish/v1/Managers/' + self.uuid + '/VirtualMedia')
 
         self.assertEqual(200, response.status_code)
         self.assertEqual('Virtual Media Services', response.json['Name'])

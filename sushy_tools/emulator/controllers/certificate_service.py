@@ -28,7 +28,7 @@ _VMEDIA_URI_PATTERN = re.compile(
 )
 
 
-@certificate_service.route('/', methods=['GET'])
+@certificate_service.route('', methods=['GET'])
 @api_utils.returns_json
 def certificate_service_resource():
     api_utils.debug('Serving certificate service')
