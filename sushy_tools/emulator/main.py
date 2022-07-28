@@ -83,6 +83,10 @@ class Application(flask.Flask):
         # This is needed for WSGI since it cannot process argv
         self.configure(config_file=os.environ.get('SUSHY_EMULATOR_CONFIG'))
 
+        @self.before_request
+        def reset_cache():
+            self._cache = {}
+
     def configure(self, config_file=None, extra_config=None):
         if config_file:
             self.config.from_pyfile(config_file)
