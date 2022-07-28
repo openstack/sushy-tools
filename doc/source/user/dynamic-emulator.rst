@@ -286,6 +286,28 @@ And flip its power state via the Redfish call:
 You can have as many OpenStack instances as you need. The instances can be
 concurrently managed over Redfish and functionally similar tools.
 
+Filtering by allowed instances
+++++++++++++++++++++++++++++++
+
+It is not always desirable to manage every accessable virtual machine as a
+Redfish System, such as when an OpenStack tenant has many instances which do not
+represent virtual baremetal. In this case it is possible to specify a list of
+UUIDs which are allowed.
+
+.. code-block:: bash
+
+    $ cat sushy-tools/doc/source/admin/emulator.conf
+    ...
+    SUSHY_EMULATOR_ALLOWED_INSTANCES = [
+        "437XR1138R2",
+        "1",
+        "529QB9450R6",
+        "529QB9451R6",
+        "529QB9452R6",
+        "529QB9453R6"
+    ]
+    ...
+
 Managers resource
 -----------------
 
