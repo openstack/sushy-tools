@@ -54,8 +54,8 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'sushy-tools Release Notes'
-copyright = u'2018, Sushy Developers'
+project = 'sushy-tools Release Notes'
+copyright = '2018, Sushy Developers'
 
 # openstackdocstheme options
 openstackdocs_repo_name = 'openstack/sushy-tools'
@@ -214,8 +214,8 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
     ('index', 'SushyToolsReleaseNotes.tex',
-     u'Sushy Tools Release Notes Documentation',
-     u'Ironic Developers', 'manual'),
+     'Sushy Tools Release Notes Documentation',
+     'Ironic Developers', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -245,8 +245,8 @@ latex_documents = [
 # (source start file, name, description, authors, manual section).
 man_pages = [
     ('index', 'sushytoolsreleasenotes',
-     u'Sushy Tools Release Notes Documentation',
-     [u'Ironic Developers'], 1)
+     'Sushy Tools Release Notes Documentation',
+     ['Ironic Developers'], 1)
 ]
 
 # If true, show URL addresses after external links.
@@ -260,8 +260,8 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
     ('index', 'SushyToolsReleaseNotes',
-     u'Sushy Tools Release Notes Documentation',
-     u'Ironic Developers', 'SushyToolsReleaseNotes',
+     'Sushy Tools Release Notes Documentation',
+     'Ironic Developers', 'SushyToolsReleaseNotes',
      'One line description of project.',
      'Miscellaneous'),
 ]
