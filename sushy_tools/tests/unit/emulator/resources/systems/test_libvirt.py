@@ -948,6 +948,8 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         nics = self.test_driver.get_nics(self.uuid)
         self.assertEqual([{'id': '00:11:22:33:44:55',
                            'mac': '00:11:22:33:44:55'},
+                          {'id': '52:54:00:12:31:dd',
+                           'mac': '52:54:00:12:31:dd'},
                           {'id': '52:54:00:4e:5d:37',
                            'mac': '52:54:00:4e:5d:37'}],
                          sorted(nics, key=lambda k: k['id']))
