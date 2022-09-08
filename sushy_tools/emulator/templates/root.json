@@ -4,6 +4,9 @@
     "Name": "Redvirt Service",
     "RedfishVersion": "1.5.0",
     "UUID": "85775665-c110-4b85-8989-e6162170b3ec",
+    "Chassis": {
+        "@odata.id": "/redfish/v1/Chassis"
+    },
     "Systems": {
         "@odata.id": "/redfish/v1/Systems"
     },
