@@ -189,6 +189,20 @@ class LibvirtDriver(AbstractSystemsDriver):
 
             raise error.AliasAccessError(domain.UUIDString())
 
+    # Copied from nova/virt/libvirt/guest.py
+    def get_xml_desc(self, domain, dump_inactive=True,
+                     dump_sensitive=True):
+        """Returns xml description of guest.
+
+        :param dump_inactive: Dump inactive domain information
+        :param domain: The libvirt domain to call
+        :param dump_sensitive: Dump security sensitive information
+        :returns string: XML description of the guest
+        """
+        flags = dump_inactive and libvirt.VIR_DOMAIN_XML_INACTIVE or 0
+        flags |= dump_sensitive and libvirt.VIR_DOMAIN_XML_SECURE or 0
+        return domain.XMLDesc(flags=flags)
+
     @property
     def driver(self):
         """Return human-friendly driver information
@@ -386,7 +400,7 @@ class LibvirtDriver(AbstractSystemsDriver):
         domain = self._get_domain(identity)
 
         # XML schema: https://libvirt.org/formatdomain.html#elementsOSBIOS
-        tree = ET.fromstring(domain.XMLDesc(libvirt.VIR_DOMAIN_XML_INACTIVE))
+        tree = ET.fromstring(self.get_xml_desc(domain))
 
         # Remove bootloader configuration
 
@@ -492,7 +506,7 @@ class LibvirtDriver(AbstractSystemsDriver):
         domain = self._get_domain(identity, readonly=True)
 
         # XML schema: https://libvirt.org/formatdomain.html#elementsOSBIOS
-        tree = ET.fromstring(domain.XMLDesc(libvirt.VIR_DOMAIN_XML_INACTIVE))
+        tree = ET.fromstring(self.get_xml_desc(domain))
 
         try:
             loader_type = self.BOOT_MODE_MAP[boot_mode]
@@ -1062,8 +1076,7 @@ class LibvirtDriver(AbstractSystemsDriver):
         """
         domain = self._get_domain(identity)
 
-        domain_tree = ET.fromstring(
-            domain.XMLDesc(libvirt.VIR_DOMAIN_XML_INACTIVE))
+        domain_tree = ET.fromstring(self.get_xml_desc(domain))
 
         self._remove_boot_images(domain, domain_tree, device)
 
