@@ -4,7 +4,9 @@ Redfish development tools
 
 This is a set of simple simulation tools aiming at supporting the
 development and testing of the Redfish protocol implementations and,
-in particular, Sushy library (https://docs.openstack.org/sushy/).
+in particular, Sushy library (https://docs.openstack.org/sushy/). It
+is not designed for use outside of development and testing environments.
+Please do not run sushy-tools in a production environment of any kind.
 
 The package ships two simulators - static Redfish responder and
 virtual Redfish BMC that is backed by libvirt or OpenStack cloud.
