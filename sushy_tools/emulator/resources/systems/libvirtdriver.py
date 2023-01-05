@@ -403,9 +403,11 @@ class LibvirtDriver(AbstractSystemsDriver):
         tree = ET.fromstring(self.get_xml_desc(domain))
 
         # Remove bootloader configuration
+        os_element_order = []
 
         for os_element in tree.findall('os'):
             for boot_element in os_element.findall('boot'):
+                os_element_order.append(boot_element.get('dev'))
                 os_element.remove(boot_element)
 
             if self.SUSHY_EMULATOR_IGNORE_BOOT_DEVICE:
@@ -428,20 +430,31 @@ class LibvirtDriver(AbstractSystemsDriver):
             raise error.FishyError(msg)
 
         target_device_elements = []
+        cur_hd_osboot_elements = []
+        cur_hd_order_elements = []
 
         # Remove per-disk boot configuration
+        # We should save at least hdd boot entries instead of just removing
+        # everything. In some scenarious PXE after provisioning stops replying
+        # and if there is no other boot device, then vm will fail to boot
+        # cdrom and floppy are ignored.
 
         for disk_element in devices_element.findall('disk'):
 
             device_attr = disk_element.get('device')
             if device_attr is None:
                 continue
+            boot_elements = disk_element.findall('boot')
 
             # NOTE(etingof): multiple devices of the same type not supported
             if device_attr == target:
                 target_device_elements.append(disk_element)
+            elif 'hd' in os_element_order:
+                cur_hd_osboot_elements.append(disk_element)
+            elif boot_elements:
+                cur_hd_order_elements.append(disk_element)
 
-            for boot_element in disk_element.findall('boot'):
+            for boot_element in boot_elements:
                 disk_element.remove(boot_element)
 
         target = self.INTERFACE_MAP.get(boot_source)
@@ -462,6 +475,15 @@ class LibvirtDriver(AbstractSystemsDriver):
                                  'uuid': domain.UUIDString()})
 
             raise error.FishyError(msg)
+
+        # OS boot and per device boot order are mutually exclusive
+        if cur_hd_osboot_elements:
+            sorted_hd_elements = sorted(
+                cur_hd_osboot_elements,
+                key=lambda child: child.find('target').get('dev'))
+            target_device_elements.extend(sorted_hd_elements)
+        else:
+            target_device_elements.extend(cur_hd_order_elements)
 
         # NOTE(etingof): Make all chosen devices bootable (important for NICs)
 
@@ -701,7 +723,10 @@ class LibvirtDriver(AbstractSystemsDriver):
     def _process_bios(self, identity,
                       bios_attributes=DEFAULT_BIOS_ATTRIBUTES,
                       update_existing_attributes=False):
-        """Process Libvirt domain XML for BIOS attributes and update it if necessary
+        """Process Libvirt domain XML for BIOS attributes
+
+        Process Libvirt domain XML for BIOS attributes and update it if
+        necessary
 
         :param identity: libvirt domain name or ID
         :param bios_attributes: Full list of BIOS attributes to use if
@@ -712,6 +737,7 @@ class LibvirtDriver(AbstractSystemsDriver):
 
         :raises: `error.FishyError` if BIOS attributes cannot be saved
         """
+
         domain = self._get_domain(identity)
 
         result = self._process_bios_attributes(
