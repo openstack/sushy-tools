@@ -101,7 +101,7 @@ class LibvirtDriver(AbstractSystemsDriver):
 
     BOOT_LOADER_MAP = {
         'UEFI': {
-            'x86_64': '/usr/share/OVMF/OVMF_CODE.fd',
+            'x86_64': '/usr/share/OVMF/OVMF_CODE.secboot.fd',
             'aarch64': '/usr/share/AAVMF/AAVMF_CODE.fd'
         },
         'Legacy': {
@@ -110,6 +110,9 @@ class LibvirtDriver(AbstractSystemsDriver):
         }
 
     }
+
+    SECURE_BOOT_ENABLED_NVRAM = '/usr/share/OVMF/OVMF_VARS.secboot.fd'
+    SECURE_BOOT_DISABLED_NVRAM = '/usr/share/OVMF/OVMF_VARS.fd'
 
     DEVICE_TYPE_MAP = {
         constants.DEVICE_TYPE_CD: 'cdrom',
@@ -161,6 +164,12 @@ class LibvirtDriver(AbstractSystemsDriver):
             'SUSHY_EMULATOR_BOOT_LOADER_MAP', cls.BOOT_LOADER_MAP)
         cls.KNOWN_BOOT_LOADERS = set(y for x in cls.BOOT_LOADER_MAP.values()
                                      for y in x.values())
+        cls.SECURE_BOOT_ENABLED_NVRAM = cls._config.get(
+            'SUSHY_EMULATOR_SECURE_BOOT_ENABLED_NVRAM',
+            cls.SECURE_BOOT_ENABLED_NVRAM)
+        cls.SECURE_BOOT_DISABLED_NVRAM = cls._config.get(
+            'SUSHY_EMULATOR_SECURE_BOOT_DISABLED_NVRAM',
+            cls.SECURE_BOOT_DISABLED_NVRAM)
         cls.SUSHY_EMULATOR_IGNORE_BOOT_DEVICE = \
             cls._config.get('SUSHY_EMULATOR_IGNORE_BOOT_DEVICE', False)
         return cls
@@ -503,11 +512,34 @@ class LibvirtDriver(AbstractSystemsDriver):
 
         :raises: `error.FishyError` if boot mode can't be set
         """
+
         domain = self._get_domain(identity, readonly=True)
 
-        # XML schema: https://libvirt.org/formatdomain.html#elementsOSBIOS
+        # XML schema:
+        # https://libvirt.org/formatdomain.html#operating-system-booting
         tree = ET.fromstring(self.get_xml_desc(domain))
+        self._build_os_element(identity, tree, boot_mode)
 
+        with libvirt_open(self._uri) as conn:
+
+            try:
+                conn.defineXML(ET.tostring(tree).decode('utf-8'))
+
+            except libvirt.libvirtError as e:
+                msg = ('Error changing boot mode at libvirt URI '
+                       '"%(uri)s": %(error)s' % {'uri': self._uri,
+                                                 'error': e})
+
+                raise error.FishyError(msg)
+
+    def _build_os_element(self, identity, tree, boot_mode, secure=None):
+        """Set the boot mode and secure boot on the os element
+
+        This also converts from the previous manual layout to the automatic
+        approach.
+
+        :raises: `error.FishyError` if boot mode can't be set
+        """
         try:
             loader_type = self.BOOT_MODE_MAP[boot_mode]
 
@@ -529,7 +561,6 @@ class LibvirtDriver(AbstractSystemsDriver):
         type_element = os_element.find('type')
         if type_element is None:
             os_arch = None
-
         else:
             os_arch = type_element.get('arch')
 
@@ -544,41 +575,83 @@ class LibvirtDriver(AbstractSystemsDriver):
                 boot_mode, os_arch)
             loader_path = None
 
-        loader_elements = os_element.findall('loader')
-        if len(loader_elements) > 1:
-            msg = ('Can\'t set boot mode because "loader" element must be '
-                   'present exactly once in domain "%(identity)s" '
+        # delete loader and nvram elements to rebuild from stratch
+        for element in os_element.findall('loader'):
+            os_element.remove(element)
+        for element in os_element.findall('nvram'):
+            os_element.remove(element)
+
+        loader_element = ET.SubElement(os_element, 'loader')
+        loader_element.set('type', loader_type)
+        if loader_path:
+            loader_element.text = loader_path
+            loader_element.set('readonly', 'yes')
+
+        if boot_mode == 'UEFI':
+            nvram_element = ET.SubElement(os_element, 'nvram')
+            if secure:
+                nvram_suffix = '.secboot.fd'
+                loader_element.set('secure', 'yes')
+                nvram_element.set('template', self.SECURE_BOOT_ENABLED_NVRAM)
+            else:
+                nvram_suffix = '.fd'
+                loader_element.set('secure', 'no')
+                nvram_element.set('template', self.SECURE_BOOT_DISABLED_NVRAM)
+
+            # force a different nvram path for secure vs not. This will ensure
+            # it gets regenerated from the template when secure boot mode
+            # changes
+            nvram_path = "/var/lib/libvirt/nvram-%s%s" % (identity,
+                                                          nvram_suffix)
+            nvram_element.text = nvram_path
+
+    def get_secure_boot(self, identity):
+        """Get computer system secure boot state for UEFI boot mode.
+
+        :returns: boolean of the current secure boot state
+
+        :raises: `FishyError` if the state can't be fetched
+        """
+        if self.get_boot_mode(identity) == 'Legacy':
+            msg = 'Legacy boot mode does not support secure boot'
+            raise error.NotSupportedError(msg)
+
+        domain = self._get_domain(identity, readonly=True)
+
+        # XML schema:
+        # https://libvirt.org/formatdomain.html#operating-system-booting
+        tree = ET.fromstring(domain.XMLDesc(libvirt.VIR_DOMAIN_XML_INACTIVE))
+
+        os_element = tree.find('os')
+
+        nvram = os_element.findall('nvram')
+        if len(nvram) > 1:
+            msg = ('Can\'t get secure boot state because "nvram" element '
+                   'must be present exactly once in domain "%(identity)s" '
                    'configuration' % {'identity': identity})
             raise error.FishyError(msg)
 
-        if loader_elements:
-            loader_element = loader_elements[0]
+        if not nvram:
+            return False
+        nvram_template = nvram[0].get('template')
+        return nvram_template == self.SECURE_BOOT_ENABLED_NVRAM
 
-            if loader_element.text not in self.KNOWN_BOOT_LOADERS:
-                msg = ('Unknown boot loader path "%(path)s" in domain '
-                       '"%(identity)s" configuration encountered while '
-                       'setting boot mode "%(mode)s", system architecture '
-                       '"%(arch)s". Consider adding this loader path to '
-                       'emulator config.' % {'identity': identity,
-                                             'mode': boot_mode,
-                                             'arch': os_arch,
-                                             'path': loader_element.text})
-                raise error.FishyError(msg)
+    def set_secure_boot(self, identity, secure):
+        """Set computer system secure boot state for UEFI boot mode.
 
-            if loader_path:
-                loader_element.set('type', loader_type)
-                loader_element.set('readonly', 'yes')
-                loader_element.text = loader_path
+        :param secure: boolean requesting the secure boot state
 
-            else:
-                # NOTE(etingof): path must be present or element must be absent
-                os_element.remove(loader_element)
+        :raises: `FishyError` if the can't be set
+        """
+        if self.get_boot_mode(identity) == 'Legacy':
+            msg = 'Legacy boot mode does not support secure boot'
+            raise error.NotSupportedError(msg)
 
-        elif loader_path:
-            loader_element = ET.SubElement(os_element, 'loader')
-            loader_element.set('type', loader_type)
-            loader_element.set('readonly', 'yes')
-            loader_element.text = loader_path
+        domain = self._get_domain(identity, readonly=True)
+
+        # XML schema: https://libvirt.org/formatdomain.html#elementsOSBIOS
+        tree = ET.fromstring(domain.XMLDesc(libvirt.VIR_DOMAIN_XML_INACTIVE))
+        self._build_os_element(identity, tree, 'UEFI', secure)
 
         with libvirt_open(self._uri) as conn:
 
@@ -586,7 +659,7 @@ class LibvirtDriver(AbstractSystemsDriver):
                 conn.defineXML(ET.tostring(tree).decode('utf-8'))
 
             except libvirt.libvirtError as e:
-                msg = ('Error changing boot mode at libvirt URI '
+                msg = ('Error changing secure boot at libvirt URI '
                        '"%(uri)s": %(error)s' % {'uri': self._uri,
                                                  'error': e})
 

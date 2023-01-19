@@ -273,6 +273,34 @@ class OpenStackDriver(AbstractSystemsDriver):
 
         raise error.NotSupportedError(msg)
 
+    def get_secure_boot(self, identity):
+        """Get computer system secure boot state for UEFI boot mode.
+
+        :returns: boolean of the current secure boot state
+
+        :raises: `FishyError` if the state can't be fetched
+        """
+        if self.get_boot_mode(identity) == 'Legacy':
+            msg = 'Legacy boot mode does not support secure boot'
+            raise error.NotSupportedError(msg)
+
+        instance = self._get_instance(identity)
+
+        image = self._get_image_info(instance.image['id'])
+
+        return getattr(image, 'os_secure_boot', None) == 'required'
+
+    def set_secure_boot(self, identity, secure):
+        """Set computer system secure boot state for UEFI boot mode.
+
+        :param secure: boolean requesting the secure boot state
+
+        :raises: `FishyError` if the can't be set
+        """
+        msg = ('The cloud driver %(driver)s does not support changing secure '
+               'boot mode through Redfish' % {'driver': self.driver})
+        raise error.NotSupportedError(msg)
+
     def get_total_memory(self, identity):
         """Get computer system total memory
 

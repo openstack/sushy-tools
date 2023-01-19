@@ -1,0 +1,12 @@
+---
+features:
+  - |
+    It is now possible to enable and disable UEFI Secure Boot mode via Redfish
+    requests for the libvirt driver. This is possible by configuring domains to
+    use a secure boot capable firmware loader, and setting configuration values
+    `SUSHY_EMULATOR_SECURE_BOOT_ENABLED_NVRAM` and
+    `SUSHY_EMULATOR_SECURE_BOOT_DISABLED_NVRAM` to nvram template paths which
+    enable or disable secure boot.
+
+    The fake driver supports getting and setting secure boot, the nova driver
+    only supports getting.

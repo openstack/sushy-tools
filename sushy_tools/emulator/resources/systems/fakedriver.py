@@ -143,6 +143,12 @@ class FakeDriver(AbstractSystemsDriver):
     def set_boot_mode(self, identity, boot_mode):
         self._update(identity, boot_mode=boot_mode)
 
+    def get_secure_boot(self, identity):
+        return self._get(identity).get('secure_boot', False)
+
+    def set_secure_boot(self, identity, secure):
+        self._update(identity, secure_boot=secure)
+
     def get_boot_image(self, identity, device):
         devinfo = self._get(identity).get('boot_image') or {}
         return devinfo.get(device) or (None, False, False)

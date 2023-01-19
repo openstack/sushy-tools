@@ -92,3 +92,8 @@ class FakeDriverTestCase(base.BaseTestCase):
                          self.test_driver.get_boot_image(UUID, 'Cd'))
         self.assertEqual((None, False, False),
                          self.test_driver.get_boot_image(UUID, 'Hdd'))
+
+    def test_secure_boot(self):
+        self.assertFalse(self.test_driver.get_secure_boot(UUID))
+        self.test_driver.set_secure_boot(UUID, True)
+        self.assertTrue(self.test_driver.get_secure_boot(UUID))

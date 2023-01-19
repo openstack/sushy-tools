@@ -429,6 +429,40 @@ class EthernetInterfacesTestCase(EmulatorTestCase):
 
 
 @patch_resource('systems')
+class SecureBootTestCase(EmulatorTestCase):
+
+    def test_secure_boot_get(self, systems_mock):
+        systems_mock = systems_mock.return_value
+        systems_mock.get_secure_boot.return_value = True
+        response = self.app.get('redfish/v1/Systems/%s/SecureBoot' % self.uuid)
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('UEFI Secure Boot',
+                         response.json['Name'])
+        self.assertTrue(response.json['SecureBootEnable'])
+
+        systems_mock.get_secure_boot.return_value = False
+        response = self.app.get('redfish/v1/Systems/%s/SecureBoot' % self.uuid)
+        self.assertFalse(response.json['SecureBootEnable'])
+
+    def test_secure_boot_patch_on(self, systems_mock):
+        systems_mock = systems_mock.return_value
+        data = {'SecureBootEnable': True}
+        response = self.app.patch('redfish/v1/Systems/%s/SecureBoot'
+                                  % self.uuid, json=data)
+        self.assertEqual(204, response.status_code)
+        systems_mock.set_secure_boot.assert_called_once_with(self.uuid, True)
+
+    def test_secure_boot_patch_off(self, systems_mock):
+        systems_mock = systems_mock.return_value
+        data = {'SecureBootEnable': False}
+        response = self.app.patch('redfish/v1/Systems/%s/SecureBoot'
+                                  % self.uuid, json=data)
+        self.assertEqual(204, response.status_code)
+        systems_mock.set_secure_boot.assert_called_once_with(self.uuid, False)
+
+
+@patch_resource('systems')
 class StorageTestCase(EmulatorTestCase):
 
     def test_simple_storage_collection(self, systems_mock):

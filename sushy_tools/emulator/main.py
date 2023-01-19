@@ -558,6 +558,33 @@ def system_reset_bios(identity):
     return '', 204
 
 
+@app.route('/redfish/v1/Systems/<identity>/SecureBoot',
+           methods=['GET', 'PATCH'])
+@api_utils.ensure_instance_access
+@api_utils.returns_json
+def secure_boot(identity):
+
+    if flask.request.method == 'GET':
+        secure = app.systems.get_secure_boot(identity)
+
+        app.logger.debug('Serving secure boot for system "%s"', identity)
+
+        return flask.render_template(
+            'secure_boot.json',
+            identity=identity,
+            secure_boot_enable=secure,
+            secure_boot_current_boot=secure and 'Enabled' or 'Disabled')
+
+    elif flask.request.method == 'PATCH':
+        secure = flask.request.json.get('SecureBootEnable')
+
+        app.systems.set_secure_boot(identity, secure)
+
+        app.logger.info('System "%s" secure boot updated to "%s"',
+                        identity, secure)
+        return '', 204
+
+
 @app.route('/redfish/v1/Systems/<identity>/SimpleStorage',
            methods=['GET'])
 @api_utils.ensure_instance_access
