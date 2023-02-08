@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Fixes ``libvirtError: operation forbidden`` when setting boot mode
+

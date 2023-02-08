@@ -513,7 +513,7 @@ class LibvirtDriver(AbstractSystemsDriver):
         :raises: `error.FishyError` if boot mode can't be set
         """
 
-        domain = self._get_domain(identity, readonly=True)
+        domain = self._get_domain(identity)
 
         # XML schema:
         # https://libvirt.org/formatdomain.html#operating-system-booting

@@ -360,7 +360,7 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         with open('sushy_tools/tests/unit/emulator/domain.xml', 'r') as f:
             data = f.read()
 
-        conn_mock = libvirt_mock.return_value
+        conn_mock = libvirt_rw_mock.return_value
         domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = data
 
@@ -378,7 +378,7 @@ class LibvirtDriverTestCase(base.BaseTestCase):
                   'r') as f:
             data = f.read()
 
-        conn_mock = libvirt_mock.return_value
+        conn_mock = libvirt_rw_mock.return_value
         domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = data
 
@@ -406,7 +406,7 @@ class LibvirtDriverTestCase(base.BaseTestCase):
 
         data = ET.tostring(tree)
 
-        conn_mock = libvirt_mock.return_value
+        conn_mock = libvirt_rw_mock.return_value
         domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = data
 
@@ -428,7 +428,7 @@ class LibvirtDriverTestCase(base.BaseTestCase):
 
         data = ET.tostring(tree)
 
-        conn_mock = libvirt_mock.return_value
+        conn_mock = libvirt_rw_mock.return_value
         domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = data
 
@@ -450,7 +450,7 @@ class LibvirtDriverTestCase(base.BaseTestCase):
 
         data = ET.tostring(tree)
 
-        conn_mock = libvirt_mock.return_value
+        conn_mock = libvirt_rw_mock.return_value
         domain_mock = conn_mock.lookupByUUID.return_value
         domain_mock.XMLDesc.return_value = data
 
