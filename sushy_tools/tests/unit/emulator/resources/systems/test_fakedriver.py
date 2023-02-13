@@ -97,3 +97,8 @@ class FakeDriverTestCase(base.BaseTestCase):
         self.assertFalse(self.test_driver.get_secure_boot(UUID))
         self.test_driver.set_secure_boot(UUID, True)
         self.assertTrue(self.test_driver.get_secure_boot(UUID))
+
+    def test_interface(self):
+        self.assertEqual([{'id': '00:5c:52:31:3a:9c',
+                           'mac': '00:5c:52:31:3a:9c'}],
+                         self.test_driver.get_nics(UUID))
