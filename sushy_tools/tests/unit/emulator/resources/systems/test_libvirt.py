@@ -327,6 +327,66 @@ class LibvirtDriverTestCase(base.BaseTestCase):
 
         self.assertIn(expected, conn_mock.defineXML.call_args[0][0])
 
+    @mock.patch('libvirt.open', autospec=True)
+    def test_set_boot_device_network_from_hd(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/'
+                  'domain_to_boot_pxe.xml', 'r') as f:
+            data = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = data
+
+        with mock.patch.object(
+                self.test_driver, 'get_power_state', return_value='Off'):
+            self.test_driver.set_boot_device(self.uuid, 'Pxe')
+
+        conn_mock.defineXML.assert_called_once_with(mock.ANY)
+
+        newtree = ET.fromstring(conn_mock.defineXML.call_args[0][0])
+        # check that os section does not have boot defined.
+        # We find all os sections if any. Then count about of boot sections.
+        # And the final summ should be 0
+        os_boot_amount = sum(
+            [len(ossec.findall('boot')) for ossec in newtree.findall('os')])
+        self.assertEqual(0, os_boot_amount)
+
+        # check that Network device has order=1
+        interface_orders = [
+            theint.find('boot').get('order')
+            for theint in newtree.find('devices').findall('interface')]
+        self.assertIn('1', interface_orders)
+
+        # Check that we have at least one hd device set after a network device
+        diskdrives_order_sum = len([
+            thedrive.find('boot').get('order')
+            for thedrive in newtree.find('devices').findall('disk')])
+        self.assertEqual(2, diskdrives_order_sum)
+
+        # Check overal config to match expected fixture
+        expected = '<domain type="qemu">\n  <name>QEmu-fedora-i686</name>\n '\
+            ' <uuid>c7a5fdbd-cdaf-9455-926a-d65c16db1809</uuid>\n  '\
+            '<memory>219200</memory>\n  '\
+            '<currentMemory>219200</currentMemory>\n  <vcpu>2</vcpu>\n  '\
+            '<os>\n    <type arch="x86_64" machine="pc">hvm</type>\n    '\
+            '<loader type="rom" />\n  </os>\n  <devices>\n    '\
+            '<emulator>/usr/bin/qemu-system-x86_64</emulator>\n    '\
+            '<disk type="file" device="cdrom">\n      '\
+            '<source file="/home/user/boot.iso" />\n      '\
+            '<target dev="hdc" />\n      <readonly />\n    '\
+            '<boot order="3" /></disk>\n    '\
+            '<disk type="file" device="disk">\n      '\
+            '<source file="/home/user/fedora.img" />\n      '\
+            '<target dev="hda" />\n    <boot order="2" /></disk>\n    '\
+            '<interface type="network">\n      '\
+            '<source network="default" />\n      '\
+            '<mac address="52:54:00:da:ac:54" />\n      '\
+            '<model type="virtio" />\n      <address type="pci" '\
+            'domain="0x0000" bus="0x01" slot="0x01" function="0x0" />\n    '\
+            '<boot order="1" /></interface>\n    '\
+            '<graphics type="vnc" port="-1" />\n  </devices>\n</domain>'
+        self.assertIn(expected, conn_mock.defineXML.call_args[0][0])
+
     @mock.patch('libvirt.openReadOnly', autospec=True)
     def test_get_boot_mode_legacy(self, libvirt_mock):
         with open('sushy_tools/tests/unit/emulator/domain.xml', 'r') as f:
