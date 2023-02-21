@@ -335,8 +335,12 @@ class StaticDriver(base.DriverBase):
 
         local_file = device_info.pop('_local_file', None)
         if local_file:
-            os.unlink(local_file)
+            try:
+                os.unlink(local_file)
 
-            self._logger.debug(
-                'Removed local file %(file)s for %(identity)s' % {
-                    'identity': identity, 'file': local_file})
+                self._logger.debug(
+                    'Removed local file %(file)s for %(identity)s' % {
+                        'identity': identity, 'file': local_file})
+            except FileNotFoundError:
+                # Ignore error as we are trying to remove the file anyway
+                pass
