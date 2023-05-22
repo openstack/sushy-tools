@@ -14,6 +14,8 @@ import functools
 
 import flask
 
+from sushy_tools import error
+
 
 def warning(*args, **kwargs):
     flask.current_app.logger.warning(*args, **kwargs)
