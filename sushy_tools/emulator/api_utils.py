@@ -15,20 +15,8 @@ import functools
 import flask
 
 
-def debug(*args, **kwargs):
-    flask.current_app.logger.debug(*args, **kwargs)
-
-
-def info(*args, **kwargs):
-    flask.current_app.logger.info(*args, **kwargs)
-
-
 def warning(*args, **kwargs):
     flask.current_app.logger.warning(*args, **kwargs)
-
-
-def error(*args, **kwargs):
-    flask.current_app.logger.error(*args, **kwargs)
 
 
 def instance_denied(**kwargs):
