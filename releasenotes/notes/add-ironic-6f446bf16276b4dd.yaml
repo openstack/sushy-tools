@@ -1,0 +1,9 @@
+---
+features:
+  - |
+
+    Adds new ironic driver to provide a limited emulated redfish API
+    to ironic nodes. This would be needed in cases where a redfish
+    compatible endpoint is needed but but don't have direct access
+    to the BMC (you only have access via Ironic) or the BMC doesn't
+    support redfish.
