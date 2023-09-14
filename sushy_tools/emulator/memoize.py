@@ -111,6 +111,7 @@ class PersistentDict(MutableMapping):
             raise TypeError('Dict is not yet persistent')
 
         with sqlite3.connect(self._dbpath) as connection:
+            connection.execute("pragma journal_mode=wal")
             yield connection.cursor()
 
     @_retry
