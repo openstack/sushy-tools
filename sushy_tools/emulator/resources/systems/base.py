@@ -233,3 +233,21 @@ class AbstractSystemsDriver(metaclass=abc.ABCMeta):
         :returns: Id of the volume if successfully found/created else None
         """
         raise error.NotSupportedError('Not implemented')
+
+    def get_http_boot_uri(self, identity):
+        """Return the URI stored for the HttpBootUri.
+
+        :param identity: The libvirt identity. Unused, exists for internal
+                         sushy-tools compatability.
+        :returns: Stored URI value for HttpBootURI.
+        """
+        raise error.NotSupportedError('Not implemented')
+
+    def set_http_boot_uri(self, uri):
+        """Stores the Uri for HttpBootURI.
+
+        :param uri: String to return
+
+        :returns: None
+        """
+        raise error.NotSupportedError('Not implemented')

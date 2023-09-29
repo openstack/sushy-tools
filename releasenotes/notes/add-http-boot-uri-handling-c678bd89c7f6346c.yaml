@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    Adds support to handle ``HttpBootUri`` being posted to the node, which
+    maps to the virtual media functionality, because there is not a direct
+    analog setting when interacting with libvirt.

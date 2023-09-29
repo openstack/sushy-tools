@@ -172,6 +172,7 @@ class LibvirtDriver(AbstractSystemsDriver):
             cls.SECURE_BOOT_DISABLED_NVRAM)
         cls.SUSHY_EMULATOR_IGNORE_BOOT_DEVICE = \
             cls._config.get('SUSHY_EMULATOR_IGNORE_BOOT_DEVICE', False)
+        cls._http_boot_uri = None
         return cls
 
     @memoize.memoize()
@@ -1353,3 +1354,21 @@ class LibvirtDriver(AbstractSystemsDriver):
                     self._logger.debug(msg)
                     return
             return data['Id']
+
+    def get_http_boot_uri(self, identity):
+        """Return the URI stored for the HttpBootUri.
+
+        :param identity: The libvirt identity. Unused, exists for internal
+                         sushy-tools compatability.
+        :returns: Stored URI value for HttpBootURI.
+        """
+        return self._http_boot_uri
+
+    def set_http_boot_uri(self, uri):
+        """Stores the Uri for HttpBootURI.
+
+        :param uri: String to return
+
+        :returns: None
+        """
+        self._http_boot_uri = uri
