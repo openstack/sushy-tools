@@ -58,6 +58,7 @@
     "Bios": {
         "@odata.id": {{ "/redfish/v1/Systems/%s/BIOS"|format(identity)|tojson }}
     },
+    "BiosVersion": "1.0.0",
     "Processors": {
         "@odata.id": {{ "/redfish/v1/Systems/%s/Processors"|format(identity)|tojson }}
     },
