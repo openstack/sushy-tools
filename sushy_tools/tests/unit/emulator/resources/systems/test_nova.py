@@ -287,3 +287,11 @@ class NovaDriverTestCase(base.BaseTestCase):
         self.assertRaises(
             error.NotSupportedError, self.test_driver.set_secure_boot,
             self.uuid, True)
+
+    def test_set_get_http_boot_uri(self):
+        self.assertRaises(error.NotSupportedError,
+                          self.test_driver.get_http_boot_uri,
+                          None)
+        self.assertRaises(error.NotSupportedError,
+                          self.test_driver.set_http_boot_uri,
+                          None)

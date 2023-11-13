@@ -273,6 +273,29 @@ class SystemsTestCase(EmulatorTestCase):
         set_boot_device = systems_mock.return_value.set_boot_device
         set_boot_device.assert_called_once_with('xxxx-yyyy-zzzz', 'Cd')
 
+    @patch_resource('vmedia')
+    @patch_resource('systems')
+    def test_system_boot_http_uri(self, systems_mock, vmedia_mock):
+        data = {'Boot': {'BootSourceOverrideMode': 'UEFI',
+                         'BootSourceOverrideTarget': 'UefiHttp',
+                         'HttpBootUri': 'http://test.url/boot.iso'}}
+        insert_image = vmedia_mock.return_value.insert_image
+        insert_image.return_value = '/path/to/file.iso'
+        response = self.app.patch('/redfish/v1/Systems/xxxx-yyyy-zzzz',
+                                  json=data)
+        self.assertEqual(204, response.status_code)
+        insert_image.assert_called_once_with('xxxx-yyyy-zzzz', 'Cd',
+                                             'http://test.url/boot.iso')
+        set_boot_device = systems_mock.return_value.set_boot_device
+        set_boot_image = systems_mock.return_value.set_boot_image
+        set_boot_mode = systems_mock.return_value.set_boot_mode
+        set_http_boot_uri = systems_mock.return_value.set_http_boot_uri
+        set_boot_device.assert_called_once_with('xxxx-yyyy-zzzz', 'Cd')
+        set_boot_image.assert_called_once_with(
+            'Cd', boot_image='/path/to/file.iso', write_protected=True)
+        set_boot_mode.assert_called_once_with('xxxx-yyyy-zzzz', 'UEFI')
+        set_http_boot_uri.assert_called_once_with('http://test.url/boot.iso')
+
     @patch_resource('systems')
     def test_system_reset_action(self, systems_mock):
         set_power_state = systems_mock.return_value.set_power_state

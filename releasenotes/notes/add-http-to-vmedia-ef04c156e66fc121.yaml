@@ -1,0 +1,9 @@
+---
+features:
+  - |
+    Adds basic functionality for ``HttpBootUri`` to be passed through to
+    the libvirt driver, enabling boot operations utilizing supplied media.
+    This does not influence the default URL to boot from due to a lack of
+    capability in libvirt, but instead treats it similar to virtual media.
+    In this case, an override boot target of ``UefiHttp`` is also re-mapped
+    to ``Cd`` to facilitate testing.

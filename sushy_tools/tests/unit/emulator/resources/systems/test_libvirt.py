@@ -1245,3 +1245,17 @@ class LibvirtDriverTestCase(base.BaseTestCase):
 
         self.assertRaises(error.NotSupportedError,
                           self.test_driver.set_secure_boot, self.uuid, True)
+
+    @mock.patch('libvirt.open', autospec=True)
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_set_get_http_boot_uri(self, libvirt_mock, libvirt_rw_mock):
+        with open('sushy_tools/tests/unit/emulator/domain-q35.xml', 'r') as f:
+            data = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = data
+        self.assertIsNone(self.test_driver.get_http_boot_uri(None))
+        uri = 'http://host.path/meow'
+        self.test_driver.set_http_boot_uri(uri)
+        self.assertEqual(uri, self.test_driver.get_http_boot_uri(None))

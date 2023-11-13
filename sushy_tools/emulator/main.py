@@ -392,7 +392,8 @@ def system_resource(identity):
             managers=app.managers.get_managers_for_system(identity),
             chassis=app.chassis.chassis[:1],
             indicator_led=app.indicators.get_indicator_state(
-                app.systems.uuid(identity))
+                app.systems.uuid(identity)),
+            http_boot_uri=try_get(app.systems.get_http_boot_uri)
         )
 
     elif flask.request.method == 'PATCH':
@@ -404,6 +405,12 @@ def system_resource(identity):
 
         if boot:
             target = boot.get('BootSourceOverrideTarget')
+
+            if target == 'UefiHttp':
+                # Reset to Cd, in our case, since we can't force override
+                # the network boot to a specific URL. This is sort of a hack
+                # but testing functionality overall is a bit more important.
+                target = 'Cd'
 
             if target:
                 # NOTE(lucasagomes): In libvirt we always set the boot
@@ -423,9 +430,30 @@ def system_resource(identity):
                 app.logger.info('Set boot mode to "%s" for system "%s"',
                                 mode, identity)
 
-            if not target and not mode:
+            http_uri = boot.get('HttpBootUri')
+
+            if http_uri:
+
+                try:
+                    # Download the image
+                    image_path = flask.current_app.vmedia.insert_image(
+                        identity, 'Cd', http_uri)
+                    # Mount it as an ISO
+                    flask.current_app.systems.set_boot_image(
+                        'Cd', boot_image=image_path,
+                        write_protected=True)
+                    # Set it for our emulator's API surface to return it
+                    # if queried.
+                    flask.current_app.systems.set_http_boot_uri(http_uri)
+                except Exception as e:
+                    app.logger.error('Unable to load HttpBootUri for boot '
+                                     'operation. Error: %s', e)
+                    return '', 400
+
+            if not target and not mode and not http_uri:
                 return ('Missing the BootSourceOverrideTarget and/or '
-                        'BootSourceOverrideMode element', 400)
+                        'BootSourceOverrideMode and/or HttpBootUri '
+                        'element', 400)
 
         if indicator_led_state:
             app.indicators.set_indicator_state(

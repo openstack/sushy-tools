@@ -19,16 +19,21 @@
         "BootSourceOverrideTarget@Redfish.AllowableValues": [
             "Pxe",
             "Cd",
-            "Hdd"
         {%- if boot_source_mode %}
-        ],
         {%- if 'uefi' in boot_source_mode.lower() %}
+            "Hdd",
+            "UefiHttp"
+        ],
         "BootSourceOverrideMode": {{ boot_source_mode|string|tojson }},
-        "UefiTargetBootSourceOverride": "/0x31/0x33/0x01/0x01"
+        "UefiTargetBootSourceOverride": "/0x31/0x33/0x01/0x01",
+        "HttpBootUri": {{ http_boot_uri|string|tojson }}
         {%- else %}
+            "Hdd"
+        ],
         "BootSourceOverrideMode": {{ boot_source_mode|string|tojson }}
         {%- endif %}
         {%- else %}
+	    "Hdd"
         ]
         {%- endif %}
         {%- else %}
