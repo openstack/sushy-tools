@@ -389,6 +389,7 @@ def system_resource(identity):
             total_cpus=try_get(app.systems.get_total_cpus),
             boot_source_target=app.systems.get_boot_device(identity),
             boot_source_mode=try_get(app.systems.get_boot_mode),
+            uefi_mode=(try_get(app.systems.get_boot_mode) == 'UEFI'),
             managers=app.managers.get_managers_for_system(identity),
             chassis=app.chassis.chassis[:1],
             indicator_led=app.indicators.get_indicator_state(
@@ -405,6 +406,38 @@ def system_resource(identity):
 
         if boot:
             target = boot.get('BootSourceOverrideTarget')
+            mode = boot.get('BootSourceOverrideMode')
+            http_uri = boot.get('HttpBootUri')
+
+            if http_uri and target == 'UefiHttp':
+
+                try:
+                    # Download the image
+                    image_path = app.vmedia.insert_image(
+                        identity, 'Cd', http_uri)
+                except Exception as e:
+                    app.logger.error('Unable to insert image for HttpBootUri '
+                                     'request processing. Error: %s', e)
+                    return 'Failed to download and attach HttpBootUri.', 400
+                try:
+                    # Mount it as an ISO
+                    app.systems.set_boot_image(
+                        identity,
+                        'Cd', boot_image=image_path,
+                        write_protected=True)
+                    # Set it for our emulator's API surface to return it
+                    # if queried.
+                except Exception as e:
+                    app.logger.error('Unable to attach HttpBootUri for boot '
+                                     'operation. Error: %s', e)
+                    return (('Failed to set the supplied media as the next '
+                             'bootdevice.'), 400)
+                try:
+                    app.systems.set_http_boot_uri(http_uri)
+                except Exception as e:
+                    app.logger.error('Unable to record HttpBootUri for boot '
+                                     'operation. Error: %s', e)
+                    return 'Failed to save HttpBootUri field value.', 400
 
             if target == 'UefiHttp':
                 # Reset to Cd, in our case, since we can't force override
@@ -422,33 +455,11 @@ def system_resource(identity):
                 app.logger.info('Set boot device to "%s" for system "%s"',
                                 target, identity)
 
-            mode = boot.get('BootSourceOverrideMode')
-
             if mode:
                 app.systems.set_boot_mode(identity, mode)
 
                 app.logger.info('Set boot mode to "%s" for system "%s"',
                                 mode, identity)
-
-            http_uri = boot.get('HttpBootUri')
-
-            if http_uri:
-
-                try:
-                    # Download the image
-                    image_path = flask.current_app.vmedia.insert_image(
-                        identity, 'Cd', http_uri)
-                    # Mount it as an ISO
-                    flask.current_app.systems.set_boot_image(
-                        'Cd', boot_image=image_path,
-                        write_protected=True)
-                    # Set it for our emulator's API surface to return it
-                    # if queried.
-                    flask.current_app.systems.set_http_boot_uri(http_uri)
-                except Exception as e:
-                    app.logger.error('Unable to load HttpBootUri for boot '
-                                     'operation. Error: %s', e)
-                    return '', 400
 
             if not target and not mode and not http_uri:
                 return ('Missing the BootSourceOverrideTarget and/or '

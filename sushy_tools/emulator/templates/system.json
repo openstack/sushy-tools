@@ -20,7 +20,7 @@
             "Pxe",
             "Cd",
         {%- if boot_source_mode %}
-        {%- if 'uefi' in boot_source_mode.lower() %}
+        {%- if uefi_mode %}
             "Hdd",
             "UefiHttp"
         ],
