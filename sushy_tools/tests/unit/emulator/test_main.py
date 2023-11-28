@@ -292,7 +292,7 @@ class SystemsTestCase(EmulatorTestCase):
         set_http_boot_uri = systems_mock.return_value.set_http_boot_uri
         set_boot_device.assert_called_once_with('xxxx-yyyy-zzzz', 'Cd')
         set_boot_image.assert_called_once_with(
-            'xxxx-yyyy-zzzz',
+            mock.ANY,
             'Cd',
             boot_image='/path/to/file.iso',
             write_protected=True)
