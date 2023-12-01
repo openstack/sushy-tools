@@ -598,6 +598,9 @@ class LibvirtDriver(AbstractSystemsDriver):
                 boot_mode, os_arch)
             loader_path = None
 
+        nvram_element = os_element.find('nvram')
+        nvram_path = nvram_element.text if nvram_element is not None else None
+
         # delete loader and nvram elements to rebuild from stratch
         for element in os_element.findall('loader'):
             os_element.remove(element)
@@ -617,16 +620,24 @@ class LibvirtDriver(AbstractSystemsDriver):
                 loader_element.set('secure', 'yes')
                 nvram_element.set('template', self.SECURE_BOOT_ENABLED_NVRAM)
             else:
-                nvram_suffix = '.fd'
+                nvram_suffix = '.nosecboot.fd'
                 loader_element.set('secure', 'no')
                 nvram_element.set('template', self.SECURE_BOOT_DISABLED_NVRAM)
 
             # force a different nvram path for secure vs not. This will ensure
             # it gets regenerated from the template when secure boot mode
             # changes
-            nvram_path = "/var/lib/libvirt/nvram-%s%s" % (identity,
-                                                          nvram_suffix)
-            nvram_element.text = nvram_path
+            if nvram_path:
+                nvram_file = os.path.basename(nvram_path)
+                # replace suffix
+                for suffix in ['.secboot.fd', '.nosecboot.fd', '.fd']:
+                    # str.removesuffix() for Python <3.9
+                    if nvram_file.endswith(suffix):
+                        nvram_file = nvram_file[:-len(suffix)]
+
+                nvram_file += nvram_suffix
+                nvram_element.text = os.path.join(os.path.dirname(nvram_path),
+                                                  nvram_file)
 
     def get_secure_boot(self, identity):
         """Get computer system secure boot state for UEFI boot mode.

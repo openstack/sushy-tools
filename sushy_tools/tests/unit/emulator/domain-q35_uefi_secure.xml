@@ -7,7 +7,7 @@
   <os>
     <type arch="x86_64" machine="q35">hvm</type>
     <loader secure="yes" readonly="yes" type="pflash">/usr/share/OVMF/OVMF_CODE.secboot.fd</loader>
-    <nvram template="/usr/share/OVMF/OVMF_VARS.secboot.fd"/>
+    <nvram template="/usr/share/OVMF/OVMF_VARS.secboot.fd">/var/lib/libvirt/nvram/QEmu-fedora-i686_VARS.fd</nvram>
     <boot dev="disk"/>
   </os>
   <devices>

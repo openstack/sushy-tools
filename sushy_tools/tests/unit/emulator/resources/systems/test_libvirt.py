@@ -1203,8 +1203,8 @@ class LibvirtDriverTestCase(base.BaseTestCase):
                          loader_element.text)
         self.assertEqual('/usr/share/OVMF/OVMF_VARS.secboot.fd',
                          nvram_element.get('template'))
-        self.assertEqual('/var/lib/libvirt/nvram-%s.secboot.fd' %
-                         self.uuid, nvram_element.text)
+        self.assertEqual('/var/lib/libvirt/nvram/%s_VARS.secboot.fd' %
+                         self.name, nvram_element.text)
 
     @mock.patch('libvirt.open', autospec=True)
     @mock.patch('libvirt.openReadOnly', autospec=True)
@@ -1230,8 +1230,8 @@ class LibvirtDriverTestCase(base.BaseTestCase):
                          loader_element.text)
         self.assertEqual('/usr/share/OVMF/OVMF_VARS.fd',
                          nvram_element.get('template'))
-        self.assertEqual('/var/lib/libvirt/nvram-%s.fd' %
-                         self.uuid, nvram_element.text)
+        self.assertEqual('/var/lib/libvirt/nvram/%s_VARS.nosecboot.fd' %
+                         self.name, nvram_element.text)
 
     @mock.patch('libvirt.open', autospec=True)
     @mock.patch('libvirt.openReadOnly', autospec=True)
