@@ -369,6 +369,7 @@ def system_collection_resource():
 @api_utils.ensure_instance_access
 @api_utils.returns_json
 def system_resource(identity):
+    uuid = app.systems.uuid(identity)
     if flask.request.method == 'GET':
 
         app.logger.debug('Serving resources for system "%s"', identity)
@@ -422,7 +423,7 @@ def system_resource(identity):
                 try:
                     # Mount it as an ISO
                     app.systems.set_boot_image(
-                        identity,
+                        uuid,
                         'Cd', boot_image=image_path,
                         write_protected=True)
                     # Set it for our emulator's API surface to return it
@@ -468,7 +469,7 @@ def system_resource(identity):
 
         if indicator_led_state:
             app.indicators.set_indicator_state(
-                app.systems.uuid(identity), indicator_led_state)
+                uuid, indicator_led_state)
 
             app.logger.info('Set indicator LED to "%s" for system "%s"',
                             indicator_led_state, identity)
