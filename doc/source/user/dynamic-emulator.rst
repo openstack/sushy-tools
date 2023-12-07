@@ -303,6 +303,69 @@ And flip its power state via the Redfish call:
 You can have as many OpenStack instances as you need. The instances can be
 concurrently managed over Redfish and functionally similar tools.
 
+Systems resource driver: Ironic
+++++++++++++++++++++++++++++++++++
+
+You can use the Ironic driver to manage Ironic baremetal instance to simulated
+Redfish API. You may want to do this if you require a redfish compatible endpoint
+but don't have direct access to the BMC (you only have access via Ironic) or
+the BMC doesn't support redfish.
+
+Assuming your baremetal cloud is setup you can invoke the Redfish emulator by
+running
+
+.. code-block:: bash
+
+   sushy-emulator --ironic-cloud baremetal-cloud
+    * Running on http://localhost:8000/ (Press CTRL+C to quit)
+
+By this point you should be able to see your Baremetal instances among the
+Redfish *Systems*:
+
+.. code-block:: bash
+
+   curl http://localhost:8000/redfish/v1/Systems/
+   {
+       "@odata.type": "#ComputerSystemCollection.ComputerSystemCollection",
+       "Name": "Computer System Collection",
+       "Members@odata.count": 1,
+       "Members": [
+
+               {
+                   "@odata.id": "/redfish/v1/Systems/<uuid>"
+               }
+
+       ],
+       "@odata.context": "/redfish/v1/$metadata#ComputerSystemCollection.ComputerSystemCollection",
+       "@odata.id": "/redfish/v1/Systems",
+       "@Redfish.Copyright": "Copyright 2014-2016 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
+   }
+
+And flip its power state via the Redfish call:
+
+.. code-block:: bash
+
+   curl -d '{"ResetType":"On"}' \
+       -H "Content-Type: application/json" -X POST \
+        http://localhost:8000/redfish/v1/Systems/<uuid>/Actions/ComputerSystem.Reset
+
+   curl -d '{"ResetType":"ForceOff"}' \
+       -H "Content-Type: application/json" -X POST \
+        http://localhost:8000/redfish/v1/Systems/<uuid>/Actions/ComputerSystem.Reset
+
+Or update their boot device:
+
+.. code-block:: bash
+
+   curl -d '{"Boot":{"BootSourceOverrideTarget":"Pxe"}}' \
+       -H "Content-Type: application/json" -X PATCH \
+        http://localhost:8000/redfish/v1/Systems/<uuid>
+
+   curl -d '{"Boot":{"BootSourceOverrideTarget":"Hdd"}}' \
+       -H "Content-Type: application/json" -X PATCH \
+        http://localhost:8000/redfish/v1/Systems/<uuid>
+
+
 Filtering by allowed instances
 ++++++++++++++++++++++++++++++
 

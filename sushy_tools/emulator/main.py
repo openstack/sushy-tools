@@ -34,6 +34,7 @@ from sushy_tools.emulator.resources import indicators as inddriver
 from sushy_tools.emulator.resources import managers as mgrdriver
 from sushy_tools.emulator.resources import storage as stgdriver
 from sushy_tools.emulator.resources.systems import fakedriver
+from sushy_tools.emulator.resources.systems import ironicdriver
 from sushy_tools.emulator.resources.systems import libvirtdriver
 from sushy_tools.emulator.resources.systems import novadriver
 from sushy_tools.emulator.resources import vmedia as vmddriver
@@ -102,6 +103,7 @@ class Application(flask.Flask):
     def systems(self):
         fake = self.config.get('SUSHY_EMULATOR_FAKE_DRIVER')
         os_cloud = self.config.get('SUSHY_EMULATOR_OS_CLOUD')
+        ironic_cloud = self.config.get('SUSHY_EMULATOR_IRONIC_CLOUD')
 
         if fake:
             result = fakedriver.FakeDriver.initialize(
@@ -114,6 +116,14 @@ class Application(flask.Flask):
 
             result = novadriver.OpenStackDriver.initialize(
                 self.config, self.logger, os_cloud)()
+
+        elif ironic_cloud:
+            if not ironicdriver.is_loaded:
+                self.logger.error('Ironic driver not loaded')
+                sys.exit(1)
+
+            result = ironicdriver.IronicDriver.initialize(
+                self.config, self.logger, ironic_cloud)()
 
         else:
             if not libvirtdriver.is_loaded:
@@ -850,6 +860,11 @@ def parse_args():
                                help='Use the fake driver. Can also be set '
                                     'via environmnet variable '
                                     'SUSHY_EMULATOR_FAKE_DRIVER.')
+    backend_group.add_argument('--ironic-cloud',
+                               type=str,
+                               help='Ironic cloud name. Can also be set via '
+                                    'via config variable '
+                                    'SUSHY_EMULATOR_IRONIC_CLOUD.')
 
     return parser.parse_args()
 
@@ -867,6 +882,9 @@ def main():
 
     if args.libvirt_uri:
         app.config['SUSHY_EMULATOR_LIBVIRT_URI'] = args.libvirt_uri
+
+    if args.ironic_cloud:
+        app.config['SUSHY_EMULATOR_IRONIC_CLOUD'] = args.ironic_cloud
 
     if args.fake:
         app.config['SUSHY_EMULATOR_FAKE_DRIVER'] = True
