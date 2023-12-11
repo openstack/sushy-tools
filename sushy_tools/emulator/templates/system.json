@@ -3,12 +3,14 @@
     "Id": {{ identity|string|tojson }},
     "Name": {{ name|string|tojson }},
     "UUID": {{ uuid|string|tojson }},
+    {%- if feature_set == "full" %}
     "Manufacturer": "Sushy Emulator",
     "Status": {
         "State": "Enabled",
         "Health": "OK",
         "HealthRollUp": "OK"
     },
+    {% endif %}
     {%- if power_state %}
     "PowerState": {{ power_state|string|tojson }},
     {%- endif %}
@@ -40,6 +42,7 @@
         "BootSourceOverrideEnabled": "Continuous"
         {%- endif %}
     },
+    {%- if feature_set == "full" %}
     "ProcessorSummary": {
         {%- if total_cpus %}
         "Count": {{ total_cpus }},
@@ -70,9 +73,6 @@
     "Memory": {
         "@odata.id": {{ "/redfish/v1/Systems/%s/Memory"|format(identity)|tojson }}
     },
-    "EthernetInterfaces": {
-        "@odata.id": {{ "/redfish/v1/Systems/%s/EthernetInterfaces"|format(identity)|tojson }}
-    },
     "SecureBoot": {
         "@odata.id": {{ "/redfish/v1/Systems/%s/SecureBoot"|format(identity)|tojson }}
     },
@@ -85,10 +85,17 @@
     {%- if indicator_led %}
     "IndicatorLED": {{ indicator_led|string|tojson }},
     {%- endif %}
+    {%- endif %}
+    {%- if feature_set != "minimum" %}
+    "EthernetInterfaces": {
+        "@odata.id": {{ "/redfish/v1/Systems/%s/EthernetInterfaces"|format(identity)|tojson }}
+    },
     "VirtualMedia": {
         "@odata.id": {{ "/redfish/v1/Systems/%s/VirtualMedia"|format(identity)|tojson }}
     },
+    {%- endif %}
     "Links": {
+        {%- if feature_set == "full" %}
         "Chassis": [
             {%- for chassis_ in chassis %}
             {
@@ -96,6 +103,8 @@
             }{% if not loop.last %},{% endif %}
             {% endfor -%}
         ],
+        {% endif %}
+        {%- if feature_set != "minimum" %}
         "ManagedBy": [
             {%- for manager in managers %}
             {
@@ -103,6 +112,7 @@
             }{% if not loop.last %},{% endif %}
             {% endfor -%}
         ]
+        {% endif %}
     },
     "Actions": {
         "#ComputerSystem.Reset": {

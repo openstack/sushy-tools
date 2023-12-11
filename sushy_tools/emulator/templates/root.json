@@ -4,21 +4,27 @@
     "Name": "Redvirt Service",
     "RedfishVersion": "1.5.0",
     "UUID": "85775665-c110-4b85-8989-e6162170b3ec",
+    {% if feature_set == "full" %}
     "Chassis": {
         "@odata.id": "/redfish/v1/Chassis"
     },
+    {% endif %}
     "Systems": {
         "@odata.id": "/redfish/v1/Systems"
     },
+    {% if feature_set != "minimum" %}
     "Managers": {
         "@odata.id": "/redfish/v1/Managers"
     },
+    {% endif %}
+    {% if feature_set == "full" %}
     "Registries": {
         "@odata.id": "/redfish/v1/Registries"
     },
     "CertificateService": {
         "@odata.id": "/redfish/v1/CertificateService"
     },
+    {% endif %}
     "@odata.id": "/redfish/v1/",
     "@Redfish.Copyright": "Copyright 2014-2016 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
 }

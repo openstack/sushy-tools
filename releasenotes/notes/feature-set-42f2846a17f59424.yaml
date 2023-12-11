@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Add a configuration options ``SUSHY_EMULATOR_FEATURE_SET`` to define which
+    resources should be available. See the documentation for more details.

@@ -8,6 +8,19 @@ except that the frontend protocol is Redfish rather than IPMI. The Redfish
 commands coming from the client are handled by one or more resource-specific
 drivers.
 
+Feature sets
+------------
+
+The emulator can be configured with different feature sets to emulate different
+hardware. The feature set is supplied either via the
+``SUSHY_EMULATOR_FEATURE_SET`` configuration variable or through the
+``--feature-set`` command line flag.
+
+Supported feature sets are:
+* ``minimum`` - only Systems with Boot settings and no other optional fields.
+* ``vmedia`` - ``minimum`` plus Managers, VirtualMedia and EthernetInterfaces.
+* ``full`` - all features implemented in the emulator.
+
 Systems resource
 ----------------
 

@@ -45,3 +45,10 @@ class BadRequest(FishyError):
 
     def __init__(self, msg, code=400):
         super().__init__(msg, code)
+
+
+class FeatureNotAvailable(NotFound):
+    """Feature is not available."""
+
+    def __init__(self, feature, code=404):
+        super().__init__(f"Feature {feature} not available", code=code)
