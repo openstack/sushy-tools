@@ -1,0 +1,4 @@
+---
+features:
+  - |
+    Exposes the VirtualMedia resource directly on Systems, not just Managers.

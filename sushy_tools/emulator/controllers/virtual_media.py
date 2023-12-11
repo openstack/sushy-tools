@@ -18,19 +18,19 @@ from sushy_tools import error
 
 virtual_media = flask.Blueprint(
     'VirtualMedia', __name__,
-    url_prefix='/redfish/v1/Managers/<identity>/VirtualMedia')
+    url_prefix='/redfish/v1/Systems/<identity>/VirtualMedia')
 
 
 @virtual_media.route('', methods=['GET'])
 @api_utils.returns_json
 def virtual_media_collection_resource(identity):
-    api_utils.debug('Serving virtual media resources for manager "%s"',
+    api_utils.debug('Serving virtual media resources for system "%s"',
                     identity)
 
     return flask.render_template(
         'virtual_media_collection.json',
         identity=identity,
-        uuid=flask.current_app.managers.get_manager(identity)['UUID'],
+        uuid=flask.current_app.systems.uuid(identity),
         devices=flask.current_app.vmedia.devices
     )
 
@@ -47,7 +47,7 @@ def virtual_media_resource(identity, device):
     device_info = flask.current_app.vmedia.get_device_image_info(
         identity, device)
 
-    api_utils.debug('Serving virtual media %s at manager "%s"',
+    api_utils.debug('Serving virtual media %s at system "%s"',
                     device, identity)
 
     return flask.render_template(
@@ -69,11 +69,11 @@ def virtual_media_resource(identity, device):
 @virtual_media.route('/<device>', methods=['PATCH'])
 @api_utils.returns_json
 def virtual_media_patch(identity, device):
-    flask.current_app.managers.get_manager(identity)
+    flask.current_app.systems.uuid(identity)
     if not flask.request.json:
         raise error.BadRequest("Empty or malformed patch")
 
-    api_utils.debug('Updating virtual media %s at manager "%s"',
+    api_utils.debug('Updating virtual media %s at system "%s"',
                     device, identity)
 
     verify = flask.request.json.get('VerifyCertificate')
@@ -91,9 +91,9 @@ def virtual_media_patch(identity, device):
 @virtual_media.route('/<device>/Certificates', methods=['GET'])
 @api_utils.returns_json
 def virtual_media_certificates(identity, device):
-    flask.current_app.managers.get_manager(identity)
+    flask.current_app.systems.uuid(identity)
     location = \
-        f'/redfish/v1/Managers/{identity}/VirtualMedia/{device}/Certificates'
+        f'/redfish/v1/Systems/{identity}/VirtualMedia/{device}/Certificates'
     certificates = flask.current_app.vmedia.list_certificates(identity, device)
     return flask.render_template(
         'certificate_collection.json',
@@ -105,7 +105,7 @@ def virtual_media_certificates(identity, device):
 @virtual_media.route('/<device>/Certificates', methods=['POST'])
 @api_utils.returns_json
 def virtual_media_add_certificate(identity, device):
-    flask.current_app.managers.get_manager(identity)
+    flask.current_app.systems.uuid(identity)
     if not flask.request.json:
         raise error.BadRequest("Empty or malformed certificate")
 
@@ -120,13 +120,13 @@ def virtual_media_add_certificate(identity, device):
             f"Only PEM certificates are supported, got {cert_type}")
 
     api_utils.debug('Adding certificate for virtual media %s at '
-                    'manager "%s"', device, identity)
+                    'system "%s"', device, identity)
 
     cert = flask.current_app.vmedia.add_certificate(
         identity, device, cert_string, cert_type)
 
     location = (
-        f'/redfish/v1/Managers/{identity}/VirtualMedia/{device}'
+        f'/redfish/v1/Systems/{identity}/VirtualMedia/{device}'
         f'/Certificates/{cert.id}'
     )
     return '', 204, {'Location': location}
@@ -135,9 +135,9 @@ def virtual_media_add_certificate(identity, device):
 @virtual_media.route('/<device>/Certificates/<cert_id>', methods=['GET'])
 @api_utils.returns_json
 def virtual_media_get_certificate(identity, device, cert_id):
-    flask.current_app.managers.get_manager(identity)
+    flask.current_app.systems.uuid(identity)
     location = (
-        f'/redfish/v1/Managers/{identity}/VirtualMedia/{device}'
+        f'/redfish/v1/Systems/{identity}/VirtualMedia/{device}'
         f'/Certificates/{cert_id}'
     )
     certificates = flask.current_app.vmedia.list_certificates(identity, device)
@@ -158,9 +158,9 @@ def virtual_media_get_certificate(identity, device, cert_id):
 @virtual_media.route('/<device>/Certificates/<cert_id>', methods=['DELETE'])
 @api_utils.returns_json
 def virtual_media_delete_certificate(identity, device, cert_id):
-    flask.current_app.managers.get_manager(identity)
+    flask.current_app.systems.uuid(identity)
     api_utils.debug('Removing certificate %s for virtual media %s at '
-                    'manager "%s"', cert_id, device, identity)
+                    'system "%s"', cert_id, device, identity)
     flask.current_app.vmedia.delete_certificate(identity, device, cert_id)
     return '', 204
 
@@ -179,32 +179,27 @@ def virtual_media_insert(identity, device):
         message = "UserName and Password must be passed together"
         return flask.render_template('error.json', message=message), 400
 
-    manager = flask.current_app.managers.get_manager(identity)
-    systems = flask.current_app.managers.get_managed_systems(manager)
-    if not systems:
-        api_utils.warning('Manager %s manages no systems', identity)
-        return '', 204
+    system = flask.current_app.systems.uuid(identity)
 
     image_path = flask.current_app.vmedia.insert_image(
         identity, device, image, inserted, write_protected,
         username=username, password=password)
 
-    for system in systems:
-        try:
-            flask.current_app.systems.set_boot_image(
-                system, device, boot_image=image_path,
-                write_protected=write_protected)
+    try:
+        flask.current_app.systems.set_boot_image(
+            system, device, boot_image=image_path,
+            write_protected=write_protected)
 
-        except error.NotSupportedError as ex:
-            api_utils.warning(
-                'System %s failed to set boot image %s on device %s: '
-                '%s', system, image_path, device, ex)
-
-    api_utils.info(
-        'Virtual media placed into device %(dev)s of manager %(mgr)s for '
-        'systems %(sys)s. Image %(img)s inserted %(ins)s',
-        {'dev': device, 'mgr': identity, 'sys': systems,
-         'img': image or '<empty>', 'ins': inserted})
+    except error.NotSupportedError as ex:
+        api_utils.warning(
+            'System %s failed to set boot image %s on device %s: '
+            '%s', system, image_path, device, ex)
+    else:
+        api_utils.info(
+            'Virtual media placed into device %(dev)s for '
+            'system %(sys)s. Image %(img)s inserted %(ins)s',
+            {'dev': device, 'sys': identity,
+             'img': image or '<empty>', 'ins': inserted})
 
     return '', 204
 
@@ -215,23 +210,16 @@ def virtual_media_insert(identity, device):
 def virtual_media_eject(identity, device):
     flask.current_app.vmedia.eject_image(identity, device)
 
-    manager = flask.current_app.managers.get_manager(identity)
-    systems = flask.current_app.managers.get_managed_systems(manager)
-    if not systems:
-        api_utils.warning('Manager %s manages no systems', identity)
-        return '', 204
+    try:
+        flask.current_app.systems.set_boot_image(identity, device)
 
-    for system in systems:
-        try:
-            flask.current_app.systems.set_boot_image(system, device)
-
-        except error.NotSupportedError as ex:
-            api_utils.warning(
-                'System %s failed to remove boot image from device %s: '
-                '%s', system, device, ex)
-
-    api_utils.info(
-        'Virtual media ejected from device %s manager %s systems %s',
-        device, identity, systems)
+    except error.NotSupportedError as ex:
+        api_utils.warning(
+            'System %s failed to remove boot image from device %s: '
+            '%s', identity, device, ex)
+    else:
+        api_utils.info(
+            'Virtual media ejected from device %s system %s',
+            device, identity)
 
     return '', 204

@@ -6,11 +6,11 @@
     "Members": [
         {% for device in devices %}
         {
-            "@odata.id": {{ "/redfish/v1/Managers/%s/VirtualMedia/%s"|format(uuid, device)|string|tojson }}
+            "@odata.id": {{ "/redfish/v1/Systems/%s/VirtualMedia/%s"|format(uuid, device)|string|tojson }}
         }{% if not loop.last %},{% endif %}
         {% endfor %}
     ],
     "@odata.context": "/redfish/v1/$metadata#VirtualMediaCollection.VirtualMediaCollection",
-    "@odata.id": {{ "/redfish/v1/Managers/%s/VirtualMedia"|format(uuid)|string|tojson }},
+    "@odata.id": {{ "/redfish/v1/Systems/%s/VirtualMedia"|format(uuid)|string|tojson }},
     "@Redfish.Copyright": "Copyright 2014-2017 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
 }

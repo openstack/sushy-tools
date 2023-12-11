@@ -343,7 +343,7 @@ def manager_resource(identity):
         "PowerState": "On",
         "FirmwareVersion": "1.00",
         "VirtualMedia": {
-            "@odata.id": "/redfish/v1/Managers/%s/VirtualMedia" % uuid
+            "@odata.id": "/redfish/v1/Systems/%s/VirtualMedia" % systems[0],
         },
         "Links": {
             "ManagerForServers": [

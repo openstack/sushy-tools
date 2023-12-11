@@ -1,5 +1,5 @@
 {
-    "@odata.type": "#ComputerSystem.v1_1_0.ComputerSystem",
+    "@odata.type": "#ComputerSystem.v1_13_0.ComputerSystem",
     "Id": {{ identity|string|tojson }},
     "Name": {{ name|string|tojson }},
     "UUID": {{ uuid|string|tojson }},
@@ -85,6 +85,9 @@
     {%- if indicator_led %}
     "IndicatorLED": {{ indicator_led|string|tojson }},
     {%- endif %}
+    "VirtualMedia": {
+        "@odata.id": {{ "/redfish/v1/Systems/%s/VirtualMedia"|format(identity)|tojson }}
+    },
     "Links": {
         "Chassis": [
             {%- for chassis_ in chassis %}
