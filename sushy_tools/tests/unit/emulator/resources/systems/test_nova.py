@@ -155,6 +155,16 @@ class NovaDriverTestCase(base.BaseTestCase):
 
         self.assertEqual('Legacy', boot_mode)
 
+    def test_get_boot_mode_no_image(self):
+        server = mock.Mock(id=self.uuid, image=dict(id=self.uuid))
+        self.nova_mock.return_value.get_server.return_value = server
+
+        self.nova_mock.return_value.image.find_image.return_value = None
+
+        boot_mode = self.test_driver.get_boot_mode(self.uuid)
+
+        self.assertIsNone(boot_mode)
+
     def test_set_boot_mode(self):
         self.assertRaises(
             error.FishyError, self.test_driver.set_boot_mode,

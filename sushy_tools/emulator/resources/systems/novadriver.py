@@ -85,6 +85,8 @@ class OpenStackDriver(AbstractSystemsDriver):
 
     @memoize.memoize(permanent_cache=PERMANENT_CACHE)
     def _get_image_info(self, identity):
+        if not identity:
+            return
         return self._cc.image.find_image(identity)
 
     def _get_server_metadata(self, identity):
