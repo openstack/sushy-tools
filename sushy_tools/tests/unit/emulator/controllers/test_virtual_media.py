@@ -131,7 +131,8 @@ class VirtualMediaTestCase(test_main.EmulatorTestCase):
 
     def test_virtual_media_update_empty(self, systems_mock, vmedia_mock):
         response = self.app.patch(
-            '/redfish/v1/Systems/%s/VirtualMedia/CD' % self.uuid)
+            '/redfish/v1/Systems/%s/VirtualMedia/CD' % self.uuid,
+            headers={'Content-Type': 'application/json'})
 
         self.assertEqual(400, response.status_code)
 
