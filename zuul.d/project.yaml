@@ -8,6 +8,8 @@
       jobs:
         - sushy-tools-tempest-bios-redfish-pxe
         - sushy-tools-tempest-uefi-redfish-vmedia
+        - sushy-tools-tox-codespell:
+            voting: false
     gate:
       jobs:
         - sushy-tools-tempest-bios-redfish-pxe
