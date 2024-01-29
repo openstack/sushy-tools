@@ -219,7 +219,7 @@ class AbstractSystemsDriver(metaclass=abc.ABCMeta):
     def get_simple_storage_collection(self, identity):
         """Get a dict of Simple Storage Controllers and their devices
 
-        :returns: dict of Simple Storage Controllers and their atributes
+        :returns: dict of Simple Storage Controllers and their attributes
         """
         raise error.NotSupportedError('Not implemented')
 
@@ -238,7 +238,7 @@ class AbstractSystemsDriver(metaclass=abc.ABCMeta):
         """Return the URI stored for the HttpBootUri.
 
         :param identity: The libvirt identity. Unused, exists for internal
-                         sushy-tools compatability.
+                         sushy-tools compatibility.
         :returns: Stored URI value for HttpBootURI.
         """
         raise error.NotSupportedError('Not implemented')

@@ -258,7 +258,7 @@ Systems resource driver: OpenStack
 You can use an OpenStack cloud instances to simulate Redfish-managed
 baremetal machines. This setup is known under the name of
 `OpenStack Virtual Baremetal <http://openstack-virtual-baremetal.readthedocs.io/en/latest/>`_.
-We will largely re-use its OpenStack infrastructure and configuration
+We will largely reuse its OpenStack infrastructure and configuration
 instructions. After all, what we are trying to do here is to set up the
 Redfish emulator alongside the
 `openstackbmc <https://github.com/cybertron/openstack-virtual-baremetal/blob/master/openstack_virtual_baremetal/openstackbmc.py>`_
@@ -382,7 +382,7 @@ Or update their boot device:
 Filtering by allowed instances
 ++++++++++++++++++++++++++++++
 
-It is not always desirable to manage every accessable virtual machine as a
+It is not always desirable to manage every accessible virtual machine as a
 Redfish System, such as when an OpenStack tenant has many instances which do not
 represent virtual baremetal. In this case it is possible to specify a list of
 UUIDs which are allowed.

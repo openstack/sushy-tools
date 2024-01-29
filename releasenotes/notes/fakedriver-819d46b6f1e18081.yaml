@@ -1,7 +1,7 @@
 ---
 features:
   - |
-    Adds a fake system driver (actived using the ``--fake`` argument) that
+    Adds a fake system driver (activated using the ``--fake`` argument) that
     does not have an actual backend and works by storing all values in
     the cache.
 

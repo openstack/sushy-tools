@@ -1370,7 +1370,7 @@ class LibvirtDriver(AbstractSystemsDriver):
         """Return the URI stored for the HttpBootUri.
 
         :param identity: The libvirt identity. Unused, exists for internal
-                         sushy-tools compatability.
+                         sushy-tools compatibility.
         :returns: Stored URI value for HttpBootURI.
         """
         return self._http_boot_uri

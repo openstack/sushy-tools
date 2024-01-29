@@ -4,7 +4,7 @@ features:
     Adds Virtual Media resource.
 
     As of this release, user can configure a collection of virtual
-    media devices including their types, names and other properies.
+    media devices including their types, names and other properties.
     By default, ``cdrom`` and ``floppy`` devices are configured.
 
     Each Manager automatically gets its own instance of the above

@@ -954,7 +954,7 @@ def parse_args():
                                     'Default is qemu:///system')
     backend_group.add_argument('--fake', action='store_true',
                                help='Use the fake driver. Can also be set '
-                                    'via environmnet variable '
+                                    'via environment variable '
                                     'SUSHY_EMULATOR_FAKE_DRIVER.')
     backend_group.add_argument('--ironic-cloud',
                                type=str,

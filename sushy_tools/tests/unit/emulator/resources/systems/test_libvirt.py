@@ -363,7 +363,7 @@ class LibvirtDriverTestCase(base.BaseTestCase):
             for thedrive in newtree.find('devices').findall('disk')])
         self.assertEqual(2, diskdrives_order_sum)
 
-        # Check overal config to match expected fixture
+        # Check overall config to match expected fixture
         expected = '<domain type="qemu">\n  <name>QEmu-fedora-i686</name>\n '\
             ' <uuid>c7a5fdbd-cdaf-9455-926a-d65c16db1809</uuid>\n  '\
             '<memory>219200</memory>\n  '\

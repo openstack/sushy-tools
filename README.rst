@@ -20,7 +20,7 @@ machine to some extent. Some client queries are translated to commands that
 actually control VM instances simulating bare metal hardware. However some
 of the Redfish commands just return static content never touching the
 virtualization backend and, for that matter, virtual Redfish BMC is similar
-to the static Redfish responser.
+to the static Redfish responder.
 
 * Free software: Apache license
 * Documentation: https://docs.openstack.org/sushy-tools
