@@ -170,7 +170,7 @@ class VirtualMediaTestCase(test_main.EmulatorTestCase):
         for index, member in enumerate(response.json['Members']):
             self.assertTrue(member['@odata.id'].endswith(
                 f'/redfish/v1/Systems/{self.uuid}/VirtualMedia/CD'
-                f'/Certificates/{index+1}'), member['@odata.id'])
+                f'/Certificates/{index + 1}'), member['@odata.id'])
         self.assertEqual(['PEM'],
                          response.json['@Redfish.SupportedCertificates'])
 
