@@ -1,0 +1,27 @@
+{
+    "@odata.context": "/redfish/v1/$metadata#UpdateService.UpdateService",
+    "@odata.id": "/redfish/v1/UpdateService",
+    "@odata.type": "#UpdateService.v1_11_0.UpdateService",
+    "Actions": {
+        "#UpdateService.SimpleUpdate": {
+            "TransferProtocol@Redfish.AllowableValues": [
+                "HTTP",
+                "HTTPS"
+            ],
+            "target": "/redfish/v1/UpdateService/Actions/UpdateService.SimpleUpdate"
+        }
+    },
+    "Description": "Represents the properties for the Update Service",
+    "FirmwareInventory": {
+        "@odata.id": "/redfish/v1/UpdateService/FirmwareInventory"
+    },
+    "HttpPushUri": "/redfish/v1/UpdateService/FirmwareInventory",
+    "Id": "UpdateService",
+    "MaxImageSizeBytes": null,
+    "Name": "Update Service",
+    "ServiceEnabled": true,
+    "SoftwareInventory": {
+        "@odata.id": "/redfish/v1/UpdateService/SoftwareInventory"
+    }
+}
+

@@ -975,3 +975,22 @@ class RegistryTestCase(EmulatorTestCase):
                           "NumberOfArgs": 0,
                           "Resolution": "No response action is required."},
                          messages['BIOS001'])
+
+
+class TaskServiceTestCase(EmulatorTestCase):
+
+    def test_task_service(self):
+        response = self.app.get('/redfish/v1/TaskService')
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('/redfish/v1/TaskService',
+                         response.json['@odata.id'])
+        self.assertEqual('Tasks Service', response.json['Name'])
+        self.assertEqual(True, response.json['ServiceEnabled'])
+
+    def test_task_service_task(self):
+        response = self.app.get('/redfish/v1/TaskService/Tasks/42')
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('/redfish/v1/TaskService/Tasks/42',
+                         response.json['@odata.id'])
+        self.assertEqual('Task 42', response.json['Name'])
+        self.assertEqual('Completed', response.json['TaskState'])
