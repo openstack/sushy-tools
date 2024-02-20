@@ -167,6 +167,15 @@ class AbstractSystemsDriver(metaclass=abc.ABCMeta):
         """
         raise error.NotSupportedError('Not implemented')
 
+    def get_versions(self, identity):
+        """Get firmware version information for the system
+
+        :returns: key-value pairs of firmware versions
+
+        :raises: `FishyError` if firmware versions cannot be processed
+        """
+        raise error.NotSupportedError('Not implemented')
+
     def set_bios(self, identity, attributes):
         """Update BIOS attributes
 
@@ -176,10 +185,26 @@ class AbstractSystemsDriver(metaclass=abc.ABCMeta):
         """
         raise error.NotSupportedError('Not implemented')
 
+    def set_versions(self, identity, firmware_versions):
+        """Update firmware versions
+
+        :param firmware_versions: key-value pairs of versions to update
+
+        :raises: `FishyError` if firmware versions cannot be processed
+        """
+        raise error.NotSupportedError('Not implemented')
+
     def reset_bios(self, identity):
         """Reset BIOS attributes to default
 
         :raises: `FishyError` if BIOS attributes cannot be processed
+        """
+        raise error.NotSupportedError('Not implemented')
+
+    def reset_versions(self, identity):
+        """Reset firmware versions to default
+
+        :raises: `FishyError` if firmware versions cannot be processed
         """
         raise error.NotSupportedError('Not implemented')
 

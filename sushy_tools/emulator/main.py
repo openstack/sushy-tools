@@ -412,6 +412,15 @@ def system_collection_resource():
 @api_utils.returns_json
 def system_resource(identity):
     uuid = app.systems.uuid(identity)
+    try:
+        versions = app.systems.get_versions(identity)
+    except error.NotSupportedError:
+        app.logger.debug('Fetching BIOS version information not supported '
+                         'for system "%s"', identity)
+        versions = {}
+
+    bios_version = versions.get('BiosVersion')
+
     if flask.request.method == 'GET':
 
         app.logger.debug('Serving resources for system "%s"', identity)
@@ -429,6 +438,7 @@ def system_resource(identity):
             uuid=app.systems.uuid(identity),
             power_state=app.systems.get_power_state(identity),
             total_memory_gb=try_get(app.systems.get_total_memory),
+            bios_version=bios_version,
             total_cpus=try_get(app.systems.get_total_cpus),
             boot_source_target=app.systems.get_boot_device(identity),
             boot_source_mode=try_get(app.systems.get_boot_mode),

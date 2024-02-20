@@ -944,6 +944,12 @@ class LibvirtDriverTestCase(base.BaseTestCase):
                              .find('sushy:bios', ns)
                              .find('sushy:attributes', ns))
 
+    def _assert_versions_xml(self, tree):
+        ns = {'sushy': 'http://openstack.org/xmlns/libvirt/sushy'}
+        self.assertIsNotNone(tree.find('metadata')
+                             .find('sushy:bios', ns)
+                             .find('sushy:versions', ns))
+
     @mock.patch('libvirt.open', autospec=True)
     def test__process_bios_error(self, libvirt_mock):
         with open('sushy_tools/tests/unit/emulator/domain.xml') as f:
@@ -960,6 +966,136 @@ class LibvirtDriverTestCase(base.BaseTestCase):
                           'xxx-yyy-zzz',
                           {"BootMode": "Uefi",
                            "ProcTurboMode": "Enabled"})
+
+    @mock.patch('libvirt.open', autospec=True)
+    def test_get_versions(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/domain.xml') as f:
+            domain_xml = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = domain_xml
+
+        firmware_versions = self.test_driver.get_versions(self.uuid)
+        self.assertEqual(LibvirtDriver.DEFAULT_FIRMWARE_VERSIONS,
+                         firmware_versions)
+        conn_mock.defineXML.assert_called_once_with(mock.ANY)
+
+    @mock.patch('libvirt.open', autospec=True)
+    def test_get_versions_existing(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/domain_versions.xml') as f:
+            domain_xml = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = domain_xml
+
+        versions = self.test_driver.get_versions(self.uuid)
+        self.assertEqual({"BiosVersion": "1.0.0"},
+                         versions)
+        conn_mock.defineXML.assert_not_called()
+
+    @mock.patch('libvirt.open', autospec=True)
+    def test_set_versions(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/domain_versions.xml') as f:
+            domain_xml = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = domain_xml
+
+        with mock.patch.object(
+                self.test_driver, 'get_power_state', return_value='Off'):
+            self.test_driver.set_versions(
+                self.uuid, {"BiosVersion": "1.1.0"})
+
+        conn_mock.defineXML.assert_called_once_with(mock.ANY)
+
+    @mock.patch('libvirt.open', autospec=True)
+    def test_reset_versions(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/domain_versions.xml') as f:
+            domain_xml = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = domain_xml
+
+        with mock.patch.object(
+                self.test_driver, 'get_power_state', return_value='Off'):
+            self.test_driver.reset_versions(self.uuid)
+
+        conn_mock.defineXML.assert_called_once_with(mock.ANY)
+
+    def test__process_versions_attributes_get_default(self):
+        with open('sushy_tools/tests/unit/emulator/domain.xml') as f:
+            domain_xml = f.read()
+
+        result = self.test_driver._process_versions_attributes(domain_xml)
+        self.assertTrue(result.attributes_written)
+        self.assertEqual(LibvirtDriver.DEFAULT_FIRMWARE_VERSIONS,
+                         result.firmware_versions)
+        self._assert_versions_xml(result.tree)
+
+    def test__process_versions_attributes_get_default_metadata_exists(self):
+        with open('sushy_tools/tests/unit/emulator/'
+                  'domain_metadata.xml') as f:
+            domain_xml = f.read()
+
+        result = self.test_driver._process_versions_attributes(domain_xml)
+        self.assertTrue(result.attributes_written)
+        self.assertEqual(LibvirtDriver.DEFAULT_FIRMWARE_VERSIONS,
+                         result.firmware_versions)
+        self._assert_versions_xml(result.tree)
+
+    def test__process_versions_attributes_get_existing(self):
+        with open('sushy_tools/tests/unit/emulator/domain_versions.xml') as f:
+            domain_xml = f.read()
+
+        result = self.test_driver._process_versions_attributes(domain_xml)
+        self.assertFalse(result.attributes_written)
+        self.assertEqual({"BiosVersion": "1.0.0"},
+                         result.firmware_versions)
+        self._assert_versions_xml(result.tree)
+
+    def test__process_versions_attributes_update(self):
+        with open('sushy_tools/tests/unit/emulator/domain_versions.xml') as f:
+            domain_xml = f.read()
+        result = self.test_driver._process_versions_attributes(
+            domain_xml,
+            {"BiosVersion": "2.0.0"},
+            True)
+        self.assertTrue(result.attributes_written)
+        self.assertEqual({"BiosVersion": "2.0.0"},
+                         result.firmware_versions)
+        self._assert_versions_xml(result.tree)
+
+    def test__process_versions_attributes_update_non_string(self):
+        with open('sushy_tools/tests/unit/emulator/domain_versions.xml') as f:
+            domain_xml = f.read()
+        result = self.test_driver._process_versions_attributes(
+            domain_xml,
+            {"BiosVersion": 42},
+            True)
+        self.assertTrue(result.attributes_written)
+        self.assertEqual({"BiosVersion": "42"},
+                         result.firmware_versions)
+        self._assert_versions_xml(result.tree)
+
+    @mock.patch('libvirt.open', autospec=True)
+    def test__process_versions_error(self, libvirt_mock):
+        with open('sushy_tools/tests/unit/emulator/domain.xml') as f:
+            domain_xml = f.read()
+
+        conn_mock = libvirt_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = domain_xml
+        conn_mock.defineXML.side_effect = libvirt.libvirtError(
+            'because I can')
+
+        self.assertRaises(error.FishyError,
+                          self.test_driver._process_bios,
+                          'xxx-yyy-zzz',
+                          {"BiosVersion" "1.0.0"})
 
     @mock.patch('libvirt.openReadOnly', autospec=True)
     def test_get_nics(self, libvirt_mock):
