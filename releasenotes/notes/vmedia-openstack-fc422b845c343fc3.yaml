@@ -1,0 +1,13 @@
+---
+features:
+  - |
+    The openstack driver now supports insert and eject of virtual media. On
+    insert a new empty volume is created and attached to the server and the
+    server is rebuilt with the that image. On eject it is assumed that the
+    attached volume has been rewritten with bootable image data. The volume is
+    detached and uploaded as an image, then the server is rebuilt with that
+    image.
+
+    Both insert and delete results in the root disk being wiped and replaced
+    with the contents of an image, so this should not be used in any scenario
+    where the root disk data needs to be retained.

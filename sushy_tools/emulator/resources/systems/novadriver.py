@@ -13,7 +13,12 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import base64
+from concurrent import futures
 import math
+import os
+import time
+from urllib import parse as urlparse
 
 from sushy_tools.emulator import memoize
 from sushy_tools.emulator.resources.systems.base import AbstractSystemsDriver
@@ -27,6 +32,8 @@ except ImportError:
 
 
 is_loaded = bool(openstack)
+
+FUTURES = {}
 
 
 class OpenStackDriver(AbstractSystemsDriver):
@@ -58,6 +65,7 @@ class OpenStackDriver(AbstractSystemsDriver):
         cls._os_cloud = os_cloud
 
         cls._cc = openstack.connect(cloud=os_cloud)
+        cls._executor = futures.ThreadPoolExecutor(max_workers=4)
 
         return cls
 
@@ -94,6 +102,18 @@ class OpenStackDriver(AbstractSystemsDriver):
 
     def _set_server_metadata(self, identity, metadata):
         self._cc.compute.set_server_metadata(identity, metadata)
+
+    @property
+    def _futures(self):
+        return FUTURES
+
+    @property
+    def connection(self):
+        """Return openstack connection
+
+        :returns: Connection object
+        """
+        return self._cc
 
     @property
     def driver(self):
@@ -358,3 +378,339 @@ class OpenStackDriver(AbstractSystemsDriver):
                         'Could not find MAC address in %s', adr)
         return [{'id': mac, 'mac': mac}
                 for mac in macs]
+
+    def get_boot_image(self, identity, device):
+        """Get backend VM boot image info
+
+        :param identity: node name or ID
+        :param device: device type (from
+            `sushy_tools.emulator.constants`)
+        :returns: a `tuple` of (boot_image, write_protected, inserted)
+        :raises: `error.FishyError` if boot device can't be accessed
+        """
+        instance = self._get_instance(identity)
+        return instance.image.id, False, True
+
+    def set_boot_image(self, identity, device, boot_image=None,
+                       write_protected=True):
+        """Set backend VM boot image
+
+        :param identity: node name or ID
+        :param device: device type (from
+            `sushy_tools.emulator.constants`)
+        :param boot_image: ID of the image, or `None` to switch to
+            boot from volume
+        :param write_protected: expose media as read-only or writable
+
+        :raises: `error.FishyError` if boot device can't be set
+        """
+        instance = self._get_instance(identity)
+
+        if instance.image.id == boot_image:
+            msg = ('Image %(identity)s already has image %(boot_image)s. '
+                   'Skipping rebuild.' % {'identity': identity,
+                                          'boot_image': boot_image})
+            self._logger.debug(msg)
+
+        elif boot_image is None:
+            self._logger.debug(
+                'Creating task to upload volume and rebuild for %(identity)s' %
+                {'identity': identity})
+            self._submit_future(
+                True, self._rebuild_with_volume_image, identity)
+        else:
+            self._logger.debug(
+                'Creating task to finish import and rebuild for %(identity)s' %
+                {'identity': identity})
+            self._submit_future(
+                True, self._rebuild_with_imported_image, identity, boot_image)
+
+    def insert_image(self, identity, image_url):
+        self._logger.debug(
+            'Creating task to insert image for %(identity)s' %
+            {'identity': identity})
+        return self._submit_future(
+            False, self._insert_image, identity, image_url)
+
+    def _insert_image(self, identity, image_url):
+        parsed_url = urlparse.urlparse(image_url)
+        local_file = os.path.basename(parsed_url.path)
+        unique = base64.urlsafe_b64encode(os.urandom(6)).decode('utf-8')
+        image_attrs = {
+            'name': '%s %s' % (local_file, unique),
+            'disk_format': 'raw',
+            'container_format': 'bare',
+            'visibility': 'private'
+        }
+        image = None
+        volume = None
+        try:
+
+            # Create image, and begin importing. Waiting for import to complete
+            # will be part of a long-running operation
+            image = self._cc.image.create_image(**image_attrs)
+            self._logger.debug(
+                'Importing image %(url)s for %(identity)s' %
+                {'identity': identity, 'url': image_url})
+            self._cc.image.import_image(image, method='web-download',
+                                        uri=image_url)
+            self._cc.set_server_metadata(
+                identity, {
+                    'sushy-tools-import-image': image.id,
+                    'sushy-tools-image-url': image_url
+                })
+
+            # Create an empty volume the size of the root disk which will be
+            # attached during the long-running operation
+            self._logger.debug(
+                'Creating volume for %(identity)s' %
+                {'identity': identity})
+            server = self._cc.compute.get_server(identity)
+            volume = self._cc.block_storage.create_volume(
+                size=server.flavor.disk,
+                name=server.name)
+            self._cc.set_server_metadata(
+                identity, {'sushy-tools-volume': volume.id})
+        except Exception as ex:
+            msg = 'Failed insert image from URL %s: %s' % (image_url, ex)
+            self._logger.exception(msg)
+            self._attempt_delete_image_volume(
+                image, volume, identity,
+                'sushy-tools-import-image', 'sushy-tools-volume')
+            if not isinstance(ex, error.FishyError):
+                ex = error.FishyError(msg)
+            raise ex
+
+        return image.id, image.name
+
+    def eject_image(self, identity):
+        self._logger.debug(
+            'Creating task to eject image for %(identity)s' %
+            {'identity': identity})
+        self._submit_future(False, self._eject_image, identity)
+
+    def _eject_image(self, identity):
+        try:
+            # Assume that the inserted image wrote a new image to the volume,
+            # so convert the volume to an image and rebuild with that image
+            # to switch
+            server = self._cc.compute.get_server(identity)
+            image_url = server.metadata.get('sushy-tools-image-url')
+            volume_id = server.metadata.get('sushy-tools-volume')
+            volume = self._cc.block_storage.get_volume(
+                volume_id)
+
+            if volume.status in ('detaching', 'available'):
+                self._logger.debug(
+                    'Volume %(volume)s already detaching or '
+                    'detached from server %(identity)s' % {
+                        'identity': identity, 'volume': volume})
+            else:
+                self._logger.debug(
+                    'Deleting attachment for volume %(volume)s and server '
+                    '%(identity)s' % {'identity': identity, 'volume': volume})
+                # Delete the attachment so the image can be created from the
+                # volume
+                self._cc.compute.delete_volume_attachment(identity, volume)
+
+            self._logger.debug(
+                'Waiting for volume %(volume)s to be available' %
+                {'volume': volume})
+            while volume.status in ('queued', 'detaching', 'in-use'):
+                time.sleep(1)
+                volume = self._cc.block_storage.get_volume(volume)
+            if volume.status != 'available':
+                raise error.FishyError(
+                    'Volume detachment resulted in status %s' %
+                    volume.status)
+
+            image_attrs = {
+                'volume': volume,
+                'image_name': volume.name,
+                'disk_format': 'raw',
+                'container_format': 'bare',
+                'visibility': 'private',
+            }
+
+            self._logger.debug(
+                'Creating image from volume %(volume)s for server '
+                '%(identity)s' %
+                {'identity': identity, 'volume': volume})
+            upload = self._cc.block_storage.upload_volume_to_image(
+                **image_attrs)
+            image_id = upload['image_id']
+            self._cc.set_server_metadata(
+                identity, {'sushy-tools-volume-image': image_id})
+
+        except Exception as ex:
+            msg = 'Failed ejecting image %s: %s' % (image_url, ex)
+            self._logger.exception(msg)
+            if not isinstance(ex, error.FishyError):
+                ex = error.FishyError(msg)
+            raise ex
+
+    def _attempt_delete_image_volume(self, image, volume, identity,
+                                     *metadata_keys):
+        if volume:
+            try:
+                self._logger.debug('Deleting volume %(volume)s' %
+                                   {'volume': volume})
+                self._cc.block_storage.delete_volume(volume)
+            except Exception:
+                pass
+        if image:
+            try:
+                self._logger.debug('Deleting image %(image)s' %
+                                   {'image': image})
+                self._cc.delete_image(image)
+            except Exception:
+                pass
+        if identity and metadata_keys:
+            try:
+                self._cc.delete_server_metadata(identity, metadata_keys)
+            except Exception:
+                pass
+
+    def _submit_future(self, run_async, fn, identity, *args, **kwargs):
+        future = self._futures.get(identity, None)
+        if future is not None:
+            if future.running():
+                raise error.Conflict(
+                    'An insert or eject operation is already in progress for '
+                    '%(identity)s' % {'identity': identity})
+
+            ex = future.exception()
+            del self._futures[identity]
+            if ex is not None:
+                # A previous operation failed, and the server may be in an
+                # unknown state. Raise the previous error as an error for
+                # this operation.
+                raise ex
+
+        future = self._executor.submit(fn, identity, *args, **kwargs)
+        self._futures[identity] = future
+        if run_async:
+            return
+        ex = future.exception()
+        if ex is not None:
+            raise ex
+        return future.result()
+
+    def _rebuild_with_imported_image(self, identity, image_id):
+        try:
+            image = self._cc.image.get_image(image_id)
+            server = self._cc.compute.get_server(identity)
+            image_url = server.metadata.get('sushy-tools-image-url')
+            volume_id = server.metadata.get('sushy-tools-volume')
+            volume = self._cc.block_storage.get_volume(volume_id)
+
+            # Wait for volume to be available
+            while volume.status == 'creating':
+                time.sleep(1)
+                volume = self._cc.block_storage.get_volume(volume)
+            if volume.status not in 'available':
+                raise error.FishyError(
+                    'Volume creation resulted in status %s' %
+                    volume.status)
+            self._logger.debug(
+                'Attaching volume %(volume)s and server %(identity)s' %
+                {'identity': identity, 'volume': volume})
+            self._cc.compute.create_volume_attachment(
+                identity, volume,
+                delete_on_termination=True)
+            while volume.status in ('available', 'reserved', 'attaching'):
+                time.sleep(1)
+                volume = self._cc.block_storage.get_volume(volume)
+            if volume.status not in 'in-use':
+                raise error.FishyError(
+                    'Volume attachment resulted in status %s' %
+                    volume.status)
+
+            # Wait for image to be imported
+            while image.status in ('queued', 'importing'):
+                time.sleep(1)
+                image = self._cc.image.get_image(image)
+            if image.status != 'active':
+                raise error.FishyError('Image import ended with status %s' %
+                                       image.status)
+
+            self._logger.debug(
+                'Rebuilding %(identity)s with image %(image)s' %
+                {'identity': identity, 'image': image.id})
+            server = self._cc.compute.rebuild_server(identity, image.id)
+            while server.status == 'REBUILD':
+                server = self._cc.compute.get_server(identity)
+                time.sleep(1)
+            if server.status != 'ACTIVE':
+                raise error.FishyError('Server rebuild attempt resulted in '
+                                       'status %s' % server.status)
+            self._logger.debug(
+                'Rebuild %(identity)s complete' % {'identity': identity})
+
+        except Exception as ex:
+            msg = 'Failed insert image from URL %s: %s' % (image_url, ex)
+            self._logger.exception(msg)
+            self._attempt_delete_image_volume(
+                None, volume_id, identity, 'sushy-tools-volume')
+            if not isinstance(ex, error.FishyError):
+                ex = error.FishyError(msg)
+            raise ex
+        finally:
+            self._attempt_delete_image_volume(
+                image_id, None, identity, 'sushy-tools-image')
+
+    def _rebuild_with_volume_image(self, identity):
+        try:
+
+            server = self._cc.compute.get_server(identity)
+            image_id = server.metadata.get('sushy-tools-volume-image')
+            volume_id = server.metadata.get('sushy-tools-volume')
+            image_url = server.metadata.get('sushy-tools-image-url')
+
+            if not image_id or not volume_id:
+                # Nothing to do
+                return
+
+            image = self._cc.image.get_image(image_id)
+            while image.status in ('queued', 'uploading', 'saving'):
+                time.sleep(1)
+                image = self._cc.image.get_image(image)
+            if image.status != 'active':
+                raise error.FishyError(
+                    'Image import ended with status %s' % image.status)
+
+            self._logger.debug(
+                'Rebuilding %(identity)s with image %(image)s' %
+                {'identity': identity, 'image': image.id})
+            server = self._cc.compute.rebuild_server(identity, image.id)
+            while server.status == 'REBUILD':
+                server = self._cc.compute.get_server(identity)
+                time.sleep(1)
+            if server.status != 'ACTIVE':
+                raise error.FishyError(
+                    'Server rebuild attempt resulted in status %s'
+                    % server.status)
+            self._logger.debug(
+                'Rebuild %(identity)s complete' % {'identity': identity})
+
+            # Wait for the volume to be back into a state which can be deleted
+            volume = self._cc.block_storage.get_volume(
+                volume_id)
+
+            while volume.status == 'uploading':
+                time.sleep(1)
+                volume = self._cc.block_storage.get_volume(volume)
+            if volume.status != 'available':
+                raise error.FishyError(
+                    'Volume upload resulted in status %s' % volume.status)
+
+        except Exception as ex:
+            msg = 'Failed ejecting image %s: %s' % (image_url, ex)
+            self._logger.exception(msg)
+            if not isinstance(ex, error.FishyError):
+                ex = error.FishyError(msg)
+            raise ex
+        finally:
+            self._attempt_delete_image_volume(
+                image_id, volume_id, identity,
+                'sushy-tools-volume-image', 'sushy-tools-volume')

@@ -495,3 +495,100 @@ class StaticDriverTestCase(base.BaseTestCase):
         self.assertRaises(error.NotFound,
                           self.test_driver.delete_certificate,
                           self.UUID, 'Cd', 'Default')
+
+
+class OpenstackDriverTestCase(base.BaseTestCase):
+
+    UUID = 'ZZZ-YYY-XXX'
+
+    def setUp(self):
+        super().setUp()
+        self.novadriver = mock.Mock()
+        with mock.patch('sushy_tools.emulator.memoize.PersistentDict',
+                        return_value={}, autospec=True):
+            self.test_driver = vmedia.OpenstackDriver(
+                {}, mock.MagicMock(), self.novadriver)
+
+    @mock.patch.object(vmedia.OpenstackDriver, '_get_device', autospec=True)
+    def test_insert_image(self, mock_get_device):
+        device_info = {}
+        mock_get_device.return_value = device_info
+
+        self.novadriver.insert_image.return_value = ('aaa-bbb', 'red.iso')
+
+        image_id = self.test_driver.insert_image(
+            self.UUID, 'Cd', 'http://fish.it/red.iso', inserted=True,
+            write_protected=False)
+
+        self.novadriver.insert_image.assert_called_once_with(
+            self.UUID, 'http://fish.it/red.iso')
+        self.assertEqual('aaa-bbb', image_id)
+
+        self.assertEqual('http://fish.it/red.iso', device_info['Image'])
+        self.assertEqual('red.iso', device_info['ImageName'])
+        self.assertTrue(device_info['Inserted'])
+        self.assertFalse(device_info['WriteProtected'])
+
+    @mock.patch.object(vmedia.OpenstackDriver, '_get_device', autospec=True)
+    def test_insert_image_auth(self, mock_get_device):
+        device_info = {}
+        mock_get_device.return_value = device_info
+
+        self.assertRaises(
+            error.NotSupportedError, self.test_driver.insert_image,
+            self.UUID, 'Cd', 'http://fish.it/red.iso', inserted=True,
+            write_protected=False, username='Admin', password='Secret')
+
+    @mock.patch.object(vmedia.OpenstackDriver, '_get_device', autospec=True)
+    def test_insert_image_verify_ssl(self, mock_get_device):
+        device_info = {}
+        mock_get_device.return_value = device_info
+
+        ssl_conf_key = 'SUSHY_EMULATOR_VMEDIA_VERIFY_SSL'
+        self.test_driver._config[ssl_conf_key] = True
+        self.assertRaises(
+            error.NotSupportedError, self.test_driver.insert_image,
+            self.UUID, 'Cd', 'https://fish.it/red.iso', inserted=True,
+            write_protected=False)
+
+    @mock.patch.object(vmedia.OpenstackDriver, '_get_device', autospec=True)
+    def test_insert_image_fail(self, mock_get_device):
+        device_info = {}
+        mock_get_device.return_value = device_info
+        self.novadriver.insert_image.side_effect = error.FishyError('ouch')
+
+        e = self.assertRaises(
+            error.FishyError, self.test_driver.insert_image,
+            self.UUID, 'Cd', 'http://fish.it/red.iso', inserted=True,
+            write_protected=False)
+        self.assertEqual('ouch', str(e))
+
+    @mock.patch.object(vmedia.OpenstackDriver, '_get_device', autospec=True)
+    def test_eject_image(self, mock_get_device):
+
+        device_info = {
+            'Image': 'http://fish.it/red.iso',
+            'Inserted': True
+        }
+        mock_get_device.return_value = device_info
+
+        self.test_driver.eject_image(self.UUID, 'Cd')
+
+        self.assertFalse(device_info['Inserted'])
+        self.assertEqual('', device_info['Image'])
+        self.assertEqual('', device_info['ImageName'])
+
+    @mock.patch.object(vmedia.OpenstackDriver, '_get_device', autospec=True)
+    def test_eject_image_error(self, mock_get_device):
+        device_info = {
+            'Image': 'http://fish.it/red.iso',
+            'Inserted': True
+        }
+        mock_get_device.return_value = device_info
+        self.novadriver.eject_image.side_effect = error.FishyError('ouch')
+
+        e = self.assertRaises(
+            error.FishyError, self.test_driver.eject_image,
+            self.UUID, 'Cd')
+        self.assertEqual('ouch', str(e))
+        self.assertTrue(device_info['Inserted'])
