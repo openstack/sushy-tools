@@ -92,6 +92,14 @@ class LibvirtDriver(AbstractSystemsDriver):
 
     LIBVIRT_URI = 'qemu:///system'
 
+    BOOT_MODE_AUTO_FW_MAP = {
+        'UEFI': 'efi',
+        'Legacy': 'bios'
+    }
+
+    BOOT_MODE_AUTO_FW_MAP_REV = {v: k for k, v
+                                 in BOOT_MODE_AUTO_FW_MAP.items()}
+
     BOOT_MODE_MAP = {
         'Legacy': 'rom',
         'UEFI': 'pflash'
@@ -503,6 +511,18 @@ class LibvirtDriver(AbstractSystemsDriver):
 
         self._defineDomain(tree)
 
+    def _is_firmware_autoselection(self, tree):
+        """Get libvirt firmware autoselection mode
+
+        :param tree: libvirt domain XML tree
+
+        :returns: True if firmware autoselection is enabled
+        """
+
+        os_element = tree.find('.//os')
+
+        return True if os_element.get('firmware') else False
+
     def get_boot_mode(self, identity):
         """Get computer system boot mode.
 
@@ -516,8 +536,15 @@ class LibvirtDriver(AbstractSystemsDriver):
         # XML schema: https://libvirt.org/formatdomain.html#elementsOSBIOS
         tree = ET.fromstring(domain.XMLDesc(libvirt.VIR_DOMAIN_XML_INACTIVE))
 
-        loader_element = tree.find('.//loader')
+        if self._is_firmware_autoselection(tree):
+            os_element = tree.find('.//os')
+            boot_mode = (
+                self.BOOT_MODE_AUTO_FW_MAP_REV.get(os_element.get('firmware'))
+            )
 
+            return boot_mode
+
+        loader_element = tree.find('.//loader')
         if loader_element is not None:
             boot_mode = (
                 self.BOOT_MODE_MAP_REV.get(loader_element.get('type'))
@@ -558,9 +585,6 @@ class LibvirtDriver(AbstractSystemsDriver):
     def _build_os_element(self, identity, tree, boot_mode, secure=None):
         """Set the boot mode and secure boot on the os element
 
-        This also converts from the previous manual layout to the automatic
-        approach.
-
         :raises: `error.FishyError` if boot mode can't be set
         """
         try:
@@ -581,6 +605,54 @@ class LibvirtDriver(AbstractSystemsDriver):
 
         os_element = os_elements[0]
 
+        if self._is_firmware_autoselection(tree):
+            self._build_os_element_fw_autoselection(boot_mode, secure,
+                                                    os_element)
+        else:
+            self._build_os_element_fw_manualselection(boot_mode, secure,
+                                                      os_element, loader_type)
+
+    def _build_os_element_fw_autoselection(self, boot_mode, secure,
+                                           os_element):
+        """Set the boot mode and secure boot (auto-selection)
+
+        :raises: `error.FishyError` if boot mode can't be set
+        """
+        os_element.set('firmware', self.BOOT_MODE_AUTO_FW_MAP[boot_mode])
+
+        # Delete the secure-boot feature element
+        try:
+            firmware_element = os_element.findall('firmware').pop()
+            for e in firmware_element.findall('.feature'
+                                              '[@name="secure-boot"]'):
+                firmware_element.remove(e)
+        except IndexError:
+            firmware_element = None
+
+        if boot_mode != 'UEFI':
+            return
+
+        if firmware_element is None:
+            firmware_element = ET.SubElement(os_element, 'firmware')
+
+        if secure:
+            secure_boot_element = ET.SubElement(firmware_element, 'feature')
+            secure_boot_element.set('name', 'secure-boot')
+            secure_boot_element.set('enabled', 'yes')
+        else:
+            secure_boot_element = ET.SubElement(firmware_element, 'feature')
+            secure_boot_element.set('name', 'secure-boot')
+            secure_boot_element.set('enabled', 'no')
+
+    def _build_os_element_fw_manualselection(self, boot_mode, secure,
+                                             os_element, loader_type):
+        """Set the boot mode and secure boot (manual-selection)
+
+        This also converts from the previous manual layout to the automatic
+        approach.
+
+        :raises: `error.FishyError` if boot mode can't be set
+        """
         type_element = os_element.find('type')
         if type_element is None:
             os_arch = None
@@ -656,6 +728,43 @@ class LibvirtDriver(AbstractSystemsDriver):
         # https://libvirt.org/formatdomain.html#operating-system-booting
         tree = ET.fromstring(domain.XMLDesc(libvirt.VIR_DOMAIN_XML_INACTIVE))
 
+        if self._is_firmware_autoselection(tree):
+            return self._get_secureboot_fw_auto_selection(identity, tree)
+        else:
+            return self._get_secureboot_fw_manual_selection(identity, tree)
+
+    def _get_secureboot_fw_auto_selection(self, identity, tree):
+        os_element = tree.find('os')
+
+        firmware_element = os_element.findall('firmware')
+
+        if len(firmware_element) == 0:
+            msg = ('Can\'t get secure boot state because "firmware" element '
+                   'is not present in domain "%(identity)s" configuration'
+                   % {'identity': identity})
+            raise error.FishyError(msg)
+
+        if len(firmware_element) > 1:
+            msg = ('Can\'t get secure boot state because "firmware" element '
+                   'must be present exactly once in domain "%(identity)s" '
+                   'configuration' % {'identity': identity})
+            raise error.FishyError(msg)
+
+        feature_secure_boot = os_element.findall('./firmware/feature'
+                                                 '[@name="secure-boot"]')
+        if len(feature_secure_boot) > 1:
+            msg = ('Can\'t get secure boot state because the "firmware" '
+                   'element contains multiple "feature" elements with the '
+                   '"secure-boot" name attribute. "secure-boot" feature '
+                   'should be present exactly once in domain %(identity)s" '
+                   'configuration' % {'identity': identity})
+            raise error.FishyError(msg)
+
+        enabled = feature_secure_boot[0].get('enabled', "no")
+
+        return True if enabled == "yes" else False
+
+    def _get_secureboot_fw_manual_selection(self, identity, tree):
         os_element = tree.find('os')
 
         nvram = os_element.findall('nvram')

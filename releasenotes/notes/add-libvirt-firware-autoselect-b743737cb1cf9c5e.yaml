@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    Support for domains utilizing firmware auto-selection has been added to
+    the libvirt driver.
+
