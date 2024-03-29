@@ -90,7 +90,7 @@ class Application(flask.Flask):
 
     def configure(self, config_file=None, extra_config=None):
         if config_file:
-            self.config.from_pyfile(config_file)
+            self.config.from_pyfile(os.path.abspath(config_file))
         if extra_config:
             self.config.update(extra_config)
 
