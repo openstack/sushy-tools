@@ -453,7 +453,7 @@ class LibvirtDriver(AbstractSystemsDriver):
 
         # Remove per-disk boot configuration
         # We should save at least hdd boot entries instead of just removing
-        # everything. In some scenarious PXE after provisioning stops replying
+        # everything. In some scenarios PXE after provisioning stops replying
         # and if there is no other boot device, then vm will fail to boot
         # cdrom and floppy are ignored.
 
