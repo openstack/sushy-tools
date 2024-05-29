@@ -170,6 +170,10 @@ class Application(flask.Flask):
     @property
     @memoize.memoize()
     def vmedia(self):
+        os_cloud = self.config.get('SUSHY_EMULATOR_OS_CLOUD')
+        if os_cloud:
+            return vmddriver.OpenstackDriver(self.config, self.logger,
+                                             self.systems)
         return vmddriver.StaticDriver(self.config, self.logger)
 
     @property

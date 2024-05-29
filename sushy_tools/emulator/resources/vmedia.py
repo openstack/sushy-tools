@@ -13,6 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import abc
 import collections
 import os
 import re
@@ -37,7 +38,7 @@ Certificate = collections.namedtuple(
 _CERT_ID = "Default"
 
 
-class StaticDriver(base.DriverBase):
+class BaseDriver(base.DriverBase):
     """Redfish virtual media simulator."""
 
     def __init__(self, config, logger):
@@ -196,6 +197,34 @@ class StaticDriver(base.DriverBase):
         del device_info["Certificate"]
         self._devices[(identity, device)] = device_info
 
+    @abc.abstractmethod
+    def insert_image(self, identity, device, image_url,
+                     inserted=True, write_protected=True,
+                     username=None, password=None):
+        """Upload, remove or insert virtual media
+
+        :param identity: parent resource ID
+        :param device: device name
+        :param image_url: URL to ISO image to place into `device` or `None`
+            to eject currently present media
+        :param inserted: treat currently present media as inserted or not
+        :param write_protected: prevent write access the inserted media
+        :raises: `FishyError` if image can't be manipulated
+        """
+
+    @abc.abstractmethod
+    def eject_image(self, identity, device):
+        """Eject virtual media image
+
+        :param identity: parent resource ID
+        :param device: device name
+        :raises: `FishyError` if image can't be manipulated
+        """
+
+
+class StaticDriver(BaseDriver):
+    """Redfish virtual media simulator for local image storage."""
+
     def _write_from_response(self, image_url, rsp, tmp_file):
         with open(tmp_file.name, 'wb') as fl:
             for chunk in rsp.iter_content(chunk_size=8192):
@@ -344,3 +373,84 @@ class StaticDriver(base.DriverBase):
             except FileNotFoundError:
                 # Ignore error as we are trying to remove the file anyway
                 pass
+
+
+class OpenstackDriver(BaseDriver):
+    """Redfish virtual media simulator for openstack image storage."""
+
+    def __init__(self, config, logger, driver):
+        super().__init__(config, logger)
+        # Only support 'Cd', ignore SUSHY_EMULATOR_VMEDIA_DEVICES
+        self._device_types = {
+            'Cd': {
+                'Name': 'Virtual CD',
+                'MediaTypes': [
+                    'CD',
+                    'DVD'
+                ]
+            }
+        }
+        self._driver = driver
+
+    @property
+    def driver(self):
+        """Return human-friendly driver description
+
+        :returns: driver description as `str`
+        """
+        return self._driver.driver
+
+    def insert_image(self, identity, device, image_url,
+                     inserted=True, write_protected=True,
+                     username=None, password=None):
+        """Upload, remove or insert virtual media
+
+        :param identity: parent resource ID
+        :param device: device name
+        :param image_url: URL to ISO image to place into `device` or `None`
+            to eject currently present media
+        :param inserted: treat currently present media as inserted or not
+        :param write_protected: prevent write access the inserted media
+        :raises: `FishyError` if image can't be manipulated
+        """
+        device_info = self._get_device(identity, device)
+        verify_media_cert = device_info.get(
+            'Verify',
+            # NOTE(dtantsur): it's de facto standard for Redfish to default
+            # to no certificate validation.
+            self._config.get('SUSHY_EMULATOR_VMEDIA_VERIFY_SSL', False))
+        if verify_media_cert:
+            msg = ('The cloud driver %(driver)s does not support inserting an '
+                   'image with a custom download certificate' %
+                   {'driver': self.driver})
+            raise error.NotSupportedError(msg)
+
+        auth = (username, password) if (username and password) else None
+        if auth:
+            msg = ('The cloud driver %(driver)s does not support inserting an '
+                   'image with download credentials' % {'driver': self.driver})
+            raise error.NotSupportedError(msg)
+
+        image_id, image_name = self._driver.insert_image(
+            identity, image_url)
+
+        device_info['Image'] = image_url
+        device_info['ImageName'] = image_name
+        device_info['Inserted'] = inserted
+        device_info['WriteProtected'] = write_protected
+
+        self._devices.update({(identity, device): device_info})
+        return image_id
+
+    def eject_image(self, identity, device):
+        """Eject virtual media image
+
+        :param identity: parent resource ID
+        :param device: device name
+        :raises: `FishyError` if image can't be manipulated
+        """
+        device_info = self._get_device(identity, device)
+        self._driver.eject_image(identity)
+        device_info['Image'] = ''
+        device_info['ImageName'] = ''
+        device_info['Inserted'] = False

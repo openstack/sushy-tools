@@ -292,7 +292,7 @@ Redfish *Systems*:
        "Members": [
 
                {
-                   "@odata.id": "/redfish/v1/Systems/vbmc-node"
+                   "@odata.id": "/redfish/v1/Systems/8dbe91da-4002-4d61-a56d-1a00fc61c35d"
                }
 
        ],
@@ -528,7 +528,8 @@ to *Cd* and boot mode to *Uefi* will cause the system to boot from
 virtual media image.
 
 User can change virtual media devices and their properties through
-emulator configuration:
+emulator configuration (except for the OpenStack driver which only
+supports *Cd*):
 
 .. code-block:: python
 
@@ -549,11 +550,11 @@ emulator configuration:
         }
     }
 
-Virtual Media resource will be revealed when querying Manager resource:
+Virtual Media resource will be revealed when querying System resource:
 
 .. code-block:: bash
 
-    curl -L http://localhost:8000/redfish/v1/Managers/58893887-8974-2487-2389-841168418919/VirtualMedia
+    curl -L http://localhost:8000/redfish/v1/Systems/58893887-8974-2487-2389-841168418919/VirtualMedia
     {
         "@odata.type": "#VirtualMediaCollection.VirtualMediaCollection",
         "Name": "Virtual Media Services",
@@ -562,16 +563,16 @@ Virtual Media resource will be revealed when querying Manager resource:
         "Members": [
 
             {
-                "@odata.id": "/redfish/v1/Managers/58893887-8974-2487-2389-841168418919/VirtualMedia/Cd"
+                "@odata.id": "/redfish/v1/Systems/58893887-8974-2487-2389-841168418919/VirtualMedia/Cd"
             },
 
             {
-                "@odata.id": "/redfish/v1/Managers/58893887-8974-2487-2389-841168418919/VirtualMedia/Floppy"
+                "@odata.id": "/redfish/v1/Systems/58893887-8974-2487-2389-841168418919/VirtualMedia/Floppy"
             }
 
         ],
         "@odata.context": "/redfish/v1/$metadata#VirtualMediaCollection.VirtualMediaCollection",
-        "@odata.id": "/redfish/v1/Managers/58893887-8974-2487-2389-841168418919/VirtualMedia",
+        "@odata.id": "/redfish/v1/Systems/58893887-8974-2487-2389-841168418919/VirtualMedia",
         "@Redfish.Copyright": "Copyright 2014-2017 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
     }
 
@@ -579,22 +580,19 @@ Redfish client can insert a HTTP-based image into the virtual device:
 
 .. code-block:: bash
 
-   curl -d '{"Image":"http://localhost.localdomain/mini.iso",\
-             "Inserted": true}' \
+   curl -d '{"Image": "http://localhost.localdomain/mini.iso", "Inserted": true}' \
         -H "Content-Type: application/json" \
         -X POST \
-        http://localhost:8000/redfish/v1/Managers/58893887-8974-2487-2389-841168418919/VirtualMedia/Cd/Actions/VirtualMedia.InsertMedia
+        http://localhost:8000/redfish/v1/Systems/58893887-8974-2487-2389-841168418919/VirtualMedia/Cd/Actions/VirtualMedia.InsertMedia
 
-.. note::
+On insert the OpenStack driver will:
 
-   All systems being managed by this manager and booting from their
-   corresponding removable media device (e.g. cdrom or fd) will boot the
-   image inserted into manager's virtual media device.
-
-.. warning::
-
-   System boot from virtual media only works if *System* resource emulation
-   driver supports setting boot image.
+* Upload the image directly to glance from the URL (long running)
+* Store the URL, image ID and volume ID in server metadata properties
+  `sushy-tools-image-url`, `sushy-tools-import-image`, `sushy-tools-volume`
+* Create and attach a new volume the same size as the root disk
+* Rebuild the server with the image, replacing the contents of the root disk
+* Delete the image
 
 Redfish client can eject image from virtual media device:
 
@@ -603,7 +601,17 @@ Redfish client can eject image from virtual media device:
    curl -d '{}' \
         -H "Content-Type: application/json" \
         -X POST \
-        http://localhost:8000/redfish/v1/Managers/58893887-8974-2487-2389-841168418919/VirtualMedia/Cd/Actions/VirtualMedia.EjectMedia
+        http://localhost:8000/redfish/v1/Systems/58893887-8974-2487-2389-841168418919/VirtualMedia/Cd/Actions/VirtualMedia.EjectMedia
+
+On eject the OpenStack driver will:
+
+* Assume the attached volume has been rewritten with a new image (an ISO installer or IPA)
+* Detach the volume
+* Create an image from the volume (long running)
+* Store the volume image ID in server metadata property `sushy-tools-volume-image`
+* Rebuild the server with the new image
+* Delete the volume
+* Delete the image
 
 Virtual media boot
 ++++++++++++++++++
@@ -632,11 +640,11 @@ being offered:
 
 .. code-block:: bash
 
-    $ curl http://localhost:8000/redfish/v1/Managers/58893887-894-2487-2389-841168418919/VirtualMedia
+    $ curl http://localhost:8000/redfish/v1/Systems/58893887-894-2487-2389-841168418919/VirtualMedia
     ...
     "Members": [
     {
-        "@odata.id": "/redfish/v1/Managers/58893887-8974-2487-2389-841168418919/VirtualMedia/Cd"
+        "@odata.id": "/redfish/v1/Systems/58893887-8974-2487-2389-841168418919/VirtualMedia/Cd"
     },
     ...
 
@@ -644,7 +652,7 @@ Knowing virtual media device name, the client can check out its present state:
 
 .. code-block:: bash
 
-    $ curl http://localhost:8000/redfish/v1/Managers/58893887-8974-2487-2389-841168418919/VirtualMedia/Cd
+    $ curl http://localhost:8000/redfish/v1/Systems/58893887-8974-2487-2389-841168418919/VirtualMedia/Cd
     {
         ...
         "Name": "Virtual CD",
@@ -669,13 +677,13 @@ virtual CD drive:
         '{"Image":"http:://localhost/var/tmp/mini.iso", "Inserted": true}' \
          -H "Content-Type: application/json" \
          -X POST \
-         http://localhost:8000/redfish/v1/Managers/58893887-8974-2487-2389-841168418919/VirtualMedia/Cd/Actions/VirtualMedia.InsertMedia
+         http://localhost:8000/redfish/v1/Systems/58893887-8974-2487-2389-841168418919/VirtualMedia/Cd/Actions/VirtualMedia.InsertMedia
 
 Querying again, the emulator should have it in the drive:
 
 .. code-block:: bash
 
-    $ curl http://localhost:8000/redfish/v1/Managers/58893887-8974-2487-2389-841168418919/VirtualMedia/Cd
+    $ curl http://localhost:8000/redfish/v1/Systems/58893887-8974-2487-2389-841168418919/VirtualMedia/Cd
     {
         ...
         "Name": "Virtual CD",
@@ -704,6 +712,11 @@ over UEFI:
          }
        }' \
        http://localhost:8000/redfish/v1/Systems/281c2fc3-dd34-439a-9f0f-63df45e2c998
+
+.. note::
+
+   With the OpenStack driver the boot source is changed during insert and eject, so setting
+   `BootSourceOverrideTarget` to `Cd` or `Hdd` has no effect.
 
 By this point the system will boot off the virtual CD drive when powering it on:
 

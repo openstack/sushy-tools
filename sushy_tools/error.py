@@ -52,3 +52,10 @@ class FeatureNotAvailable(NotFound):
 
     def __init__(self, feature, code=404):
         super().__init__(f"Feature {feature} not available", code=code)
+
+
+class Conflict(FishyError):
+    """Conflict with current state of the resource."""
+
+    def __init__(self, msg, code=409):
+        super().__init__(msg, code)
