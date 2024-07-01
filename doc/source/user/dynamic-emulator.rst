@@ -26,7 +26,8 @@ Systems resource
 
 For *Systems* resource, emulator maintains two drivers relying on
 a virtualization backend to emulate bare metal machines by means of
-virtual machines.
+virtual machines. In addition, there is a fake driver used to mock
+bare metal machines.
 
 The following sections will explain how to configure and use
 each of these drivers.
@@ -387,6 +388,39 @@ large number of virtual machines. When the Redfish emulator is configured with
 the ``fake`` system backend, all operations just return success. Any
 modifications are done purely in the local cache. This way, many Ironic
 operations can be tested at scale without access to a large computing pool.
+
+System status notifications
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``fake`` driver may need to simulate components that run on the VMs to test
+an end-to-end deployment. This requires a hook interface to integrate external
+components. For instance, when testing Ironic scalability, Ironic needs to
+communicate with the Ironic Python Agent (IPA). A fake IPA can be implemented
+and synchronized with the VM status using this hook, which notifies the fake
+IPA whenever the VM status changes.
+
+To enable notifications, set ``external_notifier`` to ``True`` in the fake system
+object:
+
+.. code-block:: python
+
+    {
+        "uuid": "7946b59-9e44-4fa7-8e91-f3527a1ef094",
+        "name": "fake",
+        "power_state": "Off",
+        "external_notifier": True,
+        "nics": [
+            {
+                "mac": "00:5c:52:31:3a:9c",
+                "ip": "172.22.0.100"
+            }
+        ]
+    }
+
+After this, whenever the fake driver updates this system object, it will send
+an HTTP ``PUT`` request with the new system object as ``JSON`` data. The
+endpoint URL can be configured with the parameter
+``EXTERNAL_NOTIFICATION_URL``.
 
 Filtering by allowed instances
 ++++++++++++++++++++++++++++++

@@ -14,10 +14,11 @@ import copy
 import random
 import time
 
+import requests
+
 from sushy_tools.emulator import memoize
 from sushy_tools.emulator.resources.systems.base import AbstractSystemsDriver
 from sushy_tools import error
-
 
 DEFAULT_UUID = '27946b59-9e44-4fa7-8e91-f3527a1ef094'
 
@@ -32,11 +33,16 @@ class FakeDriver(AbstractSystemsDriver):
                 'uuid': DEFAULT_UUID,
                 'name': 'fake',
                 'power_state': 'Off',
+                'external_notifier': False,
                 'nics': [
-                    {'address': '00:5c:52:31:3a:9c'}
+                    {
+                        'mac': '00:5c:52:31:3a:9c',
+                        'ip': '172.22.0.100'
+                    }
                 ]
             }
         ])
+        config.setdefault('EXTERNAL_NOTIFICATION_URL', 'http://localhost:9999')
         cls._config = config
         cls._logger = logger
         return cls
@@ -61,6 +67,8 @@ class FakeDriver(AbstractSystemsDriver):
     def _update_if_needed(self, system):
         pending_power = system.get('pending_power')
         if pending_power and time.time() >= pending_power['apply_time']:
+            if 'Restart' in pending_power['power_state']:
+                pending_power['power_state'] = 'On'
             self._update(system,
                          power_state=pending_power['power_state'],
                          pending_power=None)
@@ -87,6 +95,8 @@ class FakeDriver(AbstractSystemsDriver):
             system = self._get(system)
         system.update(changes)
         self._systems[system['uuid']] = system
+        if system.get('external_notifier'):
+            self._send_external_notification(system)
 
     @property
     def driver(self):
@@ -123,7 +133,7 @@ class FakeDriver(AbstractSystemsDriver):
             pending_state = 'Off'
         elif 'Restart' in state:
             system['power_state'] = 'Off'
-            pending_state = 'On'
+            pending_state = state
         else:
             raise error.NotSupportedError(
                 f'Power state {state} is not supported')
@@ -165,5 +175,36 @@ class FakeDriver(AbstractSystemsDriver):
 
     def get_nics(self, identity):
         nics = self._get(identity)['nics']
-        return [{'id': nic.get('address'), 'mac': nic.get('address')}
+        return [{'id': nic.get('mac'), 'mac': nic.get('mac')}
                 for nic in nics]
+
+    def _send_external_notification(self, system):
+        """Notify external API about a given system changes.
+
+        Args:
+            system (dict): The system dictionary containing system details.
+
+        Logs:
+            Info: Logs the start of the fake IPA boot process.
+            Error: Logs any errors encountered during the request.
+        """
+        external_notification_url = self._config['EXTERNAL_NOTIFICATION_URL']
+        self._logger.info(
+            'External notification to (%s): node %s power state changes',
+            external_notification_url, system.get('name'))
+        resp = requests.put(
+            external_notification_url, json=system,
+            headers={'Content-type': 'application/json'})
+
+        # Check if the request was unsuccessful
+        if resp.status_code >= 400:
+            self._logger.error(
+                'External notifcation to (%s) about system %s request'
+                'error %d: %s',
+                external_notification_url, system.get('name'),
+                resp.status_code, resp.text)
+            return
+
+        # Log successful notification
+        self._logger.info("External notifcation to (%s) sent about %s",
+                          external_notification_url, system.get('name'))
