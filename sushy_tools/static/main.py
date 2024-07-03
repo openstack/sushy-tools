@@ -105,9 +105,9 @@ def main():
                                    RequestHandler)
 
     if args.ssl_certificate and args.ssl_key:
-        httpd.socket = ssl.wrap_socket(
-            httpd.socket, keyfile=args.ssl_key,
-            certfile=args.ssl_certificate, server_side=True)
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(args.ssl_certificate, args.ssl_key)
+        httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
 
     httpd.serve_forever()
 
