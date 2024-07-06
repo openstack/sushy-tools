@@ -487,12 +487,17 @@ def system_resource(identity):
                     app.logger.error('Unable to record HttpBootUri for boot '
                                      'operation. Error: %s', e)
                     return 'Failed to save HttpBootUri field value.', 400
+                # Explicitly set to CD as in this case we will boot a an iso
+                # image provided, not precisely the same, but BMC facilitated
+                # HTTPBoot is a little different and the overall functionality
+                # test is more important.
+                target = 'Cd'
 
-            if target == 'UefiHttp':
-                # Reset to Cd, in our case, since we can't force override
+            if target == 'UefiHttp' and not http_uri:
+                # Reset to Pxe, in our case, since we can't force override
                 # the network boot to a specific URL. This is sort of a hack
                 # but testing functionality overall is a bit more important.
-                target = 'Cd'
+                target = 'Pxe'
 
             if target:
                 # NOTE(lucasagomes): In libvirt we always set the boot
