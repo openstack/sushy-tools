@@ -144,8 +144,9 @@ class VirtualMediaTestCase(test_main.EmulatorTestCase):
 
         self.assertEqual(204, response.status_code)
 
-        vmedia_mock.return_value.insert_image.called_once_with(
-            'CD', 'http://fish.iso', True, False)
+        vmedia_mock.return_value.insert_image.assert_called_once_with(
+            self.uuid, 'CD', 'http://fish.iso', True, True,
+            username='', password='')
 
     def test_virtual_media_eject(self, systems_mock, vmedia_mock):
         response = self.app.post(
@@ -155,7 +156,8 @@ class VirtualMediaTestCase(test_main.EmulatorTestCase):
 
         self.assertEqual(204, response.status_code)
 
-        vmedia_mock.return_value.eject_image.called_once_with('CD')
+        vmedia_mock.return_value.eject_image.assert_called_once_with(
+            self.uuid, 'CD')
 
     def test_virtual_media_certificates(self, systems_mock, vmedia_mock):
         vmedia_mock.return_value.list_certificates.return_value = [
