@@ -1,0 +1,9 @@
+---
+fixes:
+  - |
+    Replaces hardcoded BIOS version string with updatable field backed by a
+    custom section in libvirt metadata (similar to prior art on BIOS
+    settings). This can be used for BIOS version information as well as
+    storing firmware version information of other components. NOTE: this
+    enhancement is meant to facilitate testing BIOS/firmware upgrade codepaths
+    and NOT performing actual BIOS/firmware upgrades.
