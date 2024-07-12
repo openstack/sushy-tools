@@ -1,0 +1,8 @@
+---
+features:
+  - |
+    Adds support for BIOS update emulation by introducing UpdateService.
+    No actual updates are performed (all the code is doing is incrementing
+    BIOS version value in libvirt xml) however this functionality may be
+    used for automated testing of firmware update features in Ironic. Note
+    BMC firmware update emulation is not supported at this time.

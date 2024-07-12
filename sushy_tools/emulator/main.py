@@ -26,6 +26,7 @@ from werkzeug import exceptions as wz_exc
 
 from sushy_tools.emulator import api_utils
 from sushy_tools.emulator.controllers import certificate_service as certctl
+from sushy_tools.emulator.controllers import update_service as usctl
 from sushy_tools.emulator.controllers import virtual_media as vmctl
 from sushy_tools.emulator import memoize
 from sushy_tools.emulator.resources import chassis as chsdriver
@@ -195,6 +196,7 @@ class Application(flask.Flask):
 app = Application()
 app.register_blueprint(certctl.certificate_service)
 app.register_blueprint(vmctl.virtual_media)
+app.register_blueprint(usctl.update_service)
 
 
 @app.errorhandler(Exception)
@@ -925,6 +927,22 @@ def message_registry():
     app.logger.debug('Serving message registry')
 
     return app.render_template('message_registry.json')
+
+
+@app.route('/redfish/v1/TaskService',
+           methods=['GET'])
+@api_utils.ensure_instance_access
+@api_utils.returns_json
+def simple_task_service():
+    return app.render_template('task_service.json')
+
+
+@app.route('/redfish/v1/TaskService/Tasks/42',
+           methods=['GET'])
+@api_utils.ensure_instance_access
+@api_utils.returns_json
+def simple_task():
+    return app.render_template('task.json')
 
 
 def parse_args():

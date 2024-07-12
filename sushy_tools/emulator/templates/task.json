@@ -1,0 +1,11 @@
+{
+    "@odata.type":"#Task.v1_4_3.Task",
+    "Id":"42",
+    "Name":"Task 42",
+    "Description": "Task description",
+    "TaskMonitor":"/taskmon/42",
+    "TaskState":"Completed",
+    "TaskStatus":"OK",
+    "PercentComplete": 100,
+    "@odata.id":"/redfish/v1/TaskService/Tasks/42"
+ }
