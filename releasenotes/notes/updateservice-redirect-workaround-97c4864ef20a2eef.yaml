@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Resolves the issue where UpdateService.SimpleUpdate action cannot
+    complete successfully due to connections from UpdateService to System
+    being redirected by libvirt system driver alias handling code.
