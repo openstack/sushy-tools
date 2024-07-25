@@ -378,6 +378,15 @@ Or update their boot device:
        -H "Content-Type: application/json" -X PATCH \
         http://localhost:8000/redfish/v1/Systems/<uuid>
 
+Systems resource driver: fake
++++++++++++++++++++++++++++++
+
+The ``fake`` system driver is designed to conduct large-scale testing of
+Ironic without having a lot of bare-metal machines or being able to create a
+large number of virtual machines. When the Redfish emulator is configured with
+the ``fake`` system backend, all operations just return success. Any
+modifications are done purely in the local cache. This way, many Ironic
+operations can be tested at scale without access to a large computing pool.
 
 Filtering by allowed instances
 ++++++++++++++++++++++++++++++
