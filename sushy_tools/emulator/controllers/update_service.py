@@ -47,14 +47,24 @@ def update_service_simple_update():
         if "Manager" in target:
             message = "Manager is not currently a supported Target."
             return flask.render_template('error.json', message=message), 400
+        try:
+            name = target.rstrip("/").rsplit('/', 1)[-1]
+            uuid = flask.current_app.systems.uuid(name)
+        except error.AliasAccessError as exc:
+            api_utils.debug('Received a redirect in respose to GET System '
+                            '"%s". New System ID: "%s"', name, exc)
+            uuid = str(exc)
+        except Exception as exc:
+            api_utils.debug('Encountered exception "%s" while attempting to '
+                            'GET System "%s"', exc, name)
+            raise
 
-        identity = target.rsplit('/', 1)[-1]
         # NOTE(janders) iterate over the array? narrow down which one is needed
         # first? I suppose the former since we may want to update multiple
         api_utils.debug('Fetching BIOS information for System "%s"',
-                        target)
+                        uuid)
         try:
-            versions = flask.current_app.systems.get_versions(identity)
+            versions = flask.current_app.systems.get_versions(uuid)
 
         except error.NotSupportedError as ex:
             api_utils.warning(
@@ -67,7 +77,7 @@ def update_service_simple_update():
 
         api_utils.debug('Current BIOS version for System "%s" is "%s" ,'
                         'attempting upgrade.',
-                        target, bios_version)
+                        uuid, bios_version)
 
         bios_version = bios_version.split('.')
         bios_version[1] = str(int(bios_version[1]) + 1)
@@ -75,7 +85,7 @@ def update_service_simple_update():
         firmware_versions = {"BiosVersion": bios_version}
 
         try:
-            flask.current_app.systems.set_versions(identity, firmware_versions)
+            flask.current_app.systems.set_versions(uuid, firmware_versions)
         except error.NotSupportedError as ex:
             api_utils.warning('System failed to update bios with exception %s',
                               ex)
@@ -84,5 +94,5 @@ def update_service_simple_update():
 
         api_utils.info(
             'Emulated BIOS upgrade has been successful for '
-            'System %s, new version is "%s".', target, bios_version)
+            'System %s, new version is "%s".', uuid, bios_version)
     return '', 204, {'Location': '/redfish/v1/TaskService/Tasks/42'}
