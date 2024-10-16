@@ -51,7 +51,7 @@ def update_service_simple_update():
             name = target.rstrip("/").rsplit('/', 1)[-1]
             uuid = flask.current_app.systems.uuid(name)
         except error.AliasAccessError as exc:
-            api_utils.debug('Received a redirect in respose to GET System '
+            api_utils.debug('Received a redirect in response to GET System '
                             '"%s". New System ID: "%s"', name, exc)
             uuid = str(exc)
         except Exception as exc:

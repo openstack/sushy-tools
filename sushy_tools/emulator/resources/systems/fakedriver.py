@@ -211,12 +211,12 @@ class FakeDriver(AbstractSystemsDriver):
         # Check if the request was unsuccessful
         if resp.status_code >= 400:
             self._logger.error(
-                'External notifcation to (%s) about system %s request'
+                'External notification to (%s) about system %s request'
                 'error %d: %s',
                 external_notification_url, system.get('name'),
                 resp.status_code, resp.text)
             return
 
         # Log successful notification
-        self._logger.info("External notifcation to (%s) sent about %s",
+        self._logger.info("External notification to (%s) sent about %s",
                           external_notification_url, system.get('name'))

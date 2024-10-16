@@ -9,7 +9,7 @@ Contributing
 Cloning the sushy-tools repository
 ++++++++++++++++++++++++++++++++++
 
-If you haven't already, sushy-tools source code should be pulled directly
+If you haven't already, the sushy-tools source code should be pulled directly
 from git.
 
 .. code-block:: bash
