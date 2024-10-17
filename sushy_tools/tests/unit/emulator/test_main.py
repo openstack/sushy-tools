@@ -424,10 +424,10 @@ class SystemsTestCase(EmulatorTestCase):
         set_http_boot_uri.assert_called_once_with('http://test.url/boot.iso')
 
     @patch_resource('systems')
-    def test_system_reset_action(self, systems_mock):
+    def test_system_reset_action_ok(self, systems_mock):
         set_power_state = systems_mock.return_value.set_power_state
-        for reset_type in ('On', 'ForceOn', 'ForceOff', 'GracefulShutdown',
-                           'GracefulRestart', 'ForceRestart', 'Nmi'):
+        for reset_type in ('On', 'ForceOn', 'GracefulRestart', 'ForceRestart',
+                           'Nmi'):
             set_power_state.reset_mock()
             data = {'ResetType': reset_type}
             response = self.app.post(
@@ -437,6 +437,19 @@ class SystemsTestCase(EmulatorTestCase):
             self.assertEqual(204, response.status_code)
             set_power_state.assert_called_once_with('xxxx-yyyy-zzzz',
                                                     reset_type)
+
+    @patch_resource('systems')
+    def test_system_reset_action_fail(self, systems_mock):
+        self.app.application.config['SUSHY_EMULATOR_DISABLE_POWER_OFF'] = True
+        print(self.app.application.config)
+
+        for reset_type in ('ForceOff', 'GracefulShutdown'):
+            data = {'ResetType': reset_type}
+            response = self.app.post(
+                '/redfish/v1/Systems/xxxx-yyyy-zzzz/Actions/'
+                'ComputerSystem.Reset',
+                json=data)
+            self.assertEqual(400, response.status_code)
 
     @patch_resource('indicators')
     @patch_resource('systems')

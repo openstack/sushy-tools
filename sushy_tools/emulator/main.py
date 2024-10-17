@@ -614,6 +614,12 @@ def processor(identity, processor_id):
 @api_utils.returns_json
 def system_reset_action(identity):
     reset_type = flask.request.json.get('ResetType')
+    if app.config.get('SUSHY_EMULATOR_DISABLE_POWER_OFF') is True and \
+            reset_type in ('ForceOff', 'GracefulShutdown'):
+        raise error.BadRequest('Can not request power off transition. It is '
+                               'disabled via the '
+                               'SUSHY_EMULATOR_DISABLE_POWER_OFF configuration'
+                               'option.')
 
     app.systems.set_power_state(identity, reset_type)
 
