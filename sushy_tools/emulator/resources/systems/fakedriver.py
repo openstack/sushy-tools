@@ -188,12 +188,24 @@ class FakeDriver(AbstractSystemsDriver):
             Info: Logs the start of the fake IPA boot process.
             Error: Logs any errors encountered during the request.
         """
-        external_notification_url = self._config['EXTERNAL_NOTIFICATION_URL']
+        external_notification_url = self._config.get(
+            'EXTERNAL_NOTIFICATION_URL'
+            )
+        cert = None
+        verify = False
+        if self._config.get("EXTERNAL_NOTIFICATION_CAFILE"):
+            verify = self._config.get("EXTERNAL_NOTIFICATION_CAFILE")
+        elif self._config.get("EXTERNAL_NOTIFICATION_CERTFILE") and \
+            self._config.get("EXTERNAL_NOTIFICATION_KEYFILE"):
+            cert = (self._config.get("EXTERNAL_NOTIFICATION_CERTFILE"),
+                    self._config.get("EXTERNAL_NOTIFICATION_KEYFILE"))
+            verify = True
+
         self._logger.info(
             'External notification to (%s): node %s power state changes',
             external_notification_url, system.get('name'))
         resp = requests.put(
-            external_notification_url, json=system,
+            external_notification_url, verify=verify, cert=cert, json=system,
             headers={'Content-type': 'application/json'})
 
         # Check if the request was unsuccessful
