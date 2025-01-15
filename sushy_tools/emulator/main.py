@@ -21,10 +21,10 @@ import ssl
 import sys
 
 import flask
-from ironic_lib import auth_basic
 from werkzeug import exceptions as wz_exc
 
 from sushy_tools.emulator import api_utils
+from sushy_tools.emulator import auth_basic
 from sushy_tools.emulator.controllers import certificate_service as certctl
 from sushy_tools.emulator.controllers import update_service as usctl
 from sushy_tools.emulator.controllers import virtual_media as vmctl

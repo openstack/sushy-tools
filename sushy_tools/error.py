@@ -59,3 +59,19 @@ class Conflict(FishyError):
 
     def __init__(self, msg, code=409):
         super().__init__(msg, code)
+
+
+class ConfigInvalid(FishyError):
+    """Config is invalid."""
+
+    def __init__(self, msg, code=500):
+        errmsg = f"Invalid configuration file. {msg}"
+        super().__init__(errmsg, code)
+
+
+class Unauthorized(FishyError):
+    """Unauthorized for resource"""
+
+    def __init__(self, msg, code=401):
+        self.headers = {'WWW-Authenticate': 'Basic realm="Baremetal API"'}
+        super().__init__(msg, code)
