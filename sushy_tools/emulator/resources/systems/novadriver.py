@@ -425,14 +425,14 @@ class OpenStackDriver(AbstractSystemsDriver):
             self._submit_future(
                 True, self._rebuild_with_imported_image, identity, boot_image)
 
-    def insert_image(self, identity, image_url):
+    def insert_image(self, identity, image_url, local_file_path=None):
         self._logger.debug(
             'Creating task to insert image for %(identity)s' %
             {'identity': identity})
         return self._submit_future(
-            False, self._insert_image, identity, image_url)
+            False, self._insert_image, identity, image_url, local_file_path)
 
-    def _insert_image(self, identity, image_url):
+    def _insert_image(self, identity, image_url, local_file_path=None):
         parsed_url = urlparse.urlparse(image_url)
         local_file = os.path.basename(parsed_url.path)
         unique = base64.urlsafe_b64encode(os.urandom(6)).decode('utf-8')
@@ -442,23 +442,32 @@ class OpenStackDriver(AbstractSystemsDriver):
             'container_format': 'bare',
             'visibility': 'private'
         }
+        server_metadata = {'sushy-tools-image-url': image_url}
+        if local_file_path:
+            image_attrs['filename'] = local_file_path
+            server_metadata['sushy-tools-image-local-file'] = local_file_path
+
         image = None
         volume = None
         try:
-
-            # Create image, and begin importing. Waiting for import to complete
-            # will be part of a long-running operation
+            # Create image, and begin importing. Waiting for import to
+            # complete will be part of a long-running operation
             image = self._cc.image.create_image(**image_attrs)
-            self._logger.debug(
-                'Importing image %(url)s for %(identity)s' %
-                {'identity': identity, 'url': image_url})
-            self._cc.image.import_image(image, method='web-download',
-                                        uri=image_url)
-            self._cc.set_server_metadata(
-                identity, {
-                    'sushy-tools-import-image': image.id,
-                    'sushy-tools-image-url': image_url
-                })
+            server_metadata['sushy-tools-import-image'] = image.id
+            if local_file_path:
+                self._logger.debug(
+                    'Uploading image file %(file)s from source %(url)s '
+                    'for %(identity)s' % {'identity': identity,
+                                          'file': local_file_path,
+                                          'url': image_url})
+            else:
+                self._logger.debug(
+                    'Importing image %(url)s for %(identity)s' %
+                    {'identity': identity, 'url': image_url})
+                self._cc.image.import_image(image, method='web-download',
+                                            uri=image_url)
+
+            self._cc.set_server_metadata(identity, server_metadata)
 
             # Create an empty volume the size of the root disk which will be
             # attached during the long-running operation
@@ -475,8 +484,9 @@ class OpenStackDriver(AbstractSystemsDriver):
             msg = 'Failed insert image from URL %s: %s' % (image_url, ex)
             self._logger.exception(msg)
             self._attempt_delete_image_volume(
-                image, volume, identity,
-                'sushy-tools-import-image', 'sushy-tools-volume')
+                image, volume, local_file_path, identity,
+                'sushy-tools-import-image', 'sushy-tools-volume',
+                'sushy-tools-image-local-file')
             if not isinstance(ex, error.FishyError):
                 ex = error.FishyError(msg)
             raise ex
@@ -549,8 +559,8 @@ class OpenStackDriver(AbstractSystemsDriver):
                 ex = error.FishyError(msg)
             raise ex
 
-    def _attempt_delete_image_volume(self, image, volume, identity,
-                                     *metadata_keys):
+    def _attempt_delete_image_volume(self, image, volume, local_file,
+                                     identity, *metadata_keys):
         if volume:
             try:
                 self._logger.debug('Deleting volume %(volume)s' %
@@ -563,6 +573,13 @@ class OpenStackDriver(AbstractSystemsDriver):
                 self._logger.debug('Deleting image %(image)s' %
                                    {'image': image})
                 self._cc.delete_image(image)
+            except Exception:
+                pass
+        if local_file:
+            try:
+                self._logger.debug('Deleting local file %(local_file)s' %
+                                   {'local_file': local_file})
+                self._delete_local_file(local_file)
             except Exception:
                 pass
         if identity and metadata_keys:
@@ -601,6 +618,8 @@ class OpenStackDriver(AbstractSystemsDriver):
             image = self._cc.image.get_image(image_id)
             server = self._cc.compute.get_server(identity)
             image_url = server.metadata.get('sushy-tools-image-url')
+            image_local_file = server.metadata.get(
+                'sushy-tools-image-local-file')
             volume_id = server.metadata.get('sushy-tools-volume')
             volume = self._cc.block_storage.get_volume(volume_id)
 
@@ -630,6 +649,11 @@ class OpenStackDriver(AbstractSystemsDriver):
             while image.status in ('queued', 'importing'):
                 time.sleep(1)
                 image = self._cc.image.get_image(image)
+            # Delete the cached local file
+            if image_local_file:
+                self._attempt_delete_image_volume(
+                    None, None, image_local_file, identity,
+                    'sushy-tools-image-local-file')
             if image.status != 'active':
                 raise error.FishyError('Image import ended with status %s' %
                                        image.status)
@@ -651,19 +675,21 @@ class OpenStackDriver(AbstractSystemsDriver):
             msg = 'Failed insert image from URL %s: %s' % (image_url, ex)
             self._logger.exception(msg)
             self._attempt_delete_image_volume(
-                None, volume_id, identity, 'sushy-tools-volume')
+                None, volume_id, image_local_file, identity,
+                'sushy-tools-volume', 'sushy-tools-image-local-file')
             if not isinstance(ex, error.FishyError):
                 ex = error.FishyError(msg)
             raise ex
         finally:
             self._attempt_delete_image_volume(
-                image_id, None, identity, 'sushy-tools-image')
+                image_id, None, None, identity, 'sushy-tools-image')
 
     def _rebuild_with_volume_image(self, identity):
         try:
-
             server = self._cc.compute.get_server(identity)
             image_id = server.metadata.get('sushy-tools-volume-image')
+            image_local_file = server.metadata.get(
+                'sushy-tools-image-local-file')
             volume_id = server.metadata.get('sushy-tools-volume')
             image_url = server.metadata.get('sushy-tools-image-url')
 
@@ -712,5 +738,13 @@ class OpenStackDriver(AbstractSystemsDriver):
             raise ex
         finally:
             self._attempt_delete_image_volume(
-                image_id, volume_id, identity,
-                'sushy-tools-volume-image', 'sushy-tools-volume')
+                image_id, volume_id, image_local_file, identity,
+                'sushy-tools-volume-image', 'sushy-tools-volume',
+                'sushy-tools-image-local-file')
+
+    @staticmethod
+    def _delete_local_file(local_file):
+        try:
+            os.remove(local_file)
+        except (FileNotFoundError, TypeError):
+            pass

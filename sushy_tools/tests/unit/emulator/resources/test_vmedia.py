@@ -268,7 +268,7 @@ class StaticDriverTestCase(base.BaseTestCase):
 
         self.assertEqual('/alphabet/soup/fish.iso', local_file)
         mock_requests.get.assert_called_once_with(
-            'https://fish.it/red.iso', stream=True, verify=True, auth=None)
+            'https://fish.it/red.iso', stream=True, auth=None, verify=True)
         mock_open.assert_called_once_with(mock.ANY, 'wb')
         mock_rename.assert_called_once_with(
             'alphabet.soup', '/alphabet/soup/fish.iso')
@@ -308,7 +308,7 @@ class StaticDriverTestCase(base.BaseTestCase):
 
         self.assertEqual('/alphabet/soup/fish.iso', local_file)
         mock_requests.get.assert_called_once_with(
-            'https://fish.it/red.iso', stream=True, verify=True, auth=None)
+            'https://fish.it/red.iso', stream=True, auth=None, verify=True)
         mock_open.assert_called_once_with(mock.ANY, 'wb')
         mock_rename.assert_called_once_with(
             'alphabet.soup', '/alphabet/soup/fish.iso')
@@ -496,6 +496,27 @@ class StaticDriverTestCase(base.BaseTestCase):
                           self.test_driver.delete_certificate,
                           self.UUID, 'Cd', 'Default')
 
+    @mock.patch.object(builtins, 'open', autospec=True)
+    @mock.patch.object(vmedia.os, 'rename', autospec=True)
+    @mock.patch.object(vmedia, 'tempfile', autospec=True)
+    @mock.patch.object(vmedia, 'requests', autospec=True)
+    def test__get_image(self, mock_requests, mock_tempfile, mock_rename,
+                        mock_open):
+        mock_tempfile.mkdtemp.return_value = '/alphabet/soup'
+        mock_tmp_file = (mock_tempfile.NamedTemporaryFile
+                         .return_value.__enter__.return_value)
+        mock_tmp_file.name = 'alphabet.soup'
+        mock_rsp = mock_requests.get.return_value.__enter__.return_value
+        mock_rsp.headers = {
+            'content-disposition': 'attachment; filename="fish.iso"'
+        }
+        mock_rsp.status_code = 200
+
+        self.assertEqual(
+            ('fish.iso', '/alphabet/soup/fish.iso'),
+            self.test_driver._get_image(
+                'http://fish.it/fish.iso', None, False, None))
+
 
 class OpenstackDriverTestCase(base.BaseTestCase):
 
@@ -521,7 +542,31 @@ class OpenstackDriverTestCase(base.BaseTestCase):
             write_protected=False)
 
         self.novadriver.insert_image.assert_called_once_with(
-            self.UUID, 'http://fish.it/red.iso')
+            self.UUID, 'http://fish.it/red.iso', None)
+        self.assertEqual('aaa-bbb', image_id)
+
+        self.assertEqual('http://fish.it/red.iso', device_info['Image'])
+        self.assertEqual('red.iso', device_info['ImageName'])
+        self.assertTrue(device_info['Inserted'])
+        self.assertFalse(device_info['WriteProtected'])
+
+    @mock.patch.object(vmedia.OpenstackDriver, '_get_image', autospec=True)
+    @mock.patch.object(vmedia.OpenstackDriver, '_get_device', autospec=True)
+    def test_insert_image_file_upload(self, mock_get_device, mock_get_image):
+        device_info = {}
+        mock_get_device.return_value = device_info
+        mock_get_image.return_value = ('red.iso', '/fish.it/red.iso')
+        file_upload_key = 'SUSHY_EMULATOR_OS_VMEDIA_IMAGE_FILE_UPLOAD'
+        self.test_driver._config[file_upload_key] = True
+
+        self.novadriver.insert_image.return_value = ('aaa-bbb', 'red.iso')
+
+        image_id = self.test_driver.insert_image(
+            self.UUID, 'Cd', 'http://fish.it/red.iso', inserted=True,
+            write_protected=False)
+
+        self.novadriver.insert_image.assert_called_once_with(
+            self.UUID, 'http://fish.it/red.iso', '/fish.it/red.iso')
         self.assertEqual('aaa-bbb', image_id)
 
         self.assertEqual('http://fish.it/red.iso', device_info['Image'])

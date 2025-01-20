@@ -1,0 +1,11 @@
+---
+features:
+  - |
+    The openstack driver for virtual media now supports Glance file upload.
+    As an alternative to using image import via the ``web-download`` method,
+    it is now possible to configure the emulator to download the image to a
+    temp file which is then uploaded to Glance.
+
+    Set the ``SUSHY_EMULATOR_OS_VMEDIA_IMAGE_FILE_UPLOAD`` option to ``True``
+    to enable Glance file upload.
+

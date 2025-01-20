@@ -333,6 +333,50 @@ class NovaDriverTestCase(base.BaseTestCase):
             size=20, name='node01')
         self._cc.image.import_image.assert_called_once_with(
             queued_image, method='web-download', uri='http://fish.it/red.iso')
+        calls = [
+            mock.call(
+                self.uuid,
+                {'sushy-tools-image-url': 'http://fish.it/red.iso',
+                 'sushy-tools-import-image': 'aaa-bbb'}),
+            mock.call(self.uuid, {'sushy-tools-volume': 'ccc-ddd'})
+        ]
+        self._cc.set_server_metadata.assert_has_calls(calls)
+
+        self.assertEqual('aaa-bbb', image_id)
+
+    @mock.patch.object(base64, 'urlsafe_b64encode', autospec=True)
+    def test_insert_image_file_upload(self, mock_b64e):
+        mock_b64e.return_value = b'0hIwh_vN'
+        mock_server = mock.Mock()
+        mock_server.flavor.disk = 20
+        mock_server.name = 'node01'
+        queued_image = mock.Mock(id='aaa-bbb')
+
+        self._cc.image.create_image.return_value = queued_image
+        self._cc.compute.get_server.return_value = mock_server
+        self._cc.block_storage.create_volume.return_value = mock.Mock(
+            id='ccc-ddd')
+
+        image_id, image_name = self.test_driver.insert_image(
+            self.uuid, 'http://fish.it/red.iso', '/alphabet/soup/red.iso')
+
+        self._cc.image.create_image.assert_called_once_with(
+            name='red.iso 0hIwh_vN', disk_format='raw',
+            container_format='bare', visibility='private',
+            filename='/alphabet/soup/red.iso')
+        self._cc.compute.get_server.assert_called_once_with(self.uuid)
+        self._cc.block_storage.create_volume.assert_called_once_with(
+            size=20, name='node01')
+        self._cc.image.import_image.assert_not_called()
+        calls = [
+            mock.call(
+                self.uuid,
+                {'sushy-tools-image-url': 'http://fish.it/red.iso',
+                 'sushy-tools-image-local-file': '/alphabet/soup/red.iso',
+                 'sushy-tools-import-image': 'aaa-bbb'}),
+            mock.call(self.uuid, {'sushy-tools-volume': 'ccc-ddd'})
+        ]
+        self._cc.set_server_metadata.assert_has_calls(calls)
 
         self.assertEqual('aaa-bbb', image_id)
 
