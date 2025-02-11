@@ -183,6 +183,13 @@ class OpenStackDriver(AbstractSystemsDriver):
         """
         instance = self._get_instance(identity)
 
+        if instance.task_state is not None:
+            # SYS518 is used here to trick openstack/sushy to do retries.
+            # iDRAC uses SYS518 when a previous task is still running.
+            msg = ('SYS518: Cloud instance is busy, task_state: %s'
+                   % instance.task_state)
+            raise error.FishyError(msg, 503)
+
         if state in ('On', 'ForceOn'):
             if instance.power_state != self.NOVA_POWER_STATE_ON:
                 self._cc.compute.start_server(instance.id)
