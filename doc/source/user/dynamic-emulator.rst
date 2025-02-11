@@ -315,6 +315,75 @@ And flip an instance's power state via the Redfish call:
 You can have as many OpenStack instances as you need. The instances can be
 concurrently managed over Redfish and functionally similar tools.
 
+Creating Openstack instances for virtual media boot
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When creating Openstack instances for virtual media boot the instances must be
+configured to boot from volumes. One volume configured with
+``device_type: disk`` and ``boot_index: 1``. A second volume configured with
+``device_type: cdrom``, ``disk_bus: scsi`` and ``boot_index: 0``.
+
+The ``cdrom`` volume should initially be created with small (1 Megabyte) "blank"
+non-bootable image so that the server boots from the ``disk``. On insert/eject,
+this volume will be rebuilt. Following is an example showing how to create a
+"blank" image, and upload to glance:
+
+.. code-block:: shell
+
+    qemu-img create -f qcow2 blank-image.qcow2 1M
+    openstack image create --disk-format qcow2 --file blank-image.qcow2 \
+      --property hw_firmware_type=uefi --property hw_machine_type=q35 \
+      --property os_shutdown_timeout=5 \
+      sushy-tools-blank-image
+
+The following is an example show ``block_device_mapping`` that can be used to when
+creating an instance using create_server from the Openstack SDK.
+
+.. code-block:: python
+
+   block_device_mapping=[
+       {
+          'uuid': IMAGE_ID,
+          'boot_index': 1,
+          'source_type': 'image',
+          'destination_type': 'volume',
+          'device_type': 'disk',
+          'volume_size': 20,
+          'delete_on_termination': True,
+       },
+       {
+          'uuid': BLANK_IMG_ID,
+          'boot_index': 0,
+          'source_type': 'image',
+          'destination_type': 'volume',
+          'device_type': 'cdrom',
+          'disk_bus': 'scsi',
+          'volume_size': 5,
+          'delete_on_termination': True,
+       }
+   ]
+
+The following is an example Openstack heat template for creating an instance:
+
+.. code-block:: yaml
+
+   ironic0:
+     type: OS::Nova::Server
+     properties:
+       flavor: m1.medium
+       block_device_mapping_v2:
+         - device_type: disk
+           boot_index: 1
+           image_id: glance-image-name
+           volume_size: 40
+           delete_on_termination: true
+         - device_type: cdrom
+           disk_bus: scsi
+           boot_index: 0
+           image_id: sushy-tools-blank-image
+           volume_size: 5
+           delete_on_termination: true
+
 Systems resource driver: Ironic
 ++++++++++++++++++++++++++++++++++
 
@@ -626,10 +695,8 @@ On insert the OpenStack driver will:
 
 * Upload the image directly to glance from the URL (long running)
 * Store the URL, image ID and volume ID in server metadata properties
-  `sushy-tools-image-url`, `sushy-tools-import-image`, `sushy-tools-volume`
-* Create and attach a new volume with the same size as the root disk
-* Rebuild the server with the image, replacing the contents of the root disk
-* Delete the image
+  `sushy-tools-image-url`, `sushy-tools-import-image`.
+* Rebuild the volume with `boot_index: 0` using the image from Glance.
 
 Redfish client can eject image from virtual media device:
 
@@ -642,18 +709,21 @@ Redfish client can eject image from virtual media device:
 
 On eject the OpenStack driver will:
 
-* Assume the attached Volume has been rewritten with a new image (an ISO
-  installer or IPA)
-* Detach the Volume
-* Create an image from the Volume (long running)
-* Store the Volume image ID in server metadata property
-  `sushy-tools-volume-image`
-* Rebuild the server with the new image
-* Delete the Volume
-* Delete the image
+* Look up the imported image from instance metadata `sushy-tools-import-image`.
+* Delete the imported image.
+* Reset the instance metadata.
+* Rebuild the server volume with `boot_index: 0` with a "blank" (non-bootable)
+  image. The "blank" image used is defined in the configuration using
+  `SUSHY_EMULATOR_OS_VMEDIA_BLANK_IMAGE` (defaults to: `sushy-tools-blank-image`)
 
 Virtual media boot
 ++++++++++++++++++
+
+.. note::
+
+  With the OpenStack driver the cloud backing the server instances must have
+  support for rebuilding a volume-backed instance with a different image. This
+  was introduced in 26.0.0 (Zed), Nova API microversion 2.93.
 
 To boot a system from a virtual media device, the client first needs to figure
 out which Manager is responsible for the system of interest:

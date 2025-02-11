@@ -367,17 +367,13 @@ class NovaDriverTestCase(base.BaseTestCase):
                           self.test_driver.set_http_boot_uri,
                           None)
 
+    @mock.patch.object(OpenStackDriver, 'get_boot_mode', autospec=True)
     @mock.patch.object(base64, 'urlsafe_b64encode', autospec=True)
-    def test_insert_image(self, mock_b64e):
+    def test_insert_image(self, mock_b64e, mock_get_boot_mode):
+        mock_get_boot_mode.return_value = None
         mock_b64e.return_value = b'0hIwh_vN'
-        mock_server = mock.Mock()
-        mock_server.flavor.disk = 20
-        mock_server.name = 'node01'
         queued_image = mock.Mock(id='aaa-bbb')
         self._cc.image.create_image.return_value = queued_image
-        self._cc.compute.get_server.return_value = mock_server
-        self._cc.block_storage.create_volume.return_value = mock.Mock(
-            id='ccc-ddd')
 
         image_id, image_name = self.test_driver.insert_image(
             self.uuid, 'http://fish.it/red.iso')
@@ -385,34 +381,24 @@ class NovaDriverTestCase(base.BaseTestCase):
         self._cc.image.create_image.assert_called_once_with(
             name='red.iso 0hIwh_vN', disk_format='raw',
             container_format='bare', visibility='private')
-        self._cc.compute.get_server.assert_called_once_with(self.uuid)
-        self._cc.block_storage.create_volume.assert_called_once_with(
-            size=20, name='node01')
+
         self._cc.image.import_image.assert_called_once_with(
             queued_image, method='web-download', uri='http://fish.it/red.iso')
-        calls = [
-            mock.call(
-                self.uuid,
-                {'sushy-tools-image-url': 'http://fish.it/red.iso',
-                 'sushy-tools-import-image': 'aaa-bbb'}),
-            mock.call(self.uuid, {'sushy-tools-volume': 'ccc-ddd'})
-        ]
-        self._cc.set_server_metadata.assert_has_calls(calls)
+        self._cc.set_server_metadata.assert_called_once_with(
+            self.uuid,
+            {'sushy-tools-image-url': 'http://fish.it/red.iso',
+             'sushy-tools-import-image': 'aaa-bbb'})
 
         self.assertEqual('aaa-bbb', image_id)
 
+    @mock.patch.object(OpenStackDriver, 'get_boot_mode', autospec=True)
     @mock.patch.object(base64, 'urlsafe_b64encode', autospec=True)
-    def test_insert_image_file_upload(self, mock_b64e):
+    def test_insert_image_file_upload(self, mock_b64e, mock_get_boot_mode):
+        mock_get_boot_mode.return_value = None
         mock_b64e.return_value = b'0hIwh_vN'
-        mock_server = mock.Mock()
-        mock_server.flavor.disk = 20
-        mock_server.name = 'node01'
         queued_image = mock.Mock(id='aaa-bbb')
 
         self._cc.image.create_image.return_value = queued_image
-        self._cc.compute.get_server.return_value = mock_server
-        self._cc.block_storage.create_volume.return_value = mock.Mock(
-            id='ccc-ddd')
 
         image_id, image_name = self.test_driver.insert_image(
             self.uuid, 'http://fish.it/red.iso', '/alphabet/soup/red.iso')
@@ -421,30 +407,19 @@ class NovaDriverTestCase(base.BaseTestCase):
             name='red.iso 0hIwh_vN', disk_format='raw',
             container_format='bare', visibility='private',
             filename='/alphabet/soup/red.iso')
-        self._cc.compute.get_server.assert_called_once_with(self.uuid)
-        self._cc.block_storage.create_volume.assert_called_once_with(
-            size=20, name='node01')
         self._cc.image.import_image.assert_not_called()
-        calls = [
-            mock.call(
-                self.uuid,
-                {'sushy-tools-image-url': 'http://fish.it/red.iso',
-                 'sushy-tools-image-local-file': '/alphabet/soup/red.iso',
-                 'sushy-tools-import-image': 'aaa-bbb'}),
-            mock.call(self.uuid, {'sushy-tools-volume': 'ccc-ddd'})
-        ]
-        self._cc.set_server_metadata.assert_has_calls(calls)
+        self._cc.set_server_metadata.assert_called_once_with(
+            self.uuid,
+            {'sushy-tools-image-url': 'http://fish.it/red.iso',
+             'sushy-tools-image-local-file': '/alphabet/soup/red.iso',
+             'sushy-tools-import-image': 'aaa-bbb'})
 
         self.assertEqual('aaa-bbb', image_id)
 
-    def test_insert_image_fail(self):
-        mock_server = mock.Mock()
-        mock_server.flavor.disk = 20
-        mock_server.name = 'node01'
+    @mock.patch.object(OpenStackDriver, 'get_boot_mode', autospec=True)
+    def test_insert_image_fail(self, mock_get_boot_mode):
+        mock_get_boot_mode.return_value = None
         self._cc.image.create_image.return_value = mock.Mock(id='aaa-bbb')
-        self._cc.compute.get_server.return_value = mock_server
-        self._cc.block_storage.create_volume.return_value = mock.Mock(
-            id='ccc-ddd')
 
         self._cc.image.create_image.side_effect = Exception('ouch')
 
@@ -455,8 +430,9 @@ class NovaDriverTestCase(base.BaseTestCase):
             'Failed insert image from URL http://fish.it/red.iso: ouch',
             str(e))
 
-    def test_insert_image_future_running(self):
-
+    @mock.patch.object(OpenStackDriver, 'get_boot_mode', autospec=True)
+    def test_insert_image_future_running(self, mock_get_boot_mode):
+        mock_get_boot_mode.return_value = None
         mock_future = mock.Mock()
         mock_future.running.return_value = True
         self.test_driver._futures[self.uuid] = mock_future
@@ -467,8 +443,9 @@ class NovaDriverTestCase(base.BaseTestCase):
             'An insert or eject operation is already in progress for '
             'c7a5fdbd-cdaf-9455-926a-d65c16db1809', str(e))
 
-    def test_insert_image_future_exception(self):
-
+    @mock.patch.object(OpenStackDriver, 'get_boot_mode', autospec=True)
+    def test_insert_image_future_exception(self, mock_get_boot_mode):
+        mock_get_boot_mode.return_value = None
         mock_future = mock.Mock()
         mock_future.running.return_value = False
         mock_future.exception.return_value = error.FishyError('ouch')
@@ -478,70 +455,50 @@ class NovaDriverTestCase(base.BaseTestCase):
             self.uuid, 'http://fish.it/red.iso')
         self.assertEqual('ouch', str(e))
 
-    @mock.patch.object(time, 'sleep', autospec=True)
-    def test_eject_image(self, mock_sleep):
+    def test_eject_image(self):
         mock_server = mock.Mock()
         mock_server.name = 'node01'
         mock_server.metadata = {
             'sushy-tools-image-url': 'http://fish.it/red.iso',
-            'sushy-tools-volume': 'ccc-ddd'
+            'sushy-tools-import-image': 'ccc-ddd'
         }
-        self._cc.compute.get_server.return_value = mock_server
+        mock_image = mock.Mock(id='ccc-ddd')
 
-        available_volume = mock.Mock()
-        available_volume.id = 'ccc-ddd'
-        available_volume.status = 'available'
-        available_volume.name = self.uuid
-        in_use_volume = mock.Mock(id='ccc-ddd', status='in-use')
-        self._cc.block_storage.get_volume.side_effect = [
-            in_use_volume,
-            mock.Mock(id='ccc-ddd', status='queued'),
-            mock.Mock(id='ccc-ddd', status='detaching'),
-            available_volume,
-            mock.Mock(id='ccc-ddd', status='uploading'),
-            available_volume
-        ]
-        self._cc.block_storage.upload_volume_to_image.return_value = {
-            'image_id': 'aaa-bbb'}
+        self._cc.compute.get_server.return_value = mock_server
+        self._cc.image.find_image.return_value = mock_image
 
         self.test_driver.eject_image(self.uuid)
 
-        self._cc.compute.delete_volume_attachment(self.uuid, in_use_volume)
-        self._cc.block_storage.upload_volume_to_image.assert_called_once_with(
-            volume=available_volume, image_name=self.uuid, disk_format='raw',
-            container_format='bare', visibility='private')
+        self._cc.compute.get_server.assert_called_once_with(self.uuid)
+        self._cc.image.find_image.assert_called_once_with('ccc-ddd')
+        self._cc.delete_image.assert_called_once_with(mock_image)
 
-    @mock.patch.object(time, 'sleep', autospec=True)
-    def test_eject_image_error_detach(self, mock_sleep):
+    def test_eject_image_error_detach(self):
         mock_server = mock.Mock()
         mock_server.name = 'node01'
         mock_server.metadata = {
             'sushy-tools-image-url': 'http://fish.it/red.iso',
-            'sushy-tools-volume': 'ccc-ddd'
+            'sushy-tools-import-image': 'ccc-ddd'
         }
+
         self._cc.compute.get_server.return_value = mock_server
-        self._cc.block_storage.get_volume.side_effect = [
-            mock.Mock(id='ccc-ddd', status='in-use'),
-            mock.Mock(id='ccc-ddd', status='queued'),
-            mock.Mock(id='ccc-ddd', status='detaching'),
-            mock.Mock(id='ccc-ddd', status='error'),
-        ]
+        self._cc.image.find_image.return_value = None
 
         e = self.assertRaises(
             error.FishyError, self.test_driver.eject_image,
             self.uuid)
-        self.assertEqual('Volume detachment resulted in status error', str(e))
+        self.assertEqual(
+            'Failed ejecting image http://fish.it/red.iso. '
+            'Image not found in image service.', str(e))
 
-        self._cc.delete_image.assert_not_called()
-        self._cc.block_storage.delete_volume.assert_not_called()
+        # self._cc.delete_image.assert_not_called()
 
     @mock.patch.object(time, 'sleep', autospec=True)
     def test__rebuild_with_imported_image(self, mock_sleep):
         mock_server = mock.Mock()
         mock_server.name = 'node01'
         mock_server.metadata = {
-            'sushy-tools-image-url': 'http://fish.it/red.iso',
-            'sushy-tools-volume': 'ccc-ddd'
+            'sushy-tools-image-url': 'http://fish.it/red.iso'
         }
         self._cc.compute.get_server.return_value = mock_server
         queued_image = mock.Mock(id='aaa-bbb', status='queued')
@@ -549,14 +506,6 @@ class NovaDriverTestCase(base.BaseTestCase):
             queued_image,
             mock.Mock(id='aaa-bbb', status='importing'),
             mock.Mock(id='aaa-bbb', status='active'),
-        ]
-        available_volume = mock.Mock(id='ccc-ddd', status='available')
-        self._cc.block_storage.get_volume.side_effect = [
-            mock.Mock(id='ccc-ddd', status='creating'),
-            available_volume,
-            mock.Mock(id='ccc-ddd', status='reserved'),
-            mock.Mock(id='ccc-ddd', status='attaching'),
-            mock.Mock(id='ccc-ddd', status='in-use')
         ]
         self._cc.compute.rebuild_server.return_value = mock.Mock(
             status='REBUILD')
@@ -568,12 +517,8 @@ class NovaDriverTestCase(base.BaseTestCase):
         self.test_driver._rebuild_with_imported_image(
             self.uuid, 'aaa-bbb')
 
-        self._cc.compute.create_volume_attachment.assert_called_once_with(
-            self.uuid, available_volume, delete_on_termination=True)
         self._cc.compute.rebuild_server.assert_called_once_with(
             self.uuid, 'aaa-bbb')
-        self._cc.delete_image.assert_called_once_with('aaa-bbb')
-        self._cc.block_storage.delete_volume.assert_not_called()
 
     @mock.patch.object(time, 'sleep', autospec=True)
     def test__rebuild_with_imported_imaged_error_image(self, mock_sleep):
@@ -581,15 +526,7 @@ class NovaDriverTestCase(base.BaseTestCase):
         mock_server.name = 'node01'
         mock_server.metadata = {
             'sushy-tools-image-url': 'http://fish.it/red.iso',
-            'sushy-tools-volume': 'ccc-ddd'
         }
-        self._cc.block_storage.get_volume.side_effect = [
-            mock.Mock(id='ccc-ddd', status='creating'),
-            mock.Mock(id='ccc-ddd', status='available'),
-            mock.Mock(id='ccc-ddd', status='reserved'),
-            mock.Mock(id='ccc-ddd', status='attaching'),
-            mock.Mock(id='ccc-ddd', status='in-use')
-        ]
         self._cc.image.get_image.side_effect = [
             mock.Mock(id='aaa-bbb', status='queued'),
             mock.Mock(id='aaa-bbb', status='importing'),
@@ -599,30 +536,6 @@ class NovaDriverTestCase(base.BaseTestCase):
             error.FishyError, self.test_driver._rebuild_with_imported_image,
             self.uuid, 'aaa-bbb')
         self.assertEqual('Image import ended with status error', str(e))
-
-    @mock.patch.object(time, 'sleep', autospec=True)
-    def test__rebuild_with_imported_image_error_volume(self, mock_sleep):
-        mock_server = mock.Mock()
-        mock_server.name = 'node01'
-        mock_server.metadata = {
-            'sushy-tools-image-url': 'http://fish.it/red.iso',
-            'sushy-tools-volume': 'ccc-ddd'
-        }
-        self._cc.compute.get_server.return_value = mock_server
-        self._cc.image.get_image.side_effect = [
-            mock.Mock(id='aaa-bbb', status='queued'),
-            mock.Mock(id='aaa-bbb', status='importing'),
-            mock.Mock(id='aaa-bbb', status='active'),
-        ]
-        self._cc.block_storage.get_volume.side_effect = [
-            mock.Mock(id='ccc-ddd', status='creating'),
-            mock.Mock(id='ccc-ddd', status='reserved'),
-            mock.Mock(id='ccc-ddd', status='error')
-        ]
-        e = self.assertRaises(
-            error.FishyError, self.test_driver._rebuild_with_imported_image,
-            self.uuid, 'aaa-bbb')
-        self.assertEqual('Volume creation resulted in status reserved', str(e))
 
     @mock.patch.object(time, 'sleep', autospec=True)
     def test__rebuild_with_imported_image_error_rebuild(self, mock_sleep):
@@ -630,20 +543,12 @@ class NovaDriverTestCase(base.BaseTestCase):
         mock_server.name = 'node01'
         mock_server.metadata = {
             'sushy-tools-image-url': 'http://fish.it/red.iso',
-            'sushy-tools-volume': 'ccc-ddd'
         }
         self._cc.compute.get_server.return_value = mock_server
         self._cc.image.get_image.side_effect = [
             mock.Mock(id='aaa-bbb', status='queued'),
             mock.Mock(id='aaa-bbb', status='importing'),
             mock.Mock(id='aaa-bbb', status='active'),
-        ]
-        self._cc.block_storage.get_volume.side_effect = [
-            mock.Mock(id='ccc-ddd', status='creating'),
-            mock.Mock(id='ccc-ddd', status='available'),
-            mock.Mock(id='ccc-ddd', status='reserved'),
-            mock.Mock(id='ccc-ddd', status='attaching'),
-            mock.Mock(id='ccc-ddd', status='in-use')
         ]
         self._cc.compute.rebuild_server.return_value = mock.Mock(
             status='REBUILD')
@@ -656,103 +561,3 @@ class NovaDriverTestCase(base.BaseTestCase):
             self.uuid, 'aaa-bbb')
         self.assertEqual(
             'Server rebuild attempt resulted in status ERROR', str(e))
-
-    @mock.patch.object(time, 'sleep', autospec=True)
-    def test__rebuild_with_volume_image(self, mock_sleep):
-        mock_server = mock.Mock()
-        mock_server.name = 'node01'
-        mock_server.metadata = {
-            'sushy-tools-image-url': 'http://fish.it/red.iso',
-            'sushy-tools-volume': 'ccc-ddd',
-            'sushy-tools-volume-image': 'aaa-bbb'
-        }
-        mock_server.status = 'ACTIVE'
-        self._cc.image.get_image.side_effect = [
-            mock.Mock(id='aaa-bbb', status='queued'),
-            mock.Mock(id='aaa-bbb', status='uploading'),
-            mock.Mock(id='aaa-bbb', status='saving'),
-            mock.Mock(id='aaa-bbb', status='active'),
-        ]
-        self._cc.compute.rebuild_server.return_value = mock.Mock(
-            status='REBUILD')
-        self._cc.compute.get_server.side_effect = [
-            mock_server,
-            mock.Mock(status='REBUILD'),
-            mock.Mock(status='ACTIVE'),
-        ]
-        self._cc.block_storage.get_volume.side_effect = [
-            mock.Mock(id='ccc-ddd', status='uploading'),
-            mock.Mock(id='ccc-ddd', status='available')
-        ]
-
-        self.test_driver._rebuild_with_volume_image(
-            self.uuid)
-
-        self._cc.compute.rebuild_server.assert_called_once_with(
-            self.uuid, 'aaa-bbb')
-        self._cc.delete_image.assert_called_once_with('aaa-bbb')
-        self._cc.block_storage.delete_volume.assert_called_once_with('ccc-ddd')
-
-    @mock.patch.object(time, 'sleep', autospec=True)
-    def test__rebuild_with_volume_image_error_upload(self, mock_sleep):
-        mock_server = mock.Mock()
-        mock_server.name = 'node01'
-        mock_server.metadata = {
-            'sushy-tools-image-url': 'http://fish.it/red.iso',
-            'sushy-tools-volume': 'ccc-ddd',
-            'sushy-tools-volume-image': 'aaa-bbb'
-        }
-        mock_server.status = 'ACTIVE'
-        self._cc.compute.get_server.return_value = mock_server
-        self._cc.image.get_image.side_effect = [
-            mock.Mock(id='aaa-bbb', status='queued'),
-            mock.Mock(id='aaa-bbb', status='uploading'),
-            mock.Mock(id='aaa-bbb', status='saving'),
-            mock.Mock(id='aaa-bbb', status='error'),
-        ]
-
-        e = self.assertRaises(
-            error.FishyError, self.test_driver._rebuild_with_volume_image,
-            self.uuid)
-        self.assertEqual('Image import ended with status error', str(e))
-
-        self._cc.compute.rebuild_server.assert_not_called()
-        self._cc.delete_image.assert_called_once_with('aaa-bbb')
-        self._cc.block_storage.delete_volume.assert_called_once_with('ccc-ddd')
-
-    @mock.patch.object(time, 'sleep', autospec=True)
-    def test__rebuild_with_volume_image_error_rebuild(self, mock_sleep):
-        mock_server = mock.Mock()
-        mock_server.name = 'node01'
-        mock_server.metadata = {
-            'sushy-tools-image-url': 'http://fish.it/red.iso',
-            'sushy-tools-volume': 'ccc-ddd',
-            'sushy-tools-volume-image': 'aaa-bbb'
-        }
-        mock_server.status = 'ACTIVE'
-        self._cc.image.get_image.side_effect = [
-            mock.Mock(id='aaa-bbb', status='queued'),
-            mock.Mock(id='aaa-bbb', status='uploading'),
-            mock.Mock(id='aaa-bbb', status='saving'),
-            mock.Mock(id='aaa-bbb', status='active'),
-        ]
-        self._cc.block_storage.upload_volume_to_image.return_value = {
-            'image_id': 'aaa-bbb'}
-        self._cc.compute.rebuild_server.return_value = mock.Mock(
-            status='REBUILD')
-        self._cc.compute.get_server.side_effect = [
-            mock_server,
-            mock.Mock(status='REBUILD'),
-            mock.Mock(status='ERROR'),
-        ]
-
-        e = self.assertRaises(
-            error.FishyError, self.test_driver._rebuild_with_volume_image,
-            self.uuid)
-        self.assertEqual(
-            'Server rebuild attempt resulted in status ERROR', str(e))
-
-        self._cc.compute.rebuild_server.assert_called_once_with(
-            self.uuid, 'aaa-bbb')
-        self._cc.delete_image.assert_called_once_with('aaa-bbb')
-        self._cc.block_storage.delete_volume.assert_called_once_with('ccc-ddd')
