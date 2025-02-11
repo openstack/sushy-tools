@@ -180,6 +180,20 @@ class NovaDriverTestCase(base.BaseTestCase):
 
         self.assertIsNone(boot_mode)
 
+    def test_get_boot_mode_volume_boot(self):
+        volumes_attached = [mock.Mock(id='fake-vol-id')]
+        server = mock.Mock(id=self.uuid, image=dict(id=None),
+                           attached_volumes=volumes_attached)
+        vol_metadata = {'hw_firmware_type': 'uefi'}
+        volume = mock.Mock(id='fake-vol-id',
+                           volume_image_metadata=vol_metadata)
+        self.nova_mock.return_value.get_server.return_value = server
+        self.nova_mock.return_value.volume.get_volume.return_value = volume
+
+        boot_mode = self.test_driver.get_boot_mode(self.uuid)
+
+        self.assertEqual('UEFI', boot_mode)
+
     def test_set_boot_mode(self):
         self.assertRaises(
             error.FishyError, self.test_driver.set_boot_mode,

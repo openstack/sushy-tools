@@ -97,6 +97,12 @@ class OpenStackDriver(AbstractSystemsDriver):
             return
         return self._cc.image.find_image(identity)
 
+    @memoize.memoize(permanent_cache=PERMANENT_CACHE)
+    def _get_volume_info(self, identity):
+        if not identity:
+            return
+        return self._cc.volume.get_volume(identity)
+
     def _get_server_metadata(self, identity):
         return self._cc.compute.get_server_metadata(identity).to_dict()
 
@@ -280,9 +286,14 @@ class OpenStackDriver(AbstractSystemsDriver):
         """
         instance = self._get_instance(identity)
 
-        image = self._get_image_info(instance.image['id'])
-
-        hw_firmware_type = getattr(image, 'hw_firmware_type', None)
+        hw_firmware_type = None
+        if instance.image['id'] is not None:
+            image = self._get_image_info(instance.image['id'])
+            hw_firmware_type = getattr(image, 'hw_firmware_type', None)
+        elif len(instance.attached_volumes) > 0:
+            vol = self._get_volume_info(instance.attached_volumes[0].id)
+            hw_firmware_type = vol.volume_image_metadata.get(
+                'hw_firmware_type')
 
         return self.BOOT_MODE_MAP_REV.get(hw_firmware_type)
 
