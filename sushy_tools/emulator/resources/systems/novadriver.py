@@ -103,6 +103,20 @@ class OpenStackDriver(AbstractSystemsDriver):
             return
         return self._cc.volume.get_volume(identity)
 
+    def _get_instance_image_id(self, instance):
+        # instance.image.id is always None for boot from volume instance
+        image_id = instance.image.id
+        volumes_attached = []
+
+        if image_id is None:
+            volumes_attached = instance['os-extended-volumes:volumes_attached']
+
+        if len(volumes_attached) > 0:
+            vol = self._get_volume_info(volumes_attached[0].id)
+            image_id = vol.volume_image_metadata.get('image_id')
+
+        return image_id
+
     def _get_server_metadata(self, identity):
         return self._cc.compute.get_server_metadata(identity).to_dict()
 
@@ -407,7 +421,9 @@ class OpenStackDriver(AbstractSystemsDriver):
         :raises: `error.FishyError` if boot device can't be accessed
         """
         instance = self._get_instance(identity)
-        return instance.image.id, False, True
+        image_id = self._get_instance_image_id(instance)
+
+        return image_id, False, True
 
     def set_boot_image(self, identity, device, boot_image=None,
                        write_protected=True):
@@ -423,8 +439,9 @@ class OpenStackDriver(AbstractSystemsDriver):
         :raises: `error.FishyError` if boot device can't be set
         """
         instance = self._get_instance(identity)
+        instance_image = self._get_instance_image_id(instance)
 
-        if instance.image.id == boot_image:
+        if instance_image == boot_image:
             msg = ('Image %(identity)s already has image %(boot_image)s. '
                    'Skipping rebuild.' % {'identity': identity,
                                           'boot_image': boot_image})
