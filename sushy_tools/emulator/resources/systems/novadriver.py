@@ -672,7 +672,7 @@ class OpenStackDriver(AbstractSystemsDriver):
             while server.status == 'REBUILD':
                 server = self._cc.compute.get_server(identity)
                 time.sleep(1)
-            if server.status != 'ACTIVE':
+            if server.status not in ('ACTIVE', 'SHUTOFF'):
                 raise error.FishyError('Server rebuild attempt resulted in '
                                        'status %s' % server.status)
             self._logger.debug(
@@ -719,7 +719,7 @@ class OpenStackDriver(AbstractSystemsDriver):
             while server.status == 'REBUILD':
                 server = self._cc.compute.get_server(identity)
                 time.sleep(1)
-            if server.status != 'ACTIVE':
+            if server.status not in ('ACTIVE', 'SHUTOFF'):
                 raise error.FishyError(
                     'Server rebuild attempt resulted in status %s'
                     % server.status)
