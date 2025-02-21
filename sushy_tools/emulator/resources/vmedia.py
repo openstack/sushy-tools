@@ -474,3 +474,5 @@ class OpenstackDriver(BaseDriver):
         device_info['Image'] = ''
         device_info['ImageName'] = ''
         device_info['Inserted'] = False
+
+        self._devices.update({(identity, device): device_info})
