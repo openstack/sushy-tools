@@ -340,9 +340,15 @@ class OpenStackDriver(AbstractSystemsDriver):
 
         instance = self._get_instance(identity)
 
-        image = self._get_image_info(instance.image['id'])
+        os_secure_boot = None
+        if instance.image['id'] is not None:
+            image = self._get_image_info(instance.image['id'])
+            os_secure_boot = getattr(image, 'os_secure_boot', None)
+        elif len(instance.attached_volumes) > 0:
+            vol = self._get_volume_info(instance.attached_volumes[0].id)
+            os_secure_boot = vol.volume_image_metadata.get('os_secure_boot')
 
-        return getattr(image, 'os_secure_boot', None) == 'required'
+        return os_secure_boot == 'required'
 
     def set_secure_boot(self, identity, secure):
         """Set computer system secure boot state for UEFI boot mode.

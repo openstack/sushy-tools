@@ -322,6 +322,38 @@ class NovaDriverTestCase(base.BaseTestCase):
 
         self.assertTrue(self.test_driver.get_secure_boot(self.uuid))
 
+    def test_get_secure_boot_off_volume_boot(self):
+        volumes_attached = [mock.Mock(id='fake-vol-id')]
+        server = mock.Mock(id=self.uuid, image=dict(id=None),
+                           attached_volumes=volumes_attached)
+        self.nova_mock.return_value.get_server.return_value = server
+        vol_metadata = {'hw_firmware_type': 'uefi'}
+        volume = mock.Mock(id='fake-vol-id',
+                           volume_image_metadata=vol_metadata)
+
+        image = mock.Mock()
+
+        self.nova_mock.return_value.image.find_image.return_value = image
+        self.nova_mock.return_value.volume.get_volume.return_value = volume
+
+        self.assertFalse(self.test_driver.get_secure_boot(self.uuid))
+
+    def test_get_secure_boot_on_volume_boot(self):
+        volumes_attached = [mock.Mock(id='fake-vol-id')]
+        server = mock.Mock(id=self.uuid, image=dict(id=None),
+                           attached_volumes=volumes_attached)
+        self.nova_mock.return_value.get_server.return_value = server
+        vol_metadata = {'os_secure_boot': 'required'}
+        volume = mock.Mock(id='fake-vol-id',
+                           volume_image_metadata=vol_metadata)
+
+        image = mock.Mock()
+
+        self.nova_mock.return_value.image.find_image.return_value = image
+        self.nova_mock.return_value.volume.get_volume.return_value = volume
+
+        self.assertTrue(self.test_driver.get_secure_boot(self.uuid))
+
     def test_set_secure_boot(self):
         self.assertRaises(
             error.NotSupportedError, self.test_driver.set_secure_boot,
