@@ -306,7 +306,8 @@ class LibvirtDriver(AbstractSystemsDriver):
                     domain.reboot()
             elif state == 'ForceRestart':
                 if domain.isActive():
-                    domain.reset()
+                    domain.destroy()
+                    domain.create()
             elif state == 'Nmi':
                 if domain.isActive():
                     domain.injectNMI()

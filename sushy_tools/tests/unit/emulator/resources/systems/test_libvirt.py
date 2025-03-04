@@ -152,7 +152,8 @@ class LibvirtDriverTestCase(base.BaseTestCase):
 
         self.test_driver.set_power_state(self.uuid, 'ForceRestart')
 
-        domain_mock.reset.assert_called_once_with()
+        domain_mock.destroy.assert_called_once_with()
+        domain_mock.create.assert_called_once_with()
 
     @mock.patch('libvirt.open', autospec=True)
     def test_set_power_state_nmi(self, libvirt_mock):
