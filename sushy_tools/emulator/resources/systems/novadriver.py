@@ -105,7 +105,7 @@ class OpenStackDriver(AbstractSystemsDriver):
 
     def _get_instance_image_id(self, instance):
         # instance.image.id is always None for boot from volume instance
-        image_id = instance.image.id
+        image_id = instance.image.get('id')
 
         if image_id is None and len(instance.attached_volumes) > 0:
             vol = self._get_volume_info(instance.attached_volumes[0].id)
@@ -198,6 +198,21 @@ class OpenStackDriver(AbstractSystemsDriver):
 
         """
         instance = self._get_instance(identity)
+        delayed_media_eject = instance.metadata.get('sushy-tools-delay-eject')
+
+        if delayed_media_eject:
+            self._logger.debug(
+                'Create task to rebuild with blank-image for %(identity)s' %
+                {'identity': identity})
+            # Not running async here, as long as the blank image used is small
+            # this should finish in ~20 seconds.
+            self._submit_future(
+                False, self._rebuild_with_blank_image, identity)
+            try:
+                self._cc.delete_server_metadata(identity,
+                                                ['sushy-tools-delay-eject'])
+            except Exception:
+                pass
 
         if instance.task_state is not None:
             # SYS518 is used here to trick openstack/sushy to do retries.
@@ -297,7 +312,7 @@ class OpenStackDriver(AbstractSystemsDriver):
         instance = self._get_instance(identity)
 
         hw_firmware_type = None
-        if instance.image['id'] is not None:
+        if instance.image.get('id') is not None:
             image = self._get_image_info(instance.image['id'])
             hw_firmware_type = getattr(image, 'hw_firmware_type', None)
         elif len(instance.attached_volumes) > 0:
@@ -337,7 +352,7 @@ class OpenStackDriver(AbstractSystemsDriver):
         instance = self._get_instance(identity)
 
         os_secure_boot = None
-        if instance.image['id'] is not None:
+        if instance.image.get('id') is not None:
             image = self._get_image_info(instance.image['id'])
             os_secure_boot = getattr(image, 'os_secure_boot', None)
         elif len(instance.attached_volumes) > 0:
@@ -450,13 +465,20 @@ class OpenStackDriver(AbstractSystemsDriver):
             self._logger.debug(msg)
 
         elif boot_image is None:
-            self._logger.debug(
-                'Create task to rebuild with blank-image for %(identity)s' %
-                {'identity': identity})
-            # Not running async here, as long as the blank image used is small
-            # this should finish in ~20 seconds.
-            self._submit_future(
-                False, self._rebuild_with_blank_image, identity)
+            if self._config.get('SUSHY_EMULATOR_OS_VMEDIA_DELAY_EJECT', True):
+                self._logger.debug(
+                    'Set instance metadata for vmedia eject on next power '
+                    'action for %(identity)s' % {'identity': identity})
+                server_metadata = {'sushy-tools-delay-eject': 'true'}
+                self._cc.set_server_metadata(identity, server_metadata)
+            else:
+                self._logger.debug(
+                    'Create task to rebuild with blank-image for '
+                    '%(identity)s' % {'identity': identity})
+                # Not running async here, as long as the blank image used is
+                # small this should finish in ~20 seconds.
+                self._submit_future(
+                    False, self._rebuild_with_blank_image, identity)
 
         else:
             self._logger.debug(

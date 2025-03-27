@@ -79,35 +79,40 @@ class NovaDriverTestCase(base.BaseTestCase):
         self.assertEqual('Off', power_state)
 
     def test_set_power_state_on(self):
-        server = mock.Mock(id=self.uuid, power_state=0, task_state=None)
+        server = mock.Mock(id=self.uuid, power_state=0, task_state=None,
+                           metadata={})
         self.nova_mock.return_value.get_server.return_value = server
         self.test_driver.set_power_state(self.uuid, 'On')
         compute = self.nova_mock.return_value.compute
         compute.start_server.assert_called_once_with(self.uuid)
 
     def test_set_power_state_forceon(self):
-        server = mock.Mock(id=self.uuid, power_state=0, task_state=None)
+        server = mock.Mock(id=self.uuid, power_state=0, task_state=None,
+                           metadata={})
         self.nova_mock.return_value.get_server.return_value = server
         self.test_driver.set_power_state(self.uuid, 'ForceOn')
         compute = self.nova_mock.return_value.compute
         compute.start_server.assert_called_once_with(self.uuid)
 
     def test_set_power_state_forceoff(self):
-        server = mock.Mock(id=self.uuid, power_state=1, task_state=None)
+        server = mock.Mock(id=self.uuid, power_state=1, task_state=None,
+                           metadata={})
         self.nova_mock.return_value.get_server.return_value = server
         self.test_driver.set_power_state(self.uuid, 'ForceOff')
         compute = self.nova_mock.return_value.compute
         compute.stop_server.assert_called_once_with(self.uuid)
 
     def test_set_power_state_gracefulshutdown(self):
-        server = mock.Mock(id=self.uuid, power_state=1, task_state=None)
+        server = mock.Mock(id=self.uuid, power_state=1, task_state=None,
+                           metadata={})
         self.nova_mock.return_value.get_server.return_value = server
         self.test_driver.set_power_state(self.uuid, 'GracefulShutdown')
         compute = self.nova_mock.return_value.compute
         compute.stop_server.assert_called_once_with(self.uuid)
 
     def test_set_power_state_gracefulrestart(self):
-        server = mock.Mock(id=self.uuid, power_state=1, task_state=None)
+        server = mock.Mock(id=self.uuid, power_state=1, task_state=None,
+                           metadata={})
         self.nova_mock.return_value.get_server.return_value = server
         self.test_driver.set_power_state(self.uuid, 'GracefulRestart')
         compute = self.nova_mock.return_value.compute
@@ -115,7 +120,8 @@ class NovaDriverTestCase(base.BaseTestCase):
             self.uuid, reboot_type='SOFT')
 
     def test_set_power_state_forcerestart(self):
-        server = mock.Mock(id=self.uuid, power_state=1, task_state=None)
+        server = mock.Mock(id=self.uuid, power_state=1, task_state=None,
+                           metadata={})
         self.nova_mock.return_value.get_server.return_value = server
         self.test_driver.set_power_state(
             self.uuid, 'ForceRestart')
@@ -125,7 +131,8 @@ class NovaDriverTestCase(base.BaseTestCase):
 
     def test_set_power_state_raises_SYS518(self):
         server = mock.Mock(
-            id=self.uuid, power_state=1, task_state='rebuilding')
+            id=self.uuid, power_state=1, task_state='rebuilding',
+            metadata={})
         self.nova_mock.return_value.get_server.return_value = server
         e = self.assertRaises(
             error.FishyError, self.test_driver.set_power_state,
@@ -133,6 +140,19 @@ class NovaDriverTestCase(base.BaseTestCase):
         self.assertEqual(
             'SYS518: Cloud instance is busy, task_state: rebuilding',
             str(e))
+
+    @mock.patch.object(OpenStackDriver, "_rebuild_with_blank_image",
+                       autospec=True)
+    def test_set_power_state_delayed_eject(self, mock_rebuild_blank):
+        server = mock.Mock(id=self.uuid, power_state=1, task_state=None,
+                           metadata={'sushy-tools-delay-eject': 'true'})
+        self.nova_mock.return_value.get_server.return_value = server
+        self.test_driver.set_power_state(self.uuid, 'ForceOff')
+        mock_rebuild_blank.assert_called_once_with(self.test_driver, self.uuid)
+        self._cc.delete_server_metadata.assert_called_once_with(
+            self.uuid, ['sushy-tools-delay-eject'])
+        compute = self.nova_mock.return_value.compute
+        compute.stop_server.assert_called_once_with(self.uuid)
 
     def test_get_boot_device(self):
         server = mock.Mock(id=self.uuid)
