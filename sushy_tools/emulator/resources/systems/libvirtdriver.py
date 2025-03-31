@@ -187,6 +187,8 @@ class LibvirtDriver(AbstractSystemsDriver):
             cls.SECURE_BOOT_DISABLED_NVRAM)
         cls.SUSHY_EMULATOR_IGNORE_BOOT_DEVICE = \
             cls._config.get('SUSHY_EMULATOR_IGNORE_BOOT_DEVICE', False)
+        cls.STORAGE_POOL = cls._config.get(
+            'SUSHY_EMULATOR_STORAGE_POOL', cls.STORAGE_POOL)
         cls._http_boot_uri = None
         return cls
 
