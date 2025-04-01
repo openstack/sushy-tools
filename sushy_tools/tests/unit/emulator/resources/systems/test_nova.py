@@ -491,7 +491,7 @@ class NovaDriverTestCase(base.BaseTestCase):
 
         self._cc.compute.get_server.assert_called_once_with(self.uuid)
         self._cc.image.find_image.assert_called_once_with('ccc-ddd')
-        self._cc.delete_image.assert_called_once_with(mock_image)
+        self._cc.delete_image.assert_called_once_with('ccc-ddd')
 
     def test_eject_image_error_detach(self):
         mock_server = mock.Mock()

@@ -544,8 +544,9 @@ class OpenStackDriver(AbstractSystemsDriver):
         except Exception as ex:
             msg = 'Failed insert image from URL %s: %s' % (image_url, ex)
             self._logger.exception(msg)
+            image_id = image.id if image else None
             self._attempt_delete_image_local_file(
-                image, local_file_path, identity,
+                image_id, local_file_path, identity,
                 'sushy-tools-import-image',
                 'sushy-tools-image-local-file')
             if not isinstance(ex, error.FishyError):
@@ -579,7 +580,7 @@ class OpenStackDriver(AbstractSystemsDriver):
                 raise error.FishyError(msg)
 
             self._attempt_delete_image_local_file(
-                image, None, identity,
+                image.id, None, identity,
                 'sushy-tools-import-image', 'sushy-tools-image-url')
         except Exception as ex:
             msg = 'Failed eject image from URL %s: %s' % (image_url, ex)
@@ -673,7 +674,7 @@ class OpenStackDriver(AbstractSystemsDriver):
             msg = 'Failed insert image from URL %s: %s' % (image_url, ex)
             self._logger.exception(msg)
             self._attempt_delete_image_local_file(
-                image, image_local_file, identity,
+                image.id, image_local_file, identity,
                 'sushy-tools-import-image', 'sushy-tools-image-local-file')
             if not isinstance(ex, error.FishyError):
                 ex = error.FishyError(msg)
