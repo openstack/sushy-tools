@@ -208,11 +208,7 @@ class OpenStackDriver(AbstractSystemsDriver):
             # this should finish in ~20 seconds.
             self._submit_future(
                 False, self._rebuild_with_blank_image, identity)
-            try:
-                self._cc.delete_server_metadata(identity,
-                                                ['sushy-tools-delay-eject'])
-            except Exception:
-                pass
+            self._remove_delayed_eject_metadata(identity)
 
         if instance.task_state is not None:
             # SYS518 is used here to trick openstack/sushy to do retries.
@@ -481,6 +477,12 @@ class OpenStackDriver(AbstractSystemsDriver):
                     False, self._rebuild_with_blank_image, identity)
 
         else:
+            if self._config.get('SUSHY_EMULATOR_OS_VMEDIA_DELAY_EJECT', True):
+                # Make sure sushy-tools-delay-eject is cleared when media is
+                # inserted. Avoid race in case media is ejected and then
+                # inserted without a power action.
+                self._remove_delayed_eject_metadata(identity)
+
             self._logger.debug(
                 'Creating task to finish import and rebuild for %(identity)s' %
                 {'identity': identity})
@@ -725,4 +727,11 @@ class OpenStackDriver(AbstractSystemsDriver):
         try:
             os.remove(local_file)
         except (FileNotFoundError, TypeError):
+            pass
+
+    def _remove_delayed_eject_metadata(self, identity):
+        try:
+            self._cc.delete_server_metadata(identity,
+                                            ['sushy-tools-delay-eject'])
+        except Exception:
             pass
