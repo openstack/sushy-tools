@@ -145,7 +145,7 @@ class OpenStackDriver(AbstractSystemsDriver):
 
         :returns: list of UUIDs representing the systems
         """
-        return [server.id for server in self._cc.list_servers()]
+        return [server.id for server in self._cc.list_servers(bare=True)]
 
     def uuid(self, identity):
         """Get computer system UUID by name

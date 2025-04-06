@@ -1,0 +1,7 @@
+---
+fixes:
+  - |
+    The nova emulator driver makes fewer API calls when retrieving the
+    server list. This significantly improves the API response times when
+    using the emulator in a project with many instances and ports per
+    instance.
