@@ -1,0 +1,7 @@
+---
+fixes:
+  - |
+    The HTTP status code for NotSupportedError has been fixed. The generic
+    ``500 Internal Server Error`` status code was previously used, it will now
+    use the ``501 Not Implemented`` status code.
+
