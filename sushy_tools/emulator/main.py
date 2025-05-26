@@ -85,10 +85,6 @@ class Application(flask.Flask):
         # This is needed for WSGI since it cannot process argv
         self.configure(config_file=os.environ.get('SUSHY_EMULATOR_CONFIG'))
 
-        @self.before_request
-        def reset_cache():
-            self._cache = {}
-
     def configure(self, config_file=None, extra_config=None):
         if config_file:
             self.config.from_pyfile(os.path.abspath(config_file))
@@ -346,59 +342,79 @@ def jsonify(obj_type, obj_version, obj):
     return flask.jsonify(obj)
 
 
-@app.route('/redfish/v1/Managers/<identity>', methods=['GET'])
+@app.route('/redfish/v1/Managers/<identity>', methods=['GET', 'PATCH'])
 @api_utils.returns_json
 def manager_resource(identity):
     if app.feature_set == "minimum":
         raise error.FeatureNotAvailable("Managers")
-
-    app.logger.debug('Serving resources for manager "%s"', identity)
 
     manager = app.managers.get_manager(identity)
     systems = app.managers.get_managed_systems(manager)
     chassis = app.managers.get_managed_chassis(manager)
 
     uuid = manager['UUID']
-    result = {
-        "Id": manager['Id'],
-        "Name": manager.get('Name'),
-        "UUID": uuid,
-        "ManagerType": "BMC",
-        "VirtualMedia": {
-            "@odata.id": "/redfish/v1/Systems/%s/VirtualMedia" % systems[0],
-        },
-        "Links": {
-            "ManagerForServers": [
-                {
-                    "@odata.id": "/redfish/v1/Systems/%s" % system
-                }
-                for system in systems
-            ],
-            "ManagerForChassis": [
-                {
-                    "@odata.id": "/redfish/v1/Chassis/%s" % ch
-                }
-                for ch in chassis if app.feature_set == "full"
-            ]
-        },
-        "@odata.id": "/redfish/v1/Managers/%s" % uuid,
-    }
-    if app.feature_set == "full":
-        result.update({
-            "ServiceEntryPointUUID": manager.get('ServiceEntryPointUUID'),
-            "Description": "Contoso BMC",
-            "Model": "Joo Janta 200",
-            "DateTime": datetime.now().strftime('%Y-%M-%dT%H:%M:%S+00:00'),
-            "DateTimeLocalOffset": "+00:00",
-            "Status": {
-                "State": "Enabled",
-                "Health": "OK"
-            },
-            "PowerState": "On",
-            "FirmwareVersion": "1.00",
-        })
 
-    return jsonify('Manager', 'v1_3_1', result)
+    if flask.request.method == "GET":
+        app.logger.debug('Serving resources for manager "%s"', identity)
+
+        result = {
+            "Id": manager['Id'],
+            "Name": manager.get('Name'),
+            "UUID": uuid,
+            "ManagerType": "BMC",
+            "VirtualMedia": {
+                "@odata.id": "/redfish/v1/Systems/%s/VirtualMedia" % systems[0]
+                },
+            "Links": {
+                "ManagerForServers": [
+                    {
+                        "@odata.id": "/redfish/v1/Systems/%s" % system
+                        }
+                    for system in systems
+                    ],
+                "ManagerForChassis": [
+                    {
+                        "@odata.id": "/redfish/v1/Chassis/%s" % ch
+                        }
+                    for ch in chassis if app.feature_set == "full"
+                    ]
+                },
+            "@odata.id": "/redfish/v1/Managers/%s" % uuid,
+            }
+
+        if app.feature_set == "full":
+            dt_info = app.managers.get_datetime()
+            result.update({
+                "ServiceEntryPointUUID": manager.get('ServiceEntryPointUUID'),
+                "Description": "Contoso BMC",
+                "Model": "Joo Janta 200",
+                "DateTime": dt_info.get(
+                    "DateTime",
+                    datetime.now().strftime('%Y-%m-%dT%H:%M:%S+00:00')),
+                "DateTimeLocalOffset": dt_info.get(
+                    "DateTimeLocalOffset", "+00:00"),
+                "Status": {
+                    "State": "Enabled",
+                    "Health": "OK"
+                    },
+                "PowerState": "On",
+                "FirmwareVersion": "1.00",
+                })
+        return jsonify('Manager', 'v1_3_1', result)
+
+    elif flask.request.method == "PATCH":
+        if app.feature_set != "full":
+            raise error.MethodNotAllowed("PATCH not supported in minimum mode")
+
+        data = flask.request.get_json(force=True)
+        new_datetime = data.get("DateTime")
+        new_offset = data.get("DateTimeLocalOffset")
+
+        app.managers.set_datetime(new_datetime, new_offset)
+
+        app.logger.debug("Updated DateTime for manager %s", identity)
+
+        return '', 204
 
 
 @app.route('/redfish/v1/Systems')

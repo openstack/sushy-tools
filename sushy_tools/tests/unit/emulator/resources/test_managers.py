@@ -36,6 +36,9 @@ class FakeDriverTestCase(base.BaseTestCase):
         self.test_driver = managers.FakeDriver({}, mock.Mock(),
                                                self.systems, self.chassis)
 
+        self.datetime_value = "2025-06-11T12:00:00+00:00"
+        self.datetimelocaloffset_value = "+00:00"
+
     def test_get_manager_not_found(self):
         self.systems.uuid.side_effect = error.FishyError('boom')
         self.assertRaises(
@@ -52,3 +55,24 @@ class FakeDriverTestCase(base.BaseTestCase):
     def test_managed_systems(self):
         self.assertEqual(
             ['xxx'], self.test_driver.get_managed_systems(self.manager))
+
+    def test_set_datetime(self):
+        self.test_driver.set_datetime(self.datetime_value,
+                                      self.datetimelocaloffset_value)
+        self.assertEqual(self.test_driver._datetime, self.datetime_value)
+        self.assertEqual(self.test_driver._datetimelocaloffset,
+                         self.datetimelocaloffset_value)
+
+    def test_get_datetime_returns_expected_dict(self):
+        self.test_driver.set_datetime(self.datetime_value,
+                                      self.datetimelocaloffset_value)
+        result = self.test_driver.get_datetime()
+        expected = {
+            "DateTime": self.datetime_value,
+            "DateTimeLocalOffset": self.datetimelocaloffset_value
+        }
+        self.assertEqual(result, expected)
+
+    def test_get_datetime_returns_empty_dict_when_not_set(self):
+        result = self.test_driver.get_datetime()
+        self.assertEqual(result, {})
