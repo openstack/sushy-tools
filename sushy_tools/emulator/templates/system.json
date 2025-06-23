@@ -35,7 +35,7 @@
         "BootSourceOverrideMode": {{ boot_source_mode|string|tojson }}
         {%- endif %}
         {%- else %}
-	    "Hdd"
+            "Hdd"
         ]
         {%- endif %}
         {%- else %}
