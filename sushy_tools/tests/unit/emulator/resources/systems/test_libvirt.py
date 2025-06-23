@@ -10,7 +10,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import sys
 from unittest import mock
 import uuid
 import xml.etree.ElementTree as ET
@@ -266,16 +265,9 @@ class LibvirtDriverTestCase(base.BaseTestCase):
 
         conn_mock.defineXML.assert_called_once_with(mock.ANY)
 
-        expected = '<disk device="disk" type="file">\n      <source ' \
+        expected = '<disk type="file" device="disk">\n      <source ' \
                    'file="/home/user/fedora.img" />\n      <target ' \
                    'dev="hda" />\n    <boot order="1" /></disk>\n'
-
-        # NOTE(rpittau): starting from Python 3.8 the tostring() function
-        # preserves the attribute order specified by the user.
-        if sys.version_info[1] >= 8:
-            expected = '<disk type="file" device="disk">\n      <source ' \
-                       'file="/home/user/fedora.img" />\n      <target ' \
-                       'dev="hda" />\n    <boot order="1" /></disk>\n'
 
         self.assertIn(expected, conn_mock.defineXML.call_args[0][0])
 
@@ -312,19 +304,9 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         expected = '<interface type="direct">\n      <mac address=' \
                    '"52:54:00:da:ac:54" />\n      <source dev="tap-' \
                    'node-2i1" mode="vepa" />\n      <model type="vir' \
-                   'tio" />\n      <address bus="0x01" domain="0x' \
-                   '0000" function="0x0" slot="0x01" type="pci" />\n    ' \
+                   'tio" />\n      <address type="pci" domain="0x0000" ' \
+                   'bus="0x01" slot="0x01" function="0x0" />\n    ' \
                    '<boot order="1" /></interface>'
-
-        # NOTE(rpittau): starting from Python 3.8 the tostring() function
-        # preserves the attribute order specified by the user.
-        if sys.version_info[1] >= 8:
-            expected = '<interface type="direct">\n      <mac address=' \
-                       '"52:54:00:da:ac:54" />\n      <source dev="tap-' \
-                       'node-2i1" mode="vepa" />\n      <model type="vir' \
-                       'tio" />\n      <address type="pci" domain="0x0000" ' \
-                       'bus="0x01" slot="0x01" function="0x0" />\n    ' \
-                       '<boot order="1" /></interface>'
 
         self.assertIn(expected, conn_mock.defineXML.call_args[0][0])
 
@@ -661,18 +643,10 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         volume_mock = pool_mock.createXML.return_value
         volume_mock.upload.assert_called_once_with(mock.ANY, 0, mock.ANY)
 
-        expected_disk = ('<disk device="cdrom" type="file">'
-                         '<target bus="ide" dev="hdc" />'
-                         '<address bus="0" controller="0" '
-                         'target="0" type="drive" unit="0" />')
-
-        # NOTE(rpittau): starting from Python 3.8 the tostring() function
-        # preserves the attribute order specified by the user.
-        if sys.version_info[1] >= 8:
-            expected_disk = ('<disk type="file" device="cdrom">'
-                             '<target dev="hdc" bus="ide" />'
-                             '<address type="drive" controller="0"'
-                             ' bus="0" target="0" unit="0" />')
+        expected_disk = ('<disk type="file" device="cdrom">'
+                         '<target dev="hdc" bus="ide" />'
+                         '<address type="drive" controller="0"'
+                         ' bus="0" target="0" unit="0" />')
         self.assertEqual(1, conn_mock.defineXML.call_count)
         self.assertIn(expected_disk, conn_mock.defineXML.call_args[0][0])
 
@@ -719,13 +693,10 @@ class LibvirtDriverTestCase(base.BaseTestCase):
                          '<address bus="0" controller="0" '
                          'target="0" type="drive" unit="0" />')
 
-        # NOTE(rpittau): starting from Python 3.8 the tostring() function
-        # preserves the attribute order specified by the user.
-        if sys.version_info[1] >= 8:
-            expected_disk = ('<disk type="file" device="cdrom">'
-                             '<target dev="sdx" bus="sata" />'
-                             '<address type="drive" controller="0"'
-                             ' bus="0" target="0" unit="0" />')
+        expected_disk = ('<disk type="file" device="cdrom">'
+                         '<target dev="sdx" bus="sata" />'
+                         '<address type="drive" controller="0"'
+                         ' bus="0" target="0" unit="0" />')
         self.assertEqual(1, conn_mock.defineXML.call_count)
         self.assertIn(expected_disk, conn_mock.defineXML.call_args[0][0])
 
@@ -767,18 +738,10 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         volume_mock = pool_mock.createXML.return_value
         volume_mock.upload.assert_called_once_with(mock.ANY, 0, mock.ANY)
 
-        expected_disk = ('<disk device="cdrom" type="file">'
-                         '<target bus="sata" dev="sdx" />'
-                         '<address bus="0" controller="0" '
-                         'target="0" type="drive" unit="1" />')
-
-        # NOTE(rpittau): starting from Python 3.8 the tostring() function
-        # preserves the attribute order specified by the user.
-        if sys.version_info[1] >= 8:
-            expected_disk = ('<disk type="file" device="cdrom">'
-                             '<target dev="sdx" bus="sata" />'
-                             '<address type="drive" controller="0"'
-                             ' bus="0" target="0" unit="1" />')
+        expected_disk = ('<disk type="file" device="cdrom">'
+                         '<target dev="sdx" bus="sata" />'
+                         '<address type="drive" controller="0"'
+                         ' bus="0" target="0" unit="1" />')
         self.assertEqual(1, conn_mock.defineXML.call_count)
         self.assertIn(expected_disk, conn_mock.defineXML.call_args[0][0])
 
@@ -820,18 +783,10 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         volume_mock = pool_mock.createXML.return_value
         volume_mock.upload.assert_called_once_with(mock.ANY, 0, mock.ANY)
 
-        expected_disk = ('<disk device="cdrom" type="file">'
-                         '<target bus="scsi" dev="sdx" />'
-                         '<address bus="0" controller="0" '
-                         'target="0" type="drive" unit="1" />')
-
-        # NOTE(rpittau): starting from Python 3.8 the tostring() function
-        # preserves the attribute order specified by the user.
-        if sys.version_info[1] >= 8:
-            expected_disk = ('<disk type="file" device="cdrom">'
-                             '<target dev="sdx" bus="scsi" />'
-                             '<address type="drive" controller="0"'
-                             ' bus="0" target="0" unit="1" />')
+        expected_disk = ('<disk type="file" device="cdrom">'
+                         '<target dev="sdx" bus="scsi" />'
+                         '<address type="drive" controller="0"'
+                         ' bus="0" target="0" unit="1" />')
 
         self.assertEqual(1, conn_mock.defineXML.call_count)
         self.assertIn(expected_disk, conn_mock.defineXML.call_args[0][0])
