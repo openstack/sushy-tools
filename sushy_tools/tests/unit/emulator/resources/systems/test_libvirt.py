@@ -688,11 +688,6 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         volume_mock = pool_mock.createXML.return_value
         volume_mock.upload.assert_called_once_with(mock.ANY, 0, mock.ANY)
 
-        expected_disk = ('<disk device="cdrom" type="file">'
-                         '<target bus="sata" dev="sdx" />'
-                         '<address bus="0" controller="0" '
-                         'target="0" type="drive" unit="0" />')
-
         expected_disk = ('<disk type="file" device="cdrom">'
                          '<target dev="sdx" bus="sata" />'
                          '<address type="drive" controller="0"'
