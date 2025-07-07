@@ -1,0 +1,9 @@
+---
+features:
+  - |
+    Adds PATCH support for the Redfish Manager resource's ``DateTime`` and
+    ``DateTimeLocalOffset`` fields in the dynamic emulator. Implements
+    ``get_datetime`` and ``set_datetime`` methods in the fake driver and
+    adds test support for mocking datetime values. Disables cache reset
+    to persist updates across requests.
+

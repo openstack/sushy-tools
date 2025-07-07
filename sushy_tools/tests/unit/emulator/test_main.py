@@ -221,6 +221,9 @@ class ManagersTestCase(EmulatorTestCase):
         }
         managers_mock.get_managed_systems.return_value = ['xxx']
         managers_mock.get_managed_chassis.return_value = ['chassis0']
+        managers_mock.get_datetime.return_value = {
+            "DateTime": "2025-06-02T12:00:00+00:00",
+            "DateTimeLocalOffset": "+00:00"}
 
         response = self.app.get('/redfish/v1/Managers/xxxx-yyyy-zzzz')
 

@@ -21,6 +21,8 @@ class FakeDriver(base.DriverBase):
         super().__init__(config, logger)
         self._systems = systems
         self._chassis = chassis
+        self._datetime = None
+        self._datetimelocaloffset = None
 
     def get_manager(self, identity):
         """Get a manager by its identity
@@ -42,9 +44,35 @@ class FakeDriver(base.DriverBase):
             result = {'Id': system_uuid,
                       'UUID': system_uuid,
                       'Name': '%s-Manager' % system_name}
-            self._logger.debug('Found manager %(mgr)s by UUID %(id)s',
-                               {'mgr': result, 'id': identity})
+
+            self._logger.debug(
+                'Found manager %(mgr)s by UUID %(id)s',
+                {'mgr': result, 'id': identity}
+            )
             return result
+
+    def set_datetime(self, datetime_value, datetimelocaloffset_value):
+        """Set the datetime and offset information for a manager
+
+        :param datetime_value: The datetime string to set
+        :param datetimelocaloffset_value:
+        The time zone offset to set (e.g., "+00:00")
+        """
+        self._datetime = datetime_value
+        self._datetimelocaloffset = datetimelocaloffset_value
+
+    def get_datetime(self):
+        """Retrieve the datetime and offset information for a manager
+
+        :returns: A dictionary with 'DateTime' and 'DateTimeLocalOffset' keys,
+                  or an empty dict if no values are set
+        """
+        if self._datetime and self._datetimelocaloffset:
+            return {
+                'DateTime': self._datetime,
+                'DateTimeLocalOffset': self._datetimelocaloffset
+            }
+        return {}
 
     @property
     def driver(self):
