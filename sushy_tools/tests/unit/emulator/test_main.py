@@ -239,6 +239,33 @@ class ManagersTestCase(EmulatorTestCase):
                          response.json['VirtualMedia'])
 
     @patch_resource('managers')
+    def test_manager_resource_patch_valid_json(self, managers_mock):
+        managers_mock = managers_mock.return_value
+        managers_mock.set_datetime.return_value = None
+
+        payload = {
+            "DateTime": "2025-07-14T11:30:00+00:00",
+            "DateTimeLocalOffset": "+00:00"}
+
+        response = self.app.patch(
+            '/redfish/v1/Managers/xxxx-yyyy-zzzz',
+            json=payload)
+
+        self.assertEqual(204, response.status_code)
+
+    @patch_resource('managers')
+    def test_manager_resource_patch_invalid_json(self, managers_mock):
+        managers_mock = managers_mock.return_value
+        managers_mock.set_datetime.return_value = None
+
+        response = self.app.patch(
+            '/redfish/v1/Managers/xxxx-yyyy-zzzz',
+            data='not-json',
+            content_type='application/json')
+
+        self.assertEqual(400, response.status_code)
+
+    @patch_resource('managers')
     def test_manager_resource_get_reduced_feature_set(self, managers_mock):
         self.set_feature_set("vmedia")
         managers_mock = managers_mock.return_value

@@ -405,8 +405,15 @@ def manager_resource(identity):
     elif flask.request.method == "PATCH":
         if app.feature_set != "full":
             raise error.MethodNotAllowed("PATCH not supported in minimum mode")
+        try:
+            data = flask.request.get_json()
+        except wz_exc.BadRequest:
+            app.logger.error(
+                "PATCH method missing in /Managers/%s due to invalid JSON",
+                identity
+            )
+            raise error.BadRequest("Request must be a valid JSON")
 
-        data = flask.request.get_json(force=True)
         new_datetime = data.get("DateTime")
         new_offset = data.get("DateTimeLocalOffset")
 
