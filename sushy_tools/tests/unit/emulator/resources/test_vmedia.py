@@ -637,3 +637,178 @@ class OpenstackDriverTestCase(base.BaseTestCase):
             self.UUID, 'Cd')
         self.assertEqual('ouch', str(e))
         self.assertTrue(device_info['Inserted'])
+
+
+class IpFamilyValidationTestCase(base.BaseTestCase):
+    """Test IP family validation for virtual media."""
+
+    UUID = 'ZZZ-YYY-XXX'
+
+    CONFIG = {
+        'SUSHY_EMULATOR_VMEDIA_DEVICES': {
+            "Cd": {
+                "Name": "Virtual CD",
+                "MediaTypes": [
+                    "CD",
+                    "DVD"
+                ]
+            }
+        }
+    }
+
+    @mock.patch.object(vmedia.StaticDriver, '_get_device', autospec=True)
+    def test_insert_image_ip_family_validation_ipv4_required_ipv6_provided(
+            self, mock_get_device):
+        device_info = {}
+        mock_get_device.return_value = device_info
+
+        # Create driver with IPv4 restriction
+        config = self.CONFIG.copy()
+        config['SUSHY_EMULATOR_VIRTUAL_MEDIA_IP_FAMILY'] = '4'
+        with mock.patch('sushy_tools.emulator.memoize.PersistentDict',
+                        return_value={}, autospec=True):
+            driver = vmedia.StaticDriver(config, mock.MagicMock())
+
+        # IPv6 URL should raise error when IPv4 is required
+        self.assertRaises(error.BadRequest,
+                          driver.insert_image,
+                          self.UUID, 'Cd', 'http://[::1]/image.iso')
+
+    @mock.patch.object(vmedia.StaticDriver, '_get_device', autospec=True)
+    def test_insert_image_ip_family_validation_ipv6_required_ipv4_provided(
+            self, mock_get_device):
+        device_info = {}
+        mock_get_device.return_value = device_info
+
+        # Create driver with IPv6 restriction
+        config = self.CONFIG.copy()
+        config['SUSHY_EMULATOR_VIRTUAL_MEDIA_IP_FAMILY'] = '6'
+        with mock.patch('sushy_tools.emulator.memoize.PersistentDict',
+                        return_value={}, autospec=True):
+            driver = vmedia.StaticDriver(config, mock.MagicMock())
+
+        # IPv4 URL should raise error when IPv6 is required
+        self.assertRaises(error.BadRequest,
+                          driver.insert_image,
+                          self.UUID, 'Cd', 'http://192.168.1.1/image.iso')
+
+    @mock.patch.object(vmedia.StaticDriver, '_get_device', autospec=True)
+    @mock.patch.object(vmedia.StaticDriver, '_get_image', autospec=True)
+    def test_insert_image_ip_family_validation_hostname_allowed(
+            self, mock_get_image, mock_get_device):
+        device_info = {}
+        mock_get_device.return_value = device_info
+        mock_get_image.return_value = ('image.iso', '/tmp/image.iso')
+
+        # Create driver with IPv4 restriction
+        config = self.CONFIG.copy()
+        config['SUSHY_EMULATOR_VIRTUAL_MEDIA_IP_FAMILY'] = '4'
+        with mock.patch('sushy_tools.emulator.memoize.PersistentDict',
+                        return_value={}, autospec=True):
+            driver = vmedia.StaticDriver(config, mock.MagicMock())
+
+        # Hostname should be allowed regardless of IP family restriction
+        result = driver.insert_image(self.UUID, 'Cd',
+                                     'http://example.com/image.iso')
+        self.assertEqual('/tmp/image.iso', result)
+
+    @mock.patch.object(vmedia.StaticDriver, '_get_device', autospec=True)
+    @mock.patch.object(vmedia.StaticDriver, '_get_image', autospec=True)
+    def test_insert_image_ip_family_validation_ipv4_allowed(
+            self, mock_get_image, mock_get_device):
+        device_info = {}
+        mock_get_device.return_value = device_info
+        mock_get_image.return_value = ('image.iso', '/tmp/image.iso')
+
+        # Create driver with IPv4 restriction
+        config = self.CONFIG.copy()
+        config['SUSHY_EMULATOR_VIRTUAL_MEDIA_IP_FAMILY'] = '4'
+        with mock.patch('sushy_tools.emulator.memoize.PersistentDict',
+                        return_value={}, autospec=True):
+            driver = vmedia.StaticDriver(config, mock.MagicMock())
+
+        # IPv4 address should be allowed when IPv4 is required
+        result = driver.insert_image(self.UUID, 'Cd',
+                                     'http://192.168.1.1/image.iso')
+        self.assertEqual('/tmp/image.iso', result)
+
+    @mock.patch.object(vmedia.StaticDriver, '_get_device', autospec=True)
+    @mock.patch.object(vmedia.StaticDriver, '_get_image', autospec=True)
+    def test_insert_image_ip_family_validation_ipv6_allowed(
+            self, mock_get_image, mock_get_device):
+        device_info = {}
+        mock_get_device.return_value = device_info
+        mock_get_image.return_value = ('image.iso', '/tmp/image.iso')
+
+        # Create driver with IPv6 restriction
+        config = self.CONFIG.copy()
+        config['SUSHY_EMULATOR_VIRTUAL_MEDIA_IP_FAMILY'] = '6'
+        with mock.patch('sushy_tools.emulator.memoize.PersistentDict',
+                        return_value={}, autospec=True):
+            driver = vmedia.StaticDriver(config, mock.MagicMock())
+
+        # IPv6 address should be allowed when IPv6 is required
+        result = driver.insert_image(self.UUID, 'Cd',
+                                     'http://[::1]/image.iso')
+        self.assertEqual('/tmp/image.iso', result)
+
+    @mock.patch.object(vmedia.StaticDriver, '_get_device', autospec=True)
+    @mock.patch.object(vmedia.StaticDriver, '_get_image', autospec=True)
+    def test_insert_image_ip_family_validation_disabled(
+            self, mock_get_image, mock_get_device):
+        device_info = {}
+        mock_get_device.return_value = device_info
+        mock_get_image.return_value = ('image.iso', '/tmp/image.iso')
+
+        # Create driver without IP family restriction
+        config = self.CONFIG.copy()
+        with mock.patch('sushy_tools.emulator.memoize.PersistentDict',
+                        return_value={}, autospec=True):
+            driver = vmedia.StaticDriver(config, mock.MagicMock())
+
+        # Both IPv4 and IPv6 should be allowed when no restriction is set
+        result = driver.insert_image(self.UUID, 'Cd',
+                                     'http://192.168.1.1/image.iso')
+        self.assertEqual('/tmp/image.iso', result)
+
+        result = driver.insert_image(self.UUID, 'Cd',
+                                     'http://[::1]/image.iso')
+        self.assertEqual('/tmp/image.iso', result)
+
+    @mock.patch.object(vmedia.OpenstackDriver, '_get_device', autospec=True)
+    def test_openstack_driver_ip_family_validation_ipv4_required_ipv6(
+            self, mock_get_device):
+        device_info = {}
+        mock_get_device.return_value = device_info
+
+        # Create driver with IPv4 restriction
+        config = {'SUSHY_EMULATOR_VIRTUAL_MEDIA_IP_FAMILY': '4'}
+        novadriver = mock.Mock()
+        with mock.patch('sushy_tools.emulator.memoize.PersistentDict',
+                        return_value={}, autospec=True):
+            driver = vmedia.OpenstackDriver(config, mock.MagicMock(),
+                                            novadriver)
+
+        # IPv6 URL should raise error when IPv4 is required
+        self.assertRaises(error.BadRequest,
+                          driver.insert_image,
+                          self.UUID, 'Cd', 'http://[::1]/image.iso')
+
+    @mock.patch.object(vmedia.OpenstackDriver, '_get_device', autospec=True)
+    def test_openstack_driver_ip_family_validation_ipv6_required_ipv4(
+            self, mock_get_device):
+        device_info = {}
+        mock_get_device.return_value = device_info
+
+        # Create driver with IPv6 restriction
+        config = {'SUSHY_EMULATOR_VIRTUAL_MEDIA_IP_FAMILY': '6'}
+        novadriver = mock.Mock()
+        with mock.patch('sushy_tools.emulator.memoize.PersistentDict',
+                        return_value={}, autospec=True):
+            driver = vmedia.OpenstackDriver(config, mock.MagicMock(),
+                                            novadriver)
+
+        # IPv4 URL should raise error when IPv6 is required
+        self.assertRaises(error.BadRequest,
+                          driver.insert_image,
+                          self.UUID, 'Cd', 'http://192.168.1.1/image.iso')

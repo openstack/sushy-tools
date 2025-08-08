@@ -15,6 +15,7 @@
 
 import abc
 import collections
+import ipaddress
 import os
 import re
 import tempfile
@@ -25,6 +26,46 @@ import requests
 from sushy_tools.emulator import memoize
 from sushy_tools.emulator.resources import base
 from sushy_tools import error
+
+
+def _validate_ip_family(image_url, required_ip_family):
+    """Validate that the IP address in the URL matches the required IP family.
+
+    :param image_url: URL to validate
+    :param required_ip_family: Required IP family ('4' for IPv4, '6' for IPv6)
+    :raises: BadRequest if the IP family doesn't match
+    :returns: None if validation passes or URL contains hostname
+    """
+    if not required_ip_family:
+        return
+
+    if required_ip_family not in ('4', '6'):
+        raise error.BadRequest(
+            f"Invalid IP family configuration: {required_ip_family}. "
+            "Must be '4' or '6'.")
+
+    parsed_url = urlparse.urlparse(image_url)
+    host = parsed_url.hostname
+
+    if not host:
+        return
+
+    # Try to parse as IP address
+    try:
+        ip_addr = ipaddress.ip_address(host)
+    except ValueError:
+        # Not an IP address, it's a hostname - skip validation
+        return
+
+    # Check IP family
+    if (required_ip_family == '4'
+            and not isinstance(ip_addr, ipaddress.IPv4Address)):
+        raise error.BadRequest(
+            f"IPv4 address required but got IPv6 address: {host}")
+    elif (required_ip_family == '6'
+            and not isinstance(ip_addr, ipaddress.IPv6Address)):
+        raise error.BadRequest(
+            f"IPv6 address required but got IPv4 address: {host}")
 
 
 DeviceInfo = collections.namedtuple(
@@ -315,6 +356,12 @@ class StaticDriver(BaseDriver):
         :param write_protected: prevent write access the inserted media
         :raises: `FishyError` if image can't be manipulated
         """
+        # Validate IP family if configured
+        required_ip_family = self._config.get(
+            'SUSHY_EMULATOR_VIRTUAL_MEDIA_IP_FAMILY')
+        if image_url and required_ip_family:
+            _validate_ip_family(image_url, required_ip_family)
+
         device_info = self._get_device(identity, device)
         verify_media_cert = device_info.get(
             'Verify',
@@ -425,6 +472,12 @@ class OpenstackDriver(BaseDriver):
         :param write_protected: prevent write access the inserted media
         :raises: `FishyError` if image can't be manipulated
         """
+        # Validate IP family if configured
+        required_ip_family = self._config.get(
+            'SUSHY_EMULATOR_VIRTUAL_MEDIA_IP_FAMILY')
+        if image_url and required_ip_family:
+            _validate_ip_family(image_url, required_ip_family)
+
         device_info = self._get_device(identity, device)
         verify_media_cert = device_info.get(
             'Verify',
