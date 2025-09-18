@@ -1,0 +1,38 @@
+---
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+        args: ['--fix', 'lf']
+        exclude: |
+          (?x)(
+          .*.svg$|
+          )
+      - id: fix-byte-order-marker
+      - id: check-merge-conflict
+      - id: debug-statements
+      - id: check-json
+        files: .*\.json$
+        exclude: sushy_tools/emulator/templates/.*$
+      - id: check-yaml
+        files: .*\.(yaml|yml)$
+        exclude: releasenotes/.*$
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.5.4
+    hooks:
+      - id: remove-tabs
+        exclude: '.*\.(svg)$'
+  - repo: https://opendev.org/openstack/hacking
+    rev: 6.1.0
+    hooks:
+      - id: hacking
+        additional_dependencies:
+          - flake8-import-order>=0.19,<0.20
+        exclude: '^(doc|releasenotes|tools)/.*$'
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.2.6
+    hooks:
+    - id: codespell
+      args: [--write-changes]
