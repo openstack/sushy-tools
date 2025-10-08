@@ -10,6 +10,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import os
+import signal
 import tempfile
 from unittest import mock
 
@@ -1037,3 +1039,163 @@ class TaskServiceTestCase(EmulatorTestCase):
                          response.json['@odata.id'])
         self.assertEqual('Task 42', response.json['Name'])
         self.assertEqual('Completed', response.json['TaskState'])
+
+
+class ZombieCleanupTestCase(base.BaseTestCase):
+    """Test case for zombie process cleanup functionality"""
+
+    def setUp(self):
+        super().setUp()
+        # Store original signal handler to restore later
+        self.original_sigchld_handler = signal.signal(
+            signal.SIGCHLD, signal.SIG_DFL)
+
+    def tearDown(self):
+        # Restore original signal handler
+        signal.signal(signal.SIGCHLD, self.original_sigchld_handler)
+        super().tearDown()
+
+    @mock.patch('os.waitpid')
+    def test_cleanup_zombies_single_child(self, mock_waitpid):
+        """Test that cleanup_zombies reaps a single zombie child"""
+        # Mock waitpid to return a single child that has exited
+        # First call returns child, second returns no more children
+        mock_waitpid.side_effect = [(12345, 0), (0, 0)]
+
+        with mock.patch.object(main.app, 'logger') as mock_logger:
+            main.cleanup_zombies(signal.SIGCHLD, None)
+
+        # Verify waitpid was called with correct parameters
+        expected_calls = [
+            mock.call(-1, os.WNOHANG),
+            mock.call(-1, os.WNOHANG)
+        ]
+        mock_waitpid.assert_has_calls(expected_calls)
+
+        # Verify the logging statement was called with correct message
+        # Note: In real usage, logging might fail due to reentrancy
+        mock_logger.debug.assert_called_once_with(
+            "Reaped zombie process %d with status %d", 12345, 0)
+
+    @mock.patch('os.waitpid')
+    def test_cleanup_zombies_multiple_children(self, mock_waitpid):
+        """Test that cleanup_zombies reaps multiple zombie children"""
+        # Mock waitpid to return multiple children
+        mock_waitpid.side_effect = [
+            (12345, 0),    # First child
+            (12346, 256),  # Second child (exit code 1)
+            (0, 0)         # No more children
+        ]
+
+        with mock.patch.object(main.app, 'logger') as mock_logger:
+            main.cleanup_zombies(signal.SIGCHLD, None)
+
+        # Verify waitpid was called three times
+        self.assertEqual(mock_waitpid.call_count, 3)
+
+        # Verify both logging statements were called
+        expected_calls = [
+            mock.call("Reaped zombie process %d with status %d", 12345, 0),
+            mock.call("Reaped zombie process %d with status %d", 12346, 256)
+        ]
+        mock_logger.debug.assert_has_calls(expected_calls)
+
+    @mock.patch('os.waitpid')
+    def test_cleanup_zombies_no_children(self, mock_waitpid):
+        """Test that cleanup_zombies handles no zombie children gracefully"""
+        # Mock waitpid to return no children
+        mock_waitpid.return_value = (0, 0)
+
+        with mock.patch.object(main.app, 'logger') as mock_logger:
+            main.cleanup_zombies(signal.SIGCHLD, None)
+
+        # Verify waitpid was called once
+        mock_waitpid.assert_called_once_with(-1, os.WNOHANG)
+
+        # Verify no logging statements were made
+        mock_logger.debug.assert_not_called()
+
+    @mock.patch('os.waitpid')
+    def test_cleanup_zombies_oserror_handling(self, mock_waitpid):
+        """Test that cleanup_zombies handles OSError gracefully"""
+        # Mock waitpid to raise OSError (no more children)
+        mock_waitpid.side_effect = OSError("No child processes")
+
+        with mock.patch.object(main.app, 'logger') as mock_logger:
+            main.cleanup_zombies(signal.SIGCHLD, None)
+
+        # Verify waitpid was called once
+        mock_waitpid.assert_called_once_with(-1, os.WNOHANG)
+
+        # Verify no logging statements were made
+        mock_logger.debug.assert_not_called()
+
+    @mock.patch('signal.signal')
+    def test_signal_handler_installation(self, mock_signal):
+        """Test that the SIGCHLD signal handler is properly installed"""
+        # Create a mock args object with all necessary attributes
+        mock_args = mock.Mock()
+        mock_args.ssl_certificate = None
+        mock_args.ssl_key = None
+
+        # Mock the signal.signal call to verify it's called correctly
+        with mock.patch('sushy_tools.emulator.main.parse_args') as mock_parse:
+            mock_parse.return_value = mock_args
+
+            # Mock app configuration to avoid actual Flask app setup
+            with mock.patch('sushy_tools.emulator.main.app') as mock_app:
+                mock_app.configure = mock.Mock()
+                mock_app.config = {}
+                mock_app.run = mock.Mock()
+
+                # Call main function
+                main.main()
+
+        # Verify signal.signal was called with SIGCHLD and cleanup function
+        mock_signal.assert_called_with(signal.SIGCHLD, main.cleanup_zombies)
+
+    @mock.patch('os.waitpid')
+    def test_cleanup_zombies_with_different_exit_statuses(self, mock_waitpid):
+        """Test that cleanup_zombies handles different exit statuses"""
+        # Mock waitpid to return children with different exit statuses
+        mock_waitpid.side_effect = [
+            (12345, 0),      # Normal exit
+            (12346, 256),    # Exit code 1 (256 = 1 << 8)
+            (12347, 512),    # Exit code 2 (512 = 2 << 8)
+            (0, 0)           # No more children
+        ]
+
+        with mock.patch.object(main.app, 'logger') as mock_logger:
+            main.cleanup_zombies(signal.SIGCHLD, None)
+
+        # Verify all three children were reaped
+        expected_calls = [
+            mock.call("Reaped zombie process %d with status %d", 12345, 0),
+            mock.call("Reaped zombie process %d with status %d", 12346, 256),
+            mock.call("Reaped zombie process %d with status %d", 12347, 512)
+        ]
+        mock_logger.debug.assert_has_calls(expected_calls)
+
+    @mock.patch('os.waitpid')
+    def test_cleanup_zombies_logging_failure_handled(self, mock_waitpid):
+        """Test that cleanup_zombies handles logging failures gracefully"""
+        # Mock waitpid to return a child
+        mock_waitpid.side_effect = [(12345, 0), (0, 0)]
+
+        with mock.patch.object(main.app, 'logger') as mock_logger:
+            # Make logging raise an exception (simulating reentrancy issue)
+            mock_logger.debug.side_effect = RuntimeError("Logging reentrancy")
+
+            # This should not raise an exception
+            main.cleanup_zombies(signal.SIGCHLD, None)
+
+        # Verify waitpid was still called correctly
+        expected_calls = [
+            mock.call(-1, os.WNOHANG),
+            mock.call(-1, os.WNOHANG)
+        ]
+        mock_waitpid.assert_has_calls(expected_calls)
+
+        # Verify logging was attempted
+        mock_logger.debug.assert_called_once_with(
+            "Reaped zombie process %d with status %d", 12345, 0)
