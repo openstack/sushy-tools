@@ -64,6 +64,7 @@ class NovaDriverTestCase(base.BaseTestCase):
         server = mock.Mock(id=self.uuid,
                            power_state=1)
         self.nova_mock.return_value.get_server.return_value = server
+        server.fetch.return_value = None
 
         power_state = self.test_driver.get_power_state(self.uuid)
 
@@ -73,67 +74,82 @@ class NovaDriverTestCase(base.BaseTestCase):
         server = mock.Mock(id=self.uuid,
                            power_state=0)
         self.nova_mock.return_value.get_server.return_value = server
+        server.fetch.return_value = None
 
         power_state = self.test_driver.get_power_state(self.uuid)
 
         self.assertEqual('Off', power_state)
 
-    def test_set_power_state_on(self):
+    @mock.patch('time.sleep')
+    def test_set_power_state_on(self, mock_sleep):
         server = mock.Mock(id=self.uuid, power_state=0, task_state=None,
                            metadata={})
         self.nova_mock.return_value.get_server.return_value = server
+        server.fetch.return_value = None
         self.test_driver.set_power_state(self.uuid, 'On')
         compute = self.nova_mock.return_value.compute
         compute.start_server.assert_called_once_with(self.uuid)
 
-    def test_set_power_state_forceon(self):
+    @mock.patch('time.sleep')
+    def test_set_power_state_forceon(self, mock_sleep):
         server = mock.Mock(id=self.uuid, power_state=0, task_state=None,
                            metadata={})
         self.nova_mock.return_value.get_server.return_value = server
+        server.fetch.return_value = None
         self.test_driver.set_power_state(self.uuid, 'ForceOn')
         compute = self.nova_mock.return_value.compute
         compute.start_server.assert_called_once_with(self.uuid)
 
-    def test_set_power_state_forceoff(self):
+    @mock.patch('time.sleep')
+    def test_set_power_state_forceoff(self, mock_sleep):
         server = mock.Mock(id=self.uuid, power_state=1, task_state=None,
                            metadata={})
         self.nova_mock.return_value.get_server.return_value = server
+        server.fetch.return_value = None
         self.test_driver.set_power_state(self.uuid, 'ForceOff')
         compute = self.nova_mock.return_value.compute
         compute.stop_server.assert_called_once_with(self.uuid)
 
-    def test_set_power_state_gracefulshutdown(self):
+    @mock.patch('time.sleep')
+    def test_set_power_state_gracefulshutdown(self, mock_sleep):
         server = mock.Mock(id=self.uuid, power_state=1, task_state=None,
                            metadata={})
         self.nova_mock.return_value.get_server.return_value = server
+        server.fetch.return_value = None
         self.test_driver.set_power_state(self.uuid, 'GracefulShutdown')
         compute = self.nova_mock.return_value.compute
         compute.stop_server.assert_called_once_with(self.uuid)
 
-    def test_set_power_state_gracefulrestart(self):
+    @mock.patch('time.sleep')
+    def test_set_power_state_gracefulrestart(self, mock_sleep):
         server = mock.Mock(id=self.uuid, power_state=1, task_state=None,
                            metadata={})
         self.nova_mock.return_value.get_server.return_value = server
+        server.fetch.return_value = None
         self.test_driver.set_power_state(self.uuid, 'GracefulRestart')
         compute = self.nova_mock.return_value.compute
         compute.reboot_server.assert_called_once_with(
             self.uuid, reboot_type='SOFT')
 
-    def test_set_power_state_forcerestart(self):
+    @mock.patch('time.sleep')
+    def test_set_power_state_forcerestart(self, mock_sleep):
         server = mock.Mock(id=self.uuid, power_state=1, task_state=None,
                            metadata={})
         self.nova_mock.return_value.get_server.return_value = server
+        server.fetch.return_value = None
         self.test_driver.set_power_state(
             self.uuid, 'ForceRestart')
         compute = self.nova_mock.return_value.compute
         compute.reboot_server.assert_called_once_with(
             self.uuid, reboot_type='HARD')
 
-    def test_set_power_state_raises_SYS518(self):
-        server = mock.Mock(
+    @mock.patch('time.sleep')
+    def test_set_power_state_raises_SYS518(self, mock_sleep):
+        server_busy = mock.Mock(
             id=self.uuid, power_state=1, task_state='rebuilding',
             metadata={})
-        self.nova_mock.return_value.get_server.return_value = server
+        self.nova_mock.return_value.get_server.return_value = server_busy
+        server_busy.fetch.return_value = None
         e = self.assertRaises(
             error.FishyError, self.test_driver.set_power_state,
             self.uuid, 'SOFT')
@@ -141,18 +157,53 @@ class NovaDriverTestCase(base.BaseTestCase):
             'SYS518: Cloud instance is busy, task_state: rebuilding',
             str(e))
 
+    @mock.patch('time.sleep')
     @mock.patch.object(OpenStackDriver, "_rebuild_with_blank_image",
                        autospec=True)
-    def test_set_power_state_delayed_eject(self, mock_rebuild_blank):
+    def test_set_power_state_delayed_eject(self, mock_rebuild_blank,
+                                           mock_sleep):
+        """Test that 503 is always raised after triggering rebuild"""
         server = mock.Mock(id=self.uuid, power_state=1, task_state=None,
                            metadata={'sushy-tools-delay-eject': 'true'})
         self.nova_mock.return_value.get_server.return_value = server
-        self.test_driver.set_power_state(self.uuid, 'ForceOff')
+        server.fetch.return_value = None
+
+        # Should raise 503 after triggering rebuild
+        e = self.assertRaises(
+            error.FishyError, self.test_driver.set_power_state,
+            self.uuid, 'ForceOff')
+        self.assertIn('SYS518: Cloud instance rebuilding', str(e))
+
+        # Rebuild should have been triggered
         mock_rebuild_blank.assert_called_once_with(self.test_driver, self.uuid)
         self._cc.delete_server_metadata.assert_called_once_with(
             self.uuid, ['sushy-tools-delay-eject'])
+
+        # Power state change should NOT have been attempted
         compute = self.nova_mock.return_value.compute
-        compute.stop_server.assert_called_once_with(self.uuid)
+        compute.stop_server.assert_not_called()
+
+    @mock.patch('time.sleep')
+    @mock.patch.object(OpenStackDriver, "_rebuild_with_blank_image",
+                       autospec=True)
+    def test_set_power_state_delayed_eject_busy(self, mock_rebuild_blank,
+                                                mock_sleep):
+        """Test that rebuild is not attempted when instance is busy"""
+        server = mock.Mock(id=self.uuid, power_state=4,
+                           task_state='powering-off',
+                           metadata={'sushy-tools-delay-eject': 'true'})
+        self.nova_mock.return_value.get_server.return_value = server
+        server.fetch.return_value = None
+
+        # Should raise 503 before attempting rebuild due to powering-off state
+        e = self.assertRaises(
+            error.FishyError, self.test_driver.set_power_state,
+            self.uuid, 'On')
+        self.assertIn('SYS518: Cloud instance is busy', str(e))
+        self.assertIn('powering-off', str(e))
+
+        # Rebuild should NOT have been attempted
+        mock_rebuild_blank.assert_not_called()
 
     def test_get_boot_device(self):
         server = mock.Mock(id=self.uuid)
@@ -581,3 +632,113 @@ class NovaDriverTestCase(base.BaseTestCase):
             self.uuid, 'aaa-bbb')
         self.assertEqual(
             'Server rebuild attempt resulted in status ERROR', str(e))
+
+    @mock.patch('time.sleep')
+    def test_check_and_wait_task_state_immediately_ready(self, mock_sleep):
+        """Test when instance is immediately ready (task_state=None)"""
+        server = mock.Mock(id=self.uuid, task_state=None)
+        # fetch() updates instance in-place, doesn't change task_state
+        server.fetch.return_value = None
+
+        is_ready, result_instance = (
+            self.test_driver._check_and_wait_for_task_state(server))
+
+        self.assertTrue(is_ready)
+        self.assertEqual(server, result_instance)
+        # Should sleep for initial_wait (2s) + stability_wait (4s)
+        self.assertEqual(2, mock_sleep.call_count)
+        mock_sleep.assert_any_call(2)  # initial_wait
+        mock_sleep.assert_any_call(4)  # stability_wait
+        # fetch() called once after stability check
+        server.fetch.assert_called_once_with(self._cc.compute)
+
+    @mock.patch('time.sleep')
+    def test_check_and_wait_task_state_becomes_ready(self, mock_sleep):
+        """Test when instance becomes ready after polling"""
+        server = mock.Mock(id=self.uuid, task_state='rebuilding')
+
+        # fetch() updates: busy -> ready -> ready (stability check)
+        fetch_states = ['rebuilding', None, None]
+        fetch_call_count = [0]
+
+        def update_task_state(compute):
+            server.task_state = fetch_states[fetch_call_count[0]]
+            fetch_call_count[0] += 1
+
+        server.fetch.side_effect = update_task_state
+
+        is_ready, result_instance = (
+            self.test_driver._check_and_wait_for_task_state(server))
+
+        self.assertTrue(is_ready)
+        self.assertEqual(server, result_instance)
+        # Sleeps: 2s (busy), 4s (fetch->ready), 2s (check), 4s (stability)
+        self.assertEqual(4, mock_sleep.call_count)
+
+    @mock.patch('time.sleep')
+    def test_check_and_wait_task_state_timeout(self, mock_sleep):
+        """Test when instance stays busy and times out"""
+        server = mock.Mock(id=self.uuid, task_state='rebuilding')
+        # fetch() keeps task_state as 'rebuilding'
+        server.fetch.return_value = None
+
+        is_ready, result_instance = (
+            self.test_driver._check_and_wait_for_task_state(
+                server, max_wait=3))
+
+        self.assertFalse(is_ready)
+        self.assertEqual(server, result_instance)
+        # Should have tried to poll multiple times within max_wait
+        self.assertGreater(mock_sleep.call_count, 0)
+
+    @mock.patch('time.sleep')
+    def test_check_and_wait_task_state_stability_check_fails(self,
+                                                             mock_sleep):
+        """Test when stability check detects a state change"""
+        server = mock.Mock(id=self.uuid, task_state=None)
+
+        # fetch() updates: ready->busy (stability), busy->ready, ready
+        fetch_states = ['powering-off', 'powering-off', None, None]
+        fetch_call_count = [0]
+
+        def update_task_state(compute):
+            server.task_state = fetch_states[fetch_call_count[0]]
+            fetch_call_count[0] += 1
+
+        server.fetch.side_effect = update_task_state
+
+        is_ready, result_instance = (
+            self.test_driver._check_and_wait_for_task_state(server))
+
+        self.assertTrue(is_ready)
+        self.assertEqual(server, result_instance)
+        # Should have multiple sleeps due to stability check retry
+        self.assertGreater(mock_sleep.call_count, 2)
+
+    @mock.patch('time.sleep')
+    def test_check_and_wait_task_state_exponential_backoff(self, mock_sleep):
+        """Test exponential backoff behavior"""
+        server = mock.Mock(id=self.uuid, task_state='rebuilding')
+
+        # fetch() updates: busy -> ready -> ready (stability)
+        fetch_states = ['rebuilding', None, None]
+        fetch_call_count = [0]
+
+        def update_task_state(compute):
+            server.task_state = fetch_states[fetch_call_count[0]]
+            fetch_call_count[0] += 1
+
+        server.fetch.side_effect = update_task_state
+
+        is_ready, result_instance = (
+            self.test_driver._check_and_wait_for_task_state(server))
+
+        self.assertTrue(is_ready)
+        # Check that exponential backoff was used
+        calls = [call[0][0] for call in mock_sleep.call_args_list]
+        # Should see: 2s (initial), 4s (2*2), 5s (capped), 4s (stability)
+        self.assertEqual(4, len(calls))
+        self.assertEqual(2, calls[0])  # initial_wait
+        self.assertEqual(4, calls[1])  # exponential (2*2)
+        self.assertEqual(5, calls[2])  # capped at max_interval (4*2=8->5)
+        self.assertEqual(4, calls[3])  # stability_wait

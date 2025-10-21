@@ -176,7 +176,9 @@ class OpenStackDriver(AbstractSystemsDriver):
             if power state can't be determined
         """
         try:
+            # Get instance (uses cache) then fetch fresh state
             instance = self._get_instance(identity)
+            instance.fetch(self._cc.compute)
 
         except error.FishyError:
             return
@@ -185,6 +187,67 @@ class OpenStackDriver(AbstractSystemsDriver):
             return 'On'
 
         return 'Off'
+
+    def _check_and_wait_for_task_state(self, instance, max_wait=20,
+                                       initial_wait=2, stability_wait=4):
+        """Wait for instance task_state to clear and become stable
+
+        Polls with exponential backoff until task_state is None, then performs
+        a stability check to ensure it remains None.
+
+        :param instance: Current instance object
+        :param max_wait: Maximum time to wait in seconds (default 20)
+        :param initial_wait: Initial wait interval (exponential backoff)
+        :param stability_wait: Time to wait after task_state=None to ensure
+                               it stays None (catches rapid state transitions)
+        :returns: Tuple of (is_ready, instance) where is_ready is True if
+                  task_state is None and stable, False if still busy
+        """
+        waited = 0
+        wait_interval = initial_wait
+        max_interval = 5  # Cap exponential backoff at 5 seconds
+
+        while waited < max_wait:
+            sleep_time = min(wait_interval, max_wait - waited)
+            time.sleep(sleep_time)
+            waited += sleep_time
+
+            # Still busy, fetch new state and apply exponential backoff
+            if instance.task_state is not None:
+                wait_interval = min(wait_interval * 2, max_interval)
+                instance.fetch(self._cc.compute)
+                continue
+
+            # This catches Nova doing rapid state transitions like:
+            # rebuilding -> None -> powering-off -> None
+            self._logger.debug(
+                'Instance %(identity)s task_state cleared after '
+                '%(waited)s seconds, verifying stability' %
+                {'identity': instance.id, 'waited': waited})
+
+            # Cap stability wait to not exceed max_wait
+            stability_sleep = min(stability_wait, max_wait - waited)
+            time.sleep(stability_sleep)
+            waited += stability_sleep
+
+            instance.fetch(self._cc.compute)
+
+            # Task state changed again, reset backoff and continue waiting
+            if instance.task_state is not None:
+                self._logger.debug(
+                    'Instance %(identity)s task_state changed to '
+                    '%(task_state)s during stability check, '
+                    'continuing to wait' %
+                    {'identity': instance.id,
+                     'task_state': instance.task_state})
+                wait_interval = initial_wait
+                continue
+
+            # Task state is stable at None, return success
+            return True, instance
+
+        # Task still running after max_wait
+        return False, instance
 
     def set_power_state(self, identity, state):
         """Set computer system power state
@@ -197,7 +260,29 @@ class OpenStackDriver(AbstractSystemsDriver):
         :raises: `error.FishyError` if power state can't be set
 
         """
+        # Get instance (uses cache) then fetch fresh state
         instance = self._get_instance(identity)
+        instance.fetch(self._cc.compute)
+
+        # Log current instance state for diagnostics
+        self._logger.debug(
+            'set_power_state called: identity=%(identity)s, '
+            'requested_state=%(state)s, current_power_state=%(power_state)s, '
+            'current_status=%(status)s, current_task_state=%(task_state)s' %
+            {'identity': identity, 'state': state,
+             'power_state': instance.power_state,
+             'status': instance.status,
+             'task_state': instance.task_state})
+
+        # Check if instance is ready before attempting any operations
+        # Prevents power actions and rebuilds during busy states
+        # (e.g. powering-off, powering-on, rebuilding, spawning)
+        is_ready, instance = self._check_and_wait_for_task_state(instance)
+        if not is_ready:
+            msg = ('SYS518: Cloud instance is busy, task_state: %s'
+                   % instance.task_state)
+            raise error.FishyError(msg, 503)
+
         delayed_media_eject = instance.metadata.get('sushy-tools-delay-eject')
 
         if delayed_media_eject:
@@ -210,11 +295,9 @@ class OpenStackDriver(AbstractSystemsDriver):
                 False, self._rebuild_with_blank_image, identity)
             self._remove_delayed_eject_metadata(identity)
 
-        if instance.task_state is not None:
-            # SYS518 is used here to trick openstack/sushy to do retries.
-            # iDRAC uses SYS518 when a previous task is still running.
-            msg = ('SYS518: Cloud instance is busy, task_state: %s'
-                   % instance.task_state)
+            # Always raise 503 after triggering rebuild to force client retry
+            # This avoids race conditions and prevents exceeding 60s timeout
+            msg = ('SYS518: Cloud instance rebuilding, retry required')
             raise error.FishyError(msg, 503)
 
         if state in ('On', 'ForceOn'):

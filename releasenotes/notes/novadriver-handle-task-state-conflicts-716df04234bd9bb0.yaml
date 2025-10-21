@@ -1,0 +1,10 @@
+---
+fixes:
+  - |
+    Fixes OpenStack Nova driver to properly handle instance ``task_state``
+    conflicts and race conditions during power state operations. The driver
+    now waits for instances to be ready before attempting power actions or
+    rebuilds, preventing ``ConflictExceptions`` when instances are busy with
+    tasks like ``powering-off``, ``rebuilding``, or ``spawning``. When the
+    instance is busy, the driver now returns ``HTTP 503`` with ``SYS518``
+    error code to allow clients to retry.
