@@ -248,6 +248,13 @@ class AbstractSystemsDriver(metaclass=abc.ABCMeta):
         """
         raise error.NotSupportedError('Not implemented')
 
+    def get_processors(self, identity):
+        """Get processors information for the system
+
+        :returns: list of processor dictionaries
+        """
+        raise error.NotSupportedError('Not implemented')
+
     def find_or_create_storage_volume(self, data):
         """Find/create volume based on existence in the virtualization backend
 
