@@ -63,22 +63,30 @@
             "HealthRollUp": "OK"
         }
     },
+    {%- if bios_supported %}
     "Bios": {
         "@odata.id": {{ "/redfish/v1/Systems/%s/BIOS"|format(identity)|tojson }}
     },
+    {%- endif %}
+    {%- if bios_version %}
     "BiosVersion": {{ bios_version|string|tojson  }},
+    {%- endif %}
+    {%- if processors_supported %}
     "Processors": {
         "@odata.id": {{ "/redfish/v1/Systems/%s/Processors"|format(identity)|tojson }}
     },
+    {%- endif %}
     "Memory": {
         "@odata.id": {{ "/redfish/v1/Systems/%s/Memory"|format(identity)|tojson }}
     },
     "SecureBoot": {
         "@odata.id": {{ "/redfish/v1/Systems/%s/SecureBoot"|format(identity)|tojson }}
     },
+    {%- if simple_storage_supported %}
     "SimpleStorage": {
         "@odata.id": {{ "/redfish/v1/Systems/%s/SimpleStorage"|format(identity)|tojson }}
     },
+    {%- endif %}
     "Storage": {
         "@odata.id": {{ "/redfish/v1/Systems/%s/Storage"|format(identity)|tojson }}
     },

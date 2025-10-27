@@ -468,6 +468,10 @@ def system_resource(identity):
             power_state=app.systems.get_power_state(identity),
             total_memory_gb=try_get(app.systems.get_total_memory),
             bios_version=bios_version,
+            bios_supported=try_get(app.systems.get_bios),
+            processors_supported=try_get(app.systems.get_processors),
+            simple_storage_supported=try_get(
+                app.systems.get_simple_storage_collection),
             total_cpus=try_get(app.systems.get_total_cpus),
             boot_source_target=app.systems.get_boot_device(identity),
             boot_source_mode=try_get(app.systems.get_boot_mode),

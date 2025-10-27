@@ -1,0 +1,10 @@
+---
+fixes:
+  - |
+    System sub-resources (``BIOS``, ``Processors``, and ``SimpleStorage``) are
+    now conditionally exposed based on driver support. Only the libvirt driver
+    implements these features, so they will only appear in the System resource
+    response when using the libvirt backend. This prevents exposing non-
+    functional endpoints for drivers that don't support these capabilities.
+    When these fields are absent, Redfish clients like Ironic will receive a
+    ``MissingAttributeError`` and handle it gracefully.

@@ -573,6 +573,191 @@ class BiosTestCase(EmulatorTestCase):
         systems_mock.return_value.reset_bios.assert_called_once_with(self.uuid)
 
 
+class ConditionalResourceAdvertisingTestCase(EmulatorTestCase):
+    """Test that resources are only advertised when driver supports them"""
+
+    def setUp(self):
+        super(ConditionalResourceAdvertisingTestCase, self).setUp()
+        self.set_feature_set("full")
+
+    @patch_resource('indicators')
+    @patch_resource('chassis')
+    @patch_resource('managers')
+    @patch_resource('systems')
+    def test_bios_advertised_when_supported(
+            self, systems_mock, managers_mock, chassis_mock, indicators_mock):
+        """Test BIOS is advertised when driver supports it"""
+        systems_mock = systems_mock.return_value
+        systems_mock.uuid.return_value = 'zzzz-yyyy-xxxx'
+        systems_mock.get_power_state.return_value = 'On'
+        systems_mock.get_boot_device.return_value = 'Cd'
+        systems_mock.get_boot_mode.side_effect = error.NotSupportedError
+        systems_mock.get_bios.return_value = {'attr1': 'value1'}
+        systems_mock.get_processors.side_effect = error.NotSupportedError
+        systems_mock.get_simple_storage_collection.side_effect = (
+            error.NotSupportedError)
+        systems_mock.get_total_memory.side_effect = error.NotSupportedError
+        systems_mock.get_total_cpus.side_effect = error.NotSupportedError
+        systems_mock.get_versions.side_effect = error.NotSupportedError
+        managers_mock.return_value.get_managers_for_system.return_value = []
+        chassis_mock.return_value.chassis = []
+        indicators_mock.return_value.get_indicator_state.return_value = 'Off'
+
+        response = self.app.get('/redfish/v1/Systems/xxxx-yyyy-zzzz')
+
+        self.assertEqual(200, response.status_code)
+        self.assertIn('Bios', response.json)
+        self.assertEqual(
+            '/redfish/v1/Systems/xxxx-yyyy-zzzz/BIOS',
+            response.json['Bios']['@odata.id'])
+
+    @patch_resource('indicators')
+    @patch_resource('chassis')
+    @patch_resource('managers')
+    @patch_resource('systems')
+    def test_bios_not_advertised_when_not_supported(
+            self, systems_mock, managers_mock, chassis_mock, indicators_mock):
+        """Test BIOS is NOT advertised when driver doesn't support it"""
+        systems_mock = systems_mock.return_value
+        systems_mock.uuid.return_value = 'zzzz-yyyy-xxxx'
+        systems_mock.get_power_state.return_value = 'On'
+        systems_mock.get_boot_device.return_value = 'Cd'
+        systems_mock.get_boot_mode.side_effect = error.NotSupportedError
+        systems_mock.get_bios.side_effect = error.NotSupportedError
+        systems_mock.get_processors.side_effect = error.NotSupportedError
+        systems_mock.get_simple_storage_collection.side_effect = (
+            error.NotSupportedError)
+        systems_mock.get_total_memory.side_effect = error.NotSupportedError
+        systems_mock.get_total_cpus.side_effect = error.NotSupportedError
+        systems_mock.get_versions.side_effect = error.NotSupportedError
+        managers_mock.return_value.get_managers_for_system.return_value = []
+        chassis_mock.return_value.chassis = []
+        indicators_mock.return_value.get_indicator_state.return_value = 'Off'
+
+        response = self.app.get('/redfish/v1/Systems/xxxx-yyyy-zzzz')
+
+        self.assertEqual(200, response.status_code)
+        self.assertNotIn('Bios', response.json)
+
+    @patch_resource('indicators')
+    @patch_resource('chassis')
+    @patch_resource('managers')
+    @patch_resource('systems')
+    def test_processors_advertised_when_supported(
+            self, systems_mock, managers_mock, chassis_mock, indicators_mock):
+        """Test Processors is advertised when driver supports it"""
+        systems_mock = systems_mock.return_value
+        systems_mock.uuid.return_value = 'zzzz-yyyy-xxxx'
+        systems_mock.get_power_state.return_value = 'On'
+        systems_mock.get_boot_device.return_value = 'Cd'
+        systems_mock.get_boot_mode.side_effect = error.NotSupportedError
+        systems_mock.get_processors.return_value = [{'id': 'CPU'}]
+        systems_mock.get_bios.side_effect = error.NotSupportedError
+        systems_mock.get_simple_storage_collection.side_effect = (
+            error.NotSupportedError)
+        systems_mock.get_total_memory.side_effect = error.NotSupportedError
+        systems_mock.get_total_cpus.side_effect = error.NotSupportedError
+        systems_mock.get_versions.side_effect = error.NotSupportedError
+        managers_mock.return_value.get_managers_for_system.return_value = []
+        chassis_mock.return_value.chassis = []
+        indicators_mock.return_value.get_indicator_state.return_value = 'Off'
+
+        response = self.app.get('/redfish/v1/Systems/xxxx-yyyy-zzzz')
+
+        self.assertEqual(200, response.status_code)
+        self.assertIn('Processors', response.json)
+        self.assertEqual(
+            '/redfish/v1/Systems/xxxx-yyyy-zzzz/Processors',
+            response.json['Processors']['@odata.id'])
+
+    @patch_resource('indicators')
+    @patch_resource('chassis')
+    @patch_resource('managers')
+    @patch_resource('systems')
+    def test_processors_not_advertised_when_not_supported(
+            self, systems_mock, managers_mock, chassis_mock, indicators_mock):
+        """Test Processors is NOT advertised when driver doesn't support it"""
+        systems_mock = systems_mock.return_value
+        systems_mock.uuid.return_value = 'zzzz-yyyy-xxxx'
+        systems_mock.get_power_state.return_value = 'On'
+        systems_mock.get_boot_device.return_value = 'Cd'
+        systems_mock.get_boot_mode.side_effect = error.NotSupportedError
+        systems_mock.get_processors.side_effect = error.NotSupportedError
+        systems_mock.get_bios.side_effect = error.NotSupportedError
+        systems_mock.get_simple_storage_collection.side_effect = (
+            error.NotSupportedError)
+        systems_mock.get_total_memory.side_effect = error.NotSupportedError
+        systems_mock.get_total_cpus.side_effect = error.NotSupportedError
+        systems_mock.get_versions.side_effect = error.NotSupportedError
+        managers_mock.return_value.get_managers_for_system.return_value = []
+        chassis_mock.return_value.chassis = []
+        indicators_mock.return_value.get_indicator_state.return_value = 'Off'
+
+        response = self.app.get('/redfish/v1/Systems/xxxx-yyyy-zzzz')
+
+        self.assertEqual(200, response.status_code)
+        self.assertNotIn('Processors', response.json)
+
+    @patch_resource('indicators')
+    @patch_resource('chassis')
+    @patch_resource('managers')
+    @patch_resource('systems')
+    def test_simple_storage_advertised_when_supported(
+            self, systems_mock, managers_mock, chassis_mock, indicators_mock):
+        """Test SimpleStorage is advertised when driver supports it"""
+        systems_mock = systems_mock.return_value
+        systems_mock.uuid.return_value = 'zzzz-yyyy-xxxx'
+        systems_mock.get_power_state.return_value = 'On'
+        systems_mock.get_boot_device.return_value = 'Cd'
+        systems_mock.get_boot_mode.side_effect = error.NotSupportedError
+        systems_mock.get_simple_storage_collection.return_value = (
+            {'virtio': {}})
+        systems_mock.get_bios.side_effect = error.NotSupportedError
+        systems_mock.get_processors.side_effect = error.NotSupportedError
+        systems_mock.get_total_memory.side_effect = error.NotSupportedError
+        systems_mock.get_total_cpus.side_effect = error.NotSupportedError
+        systems_mock.get_versions.side_effect = error.NotSupportedError
+        managers_mock.return_value.get_managers_for_system.return_value = []
+        chassis_mock.return_value.chassis = []
+        indicators_mock.return_value.get_indicator_state.return_value = 'Off'
+
+        response = self.app.get('/redfish/v1/Systems/xxxx-yyyy-zzzz')
+
+        self.assertEqual(200, response.status_code)
+        self.assertIn('SimpleStorage', response.json)
+        self.assertEqual(
+            '/redfish/v1/Systems/xxxx-yyyy-zzzz/SimpleStorage',
+            response.json['SimpleStorage']['@odata.id'])
+
+    @patch_resource('indicators')
+    @patch_resource('chassis')
+    @patch_resource('managers')
+    @patch_resource('systems')
+    def test_simple_storage_not_advertised_when_not_supported(
+            self, systems_mock, managers_mock, chassis_mock, indicators_mock):
+        """Test SimpleStorage NOT advertised when driver doesn't support"""
+        systems_mock = systems_mock.return_value
+        systems_mock.uuid.return_value = 'zzzz-yyyy-xxxx'
+        systems_mock.get_power_state.return_value = 'On'
+        systems_mock.get_boot_device.return_value = 'Cd'
+        systems_mock.get_boot_mode.side_effect = error.NotSupportedError
+        systems_mock.get_simple_storage_collection.side_effect = (
+            error.NotSupportedError)
+        systems_mock.get_bios.side_effect = error.NotSupportedError
+        systems_mock.get_processors.side_effect = error.NotSupportedError
+        systems_mock.get_total_memory.side_effect = error.NotSupportedError
+        systems_mock.get_total_cpus.side_effect = error.NotSupportedError
+        systems_mock.get_versions.side_effect = error.NotSupportedError
+        managers_mock.return_value.get_managers_for_system.return_value = []
+        chassis_mock.return_value.chassis = []
+        indicators_mock.return_value.get_indicator_state.return_value = 'Off'
+
+        response = self.app.get('/redfish/v1/Systems/xxxx-yyyy-zzzz')
+
+        self.assertEqual(200, response.status_code)
+        self.assertNotIn('SimpleStorage', response.json)
+
+
 @patch_resource('systems')
 class EthernetInterfacesTestCase(EmulatorTestCase):
 
