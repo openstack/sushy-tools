@@ -17,6 +17,7 @@ import argparse
 from datetime import datetime
 import json
 import os
+import signal
 import ssl
 import sys
 
@@ -978,6 +979,31 @@ def simple_task():
     return app.render_template('task.json')
 
 
+def cleanup_zombies(signum, frame):
+    """Signal handler for SIGCHLD that reaps all terminated children."""
+    while True:
+        # os.waitpid(-1, os.WNOHANG) checks all children (-1)
+        # without blocking (os.WNOHANG)
+        try:
+            pid, status = os.waitpid(-1, os.WNOHANG)
+        except OSError:
+            # No more children to wait for
+            break
+
+        if pid == 0:
+            # No children have exited yet
+            break
+
+        # Log the reaped zombie process safely to avoid reentrancy issues
+        try:
+            app.logger.debug(
+                "Reaped zombie process %d with status %d", pid, status)
+        except RuntimeError:
+            # If logging fails due to reentrancy, silently continue
+            # The important part is that we reaped the zombie process
+            pass
+
+
 def parse_args():
     parser = argparse.ArgumentParser('sushy-emulator')
     parser.add_argument('--config',
@@ -1038,6 +1064,9 @@ def parse_args():
 def main():
 
     args = parse_args()
+
+    # Install the SIGCHLD handler to clean up zombie processes
+    signal.signal(signal.SIGCHLD, cleanup_zombies)
 
     app.debug = args.debug
 
