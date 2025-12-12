@@ -461,6 +461,14 @@ def system_resource(identity):
             except error.NotSupportedError:
                 return None
 
+        storage_supported = False
+        if app.feature_set == 'full':
+            try:
+                stor = app.storage.get_storage_col(uuid)
+                storage_supported = bool(stor)
+            except error.FishyError:
+                pass
+
         return app.render_template(
             'system.json',
             identity=identity,
@@ -471,6 +479,7 @@ def system_resource(identity):
             bios_version=bios_version,
             bios_supported=try_get(app.systems.get_bios),
             processors_supported=try_get(app.systems.get_processors),
+            storage_supported=storage_supported,
             simple_storage_supported=try_get(
                 app.systems.get_simple_storage_collection),
             total_cpus=try_get(app.systems.get_total_cpus),

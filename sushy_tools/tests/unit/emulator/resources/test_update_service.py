@@ -58,12 +58,14 @@ class UpdateServiceTestCase(test_main.EmulatorTestCase):
         self.assertTrue(resp.json['ServiceEnabled'])
         self.assertEqual(softwareinventory, resp.json['SoftwareInventory'])
 
+    @test_main.patch_resource('storage')
     @test_main.patch_resource('indicators')
     @test_main.patch_resource('chassis')
     @test_main.patch_resource('managers')
     @test_main.patch_resource('systems')
     def test_update_service_simpleupdate(self, systems_mock, managers_mock,
-                                         chassis_mock, indicators_mock):
+                                         chassis_mock, indicators_mock,
+                                         storage_mock):
         systems_mock = systems_mock.return_value
         systems_mock.uuid.return_value = 'zzzz-yyyy-xxxx'
         systems_mock.get_power_state.return_value = 'On'

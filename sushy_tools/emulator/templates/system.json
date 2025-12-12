@@ -87,9 +87,11 @@
         "@odata.id": {{ "/redfish/v1/Systems/%s/SimpleStorage"|format(identity)|tojson }}
     },
     {%- endif %}
+    {%- if storage_supported %}
     "Storage": {
         "@odata.id": {{ "/redfish/v1/Systems/%s/Storage"|format(identity)|tojson }}
     },
+    {%- endif %}
     {%- if indicator_led %}
     "IndicatorLED": {{ indicator_led|string|tojson }},
     {%- endif %}
