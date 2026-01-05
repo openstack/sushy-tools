@@ -27,9 +27,12 @@ class StaticDriver(base.DriverBase):
 
     def __init__(self, config, logger):
         super().__init__(config, logger)
-        self._volumes = memoize.PersistentDict()
-        self._volumes.make_permanent(
-            self._config.get('SUSHY_EMULATOR_STATE_DIR'), 'volumes')
+        if config.get('SUSHY_EMULATOR_NO_MEMOIZE'):
+            self._volumes = {}
+        else:
+            self._volumes = memoize.PersistentDict()
+            self._volumes.make_permanent(
+                self._config.get('SUSHY_EMULATOR_STATE_DIR'), 'volumes')
 
         self._volumes.update(
             self._config.get('SUSHY_EMULATOR_VOLUMES', {}))

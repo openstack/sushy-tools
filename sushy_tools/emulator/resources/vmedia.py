@@ -84,10 +84,13 @@ class BaseDriver(base.DriverBase):
 
     def __init__(self, config, logger):
         super().__init__(config, logger)
-        self._devices = memoize.PersistentDict()
-        if hasattr(self._devices, 'make_permanent'):
-            self._devices.make_permanent(
-                self._config.get('SUSHY_EMULATOR_STATE_DIR'), 'vmedia')
+        if config.get('SUSHY_EMULATOR_NO_MEMOIZE'):
+            self._devices = {}
+        else:
+            self._devices = memoize.PersistentDict()
+            if hasattr(self._devices, 'make_permanent'):
+                self._devices.make_permanent(
+                    self._config.get('SUSHY_EMULATOR_STATE_DIR'), 'vmedia')
 
         device_types = self._config.get(
             'SUSHY_EMULATOR_VMEDIA_DEVICES')
