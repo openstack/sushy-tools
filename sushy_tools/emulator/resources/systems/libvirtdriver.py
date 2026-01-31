@@ -1494,6 +1494,12 @@ class LibvirtDriver(AbstractSystemsDriver):
 
         if device == boot_device:
             self.set_boot_device(identity, boot_device)
+        elif boot_image is None:
+            try:
+                self.set_boot_device(identity, constants.DEVICE_TYPE_HDD)
+            except error.FishyError as ex:
+                self._logger.warning(
+                    'Failed to restore boot order to HDD after eject: %s', ex)
 
     def _find_device_by_path(self, vol_path):
         """Get device attributes using path

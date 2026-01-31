@@ -819,6 +819,48 @@ class LibvirtDriverTestCase(base.BaseTestCase):
         gbd_mock.assert_called_once_with(self.uuid)
         sbd_mock.assert_called_once_with(self.uuid, 'Cd')
 
+    @mock.patch(
+        'sushy_tools.emulator.resources.systems.libvirtdriver.LibvirtDriver'
+        '.set_boot_device')
+    @mock.patch('libvirt.open', autospec=True)
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_set_boot_image_eject_restores_boot_order(
+            self, libvirt_mock, libvirt_rw_mock, set_boot_device_mock):
+        """Ejecting restores boot order to HDD."""
+        with open('sushy_tools/tests/unit/emulator/domain.xml', 'r') as f:
+            data = f.read()
+
+        conn_mock = libvirt_rw_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = data
+
+        self.test_driver.set_boot_image(self.uuid, 'Cd', boot_image=None)
+
+        conn_mock.defineXML.assert_called_once()
+        set_boot_device_mock.assert_called_once_with(
+            self.uuid, 'Hdd')
+
+    @mock.patch(
+        'sushy_tools.emulator.resources.systems.libvirtdriver.LibvirtDriver'
+        '.set_boot_device',
+        side_effect=error.FishyError('No HDD in domain'))
+    @mock.patch('libvirt.open', autospec=True)
+    @mock.patch('libvirt.openReadOnly', autospec=True)
+    def test_set_boot_image_eject_succeeds_when_set_boot_device_fails(
+            self, libvirt_mock, libvirt_rw_mock, set_boot_device_mock):
+        """Eject works even if HDD restore fails."""
+        with open('sushy_tools/tests/unit/emulator/domain.xml', 'r') as f:
+            data = f.read()
+
+        conn_mock = libvirt_rw_mock.return_value
+        domain_mock = conn_mock.lookupByUUID.return_value
+        domain_mock.XMLDesc.return_value = data
+
+        self.test_driver.set_boot_image(self.uuid, 'Cd', boot_image=None)
+
+        conn_mock.defineXML.assert_called_once()
+        set_boot_device_mock.assert_called_once_with(self.uuid, 'Hdd')
+
     @mock.patch('libvirt.openReadOnly', autospec=True)
     def test_get_total_memory(self, libvirt_mock):
         conn_mock = libvirt_mock.return_value
