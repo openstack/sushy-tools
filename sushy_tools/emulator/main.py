@@ -507,6 +507,31 @@ def system_resource(identity):
             mode = boot.get('BootSourceOverrideMode')
             http_uri = boot.get('HttpBootUri')
 
+            # Clean up HttpBootUri media if boot target changes
+            # away from HTTP boot. This mimics real BMC behavior
+            # where HTTP boot is typically one-time.
+            try:
+                previous_http_uri = app.systems.get_http_boot_uri(
+                    identity)
+            except Exception:
+                previous_http_uri = None
+
+            if (previous_http_uri and target
+                    and target not in ['UefiHttp', 'Cd']):
+                app.logger.info(
+                    'Boot target changed to %s, cleaning up '
+                    'HttpBootUri media for system %s',
+                    target, identity)
+                try:
+                    app.systems.set_boot_image(
+                        identity, 'Cd', boot_image=None)
+                    app.systems.set_http_boot_uri(None)
+                except Exception as e:
+                    app.logger.warning(
+                        'Failed to clean up HttpBootUri '
+                        'media for system %s: %s',
+                        identity, e)
+
             if http_uri and target == 'UefiHttp':
 
                 try:
@@ -547,6 +572,22 @@ def system_resource(identity):
                 # the network boot to a specific URL. This is sort of a hack
                 # but testing functionality overall is a bit more important.
                 target = 'Pxe'
+
+            # Handle explicit clearing of HttpBootUri
+            if ('HttpBootUri' in boot
+                    and not http_uri and previous_http_uri):
+                app.logger.info(
+                    'HttpBootUri cleared, ejecting media '
+                    'for system %s', identity)
+                try:
+                    app.systems.set_boot_image(
+                        identity, 'Cd', boot_image=None)
+                    app.systems.set_http_boot_uri(None)
+                except Exception as e:
+                    app.logger.warning(
+                        'Failed to eject HttpBootUri '
+                        'media for system %s: %s',
+                        identity, e)
 
             if target:
                 # NOTE(lucasagomes): In libvirt we always set the boot

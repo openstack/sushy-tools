@@ -456,6 +456,71 @@ class SystemsTestCase(EmulatorTestCase):
         set_boot_mode.assert_called_once_with('xxxx-yyyy-zzzz', 'UEFI')
         set_http_boot_uri.assert_called_once_with('http://test.url/boot.iso')
 
+    @patch_resource('vmedia')
+    @patch_resource('systems')
+    def test_system_boot_target_change_cleans_http_uri(
+            self, systems_mock, vmedia_mock):
+        """Changing boot target away from UefiHttp ejects media."""
+        get_http_boot_uri = (
+            systems_mock.return_value.get_http_boot_uri)
+        get_http_boot_uri.return_value = 'http://test.url/boot.iso'
+        set_boot_image = systems_mock.return_value.set_boot_image
+        set_http_boot_uri = (
+            systems_mock.return_value.set_http_boot_uri)
+
+        data = {'Boot': {'BootSourceOverrideTarget': 'Hdd'}}
+        response = self.app.patch(
+            '/redfish/v1/Systems/xxxx-yyyy-zzzz', json=data)
+        self.assertEqual(204, response.status_code)
+
+        set_boot_image.assert_called_once_with(
+            'xxxx-yyyy-zzzz', 'Cd', boot_image=None)
+        set_http_boot_uri.assert_called_once_with(None)
+
+    @patch_resource('vmedia')
+    @patch_resource('systems')
+    def test_system_boot_target_change_no_cleanup_without_uri(
+            self, systems_mock, vmedia_mock):
+        """No cleanup when there was no previous HttpBootUri."""
+        get_http_boot_uri = (
+            systems_mock.return_value.get_http_boot_uri)
+        get_http_boot_uri.return_value = None
+        set_boot_image = systems_mock.return_value.set_boot_image
+        set_http_boot_uri = (
+            systems_mock.return_value.set_http_boot_uri)
+
+        data = {'Boot': {'BootSourceOverrideTarget': 'Hdd'}}
+        response = self.app.patch(
+            '/redfish/v1/Systems/xxxx-yyyy-zzzz', json=data)
+        self.assertEqual(204, response.status_code)
+
+        set_boot_image.assert_not_called()
+        set_http_boot_uri.assert_not_called()
+
+    @patch_resource('vmedia')
+    @patch_resource('systems')
+    def test_system_clear_http_boot_uri_ejects_media(
+            self, systems_mock, vmedia_mock):
+        """Explicitly clearing HttpBootUri ejects media."""
+        get_http_boot_uri = (
+            systems_mock.return_value.get_http_boot_uri)
+        get_http_boot_uri.return_value = 'http://test.url/boot.iso'
+        set_boot_image = systems_mock.return_value.set_boot_image
+        set_http_boot_uri = (
+            systems_mock.return_value.set_http_boot_uri)
+
+        data = {'Boot': {'BootSourceOverrideTarget': 'Hdd',
+                         'HttpBootUri': ''}}
+        response = self.app.patch(
+            '/redfish/v1/Systems/xxxx-yyyy-zzzz', json=data)
+        self.assertEqual(204, response.status_code)
+
+        # set_boot_image is called by both the target-change
+        # cleanup and the explicit HttpBootUri clear path
+        set_boot_image.assert_called_with(
+            'xxxx-yyyy-zzzz', 'Cd', boot_image=None)
+        set_http_boot_uri.assert_called_with(None)
+
     @patch_resource('systems')
     def test_system_reset_action_ok(self, systems_mock):
         set_power_state = systems_mock.return_value.set_power_state
