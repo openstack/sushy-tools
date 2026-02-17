@@ -17,6 +17,7 @@ import base64
 from concurrent import futures
 import math
 import os
+import sqlite3
 import time
 from urllib import parse as urlparse
 
@@ -56,6 +57,10 @@ class OpenStackDriver(AbstractSystemsDriver):
 
     BOOT_MODE_MAP_REV = {v: k for k, v in BOOT_MODE_MAP.items()}
 
+    # Rescue boot mode metadata values
+    RESCUE_MODE_PXE = 'pxe'
+    RESCUE_MODE_DISK = 'disk'
+
     PERMANENT_CACHE = {}
 
     @classmethod
@@ -67,7 +72,69 @@ class OpenStackDriver(AbstractSystemsDriver):
         cls._cc = openstack.connect(cloud=os_cloud)
         cls._executor = futures.ThreadPoolExecutor(max_workers=4)
 
+        # Cache rescue PXE boot enabled flag
+        cls._rescue_pxe_enabled = config.get(
+            'SUSHY_EMULATOR_OS_RESCUE_PXE_BOOT', False)
+
+        # Validate rescue-based PXE boot configuration if enabled
+        if cls._rescue_pxe_enabled:
+            cls._validate_rescue_pxe_images()
+
+            # Initialize persistent storage for rescue boot modes
+            # This avoids ConflictException when instances are in
+            # RESCUED state (Nova blocks metadata updates in that state)
+            cls._rescue_boot_modes = memoize.PersistentDict()
+            try:
+                cls._rescue_boot_modes.make_permanent(
+                    config.get('SUSHY_EMULATOR_STATE_DIR'),
+                    'rescue_boot_modes')
+            except sqlite3.OperationalError as e:
+                # Handle concurrent initialization in multi-worker environments
+                # (e.g., Flask dev server with auto-reload)
+                logger.warning(
+                    'PersistentDict initialization warning: %s. '
+                    'This is normal in multi-worker environments.', e)
+
         return cls
+
+    @classmethod
+    def _validate_rescue_pxe_images(cls):
+        """Validate that iPXE rescue images exist when rescue mode is enabled
+
+        :raises: `error.FishyError` if required images are not found
+        """
+        bios_image_name = cls._config.get(
+            'SUSHY_EMULATOR_OS_RESCUE_PXE_IMAGE_BIOS',
+            'ipxe-rescue-bios'
+        )
+        uefi_image_name = cls._config.get(
+            'SUSHY_EMULATOR_OS_RESCUE_PXE_IMAGE_UEFI',
+            'ipxe-rescue-uefi'
+        )
+
+        missing_images = []
+
+        bios_image = cls._cc.image.find_image(bios_image_name)
+        if bios_image is None:
+            missing_images.append(bios_image_name)
+
+        uefi_image = cls._cc.image.find_image(uefi_image_name)
+        if uefi_image is None:
+            missing_images.append(uefi_image_name)
+
+        if missing_images:
+            msg = (
+                'SUSHY_EMULATOR_OS_RESCUE_PXE_BOOT is enabled but required '
+                'iPXE rescue images are missing: %s'
+                % ', '.join(missing_images)
+            )
+            cls._logger.error(msg)
+            raise error.FishyError(msg)
+
+        cls._logger.info(
+            'Rescue-based PXE boot enabled with images: BIOS=%s, UEFI=%s',
+            bios_image_name, uefi_image_name
+        )
 
     @memoize.memoize()
     def _get_instance(self, identity):
@@ -203,6 +270,9 @@ class OpenStackDriver(AbstractSystemsDriver):
         :returns: Tuple of (is_ready, instance) where is_ready is True if
                   task_state is None and stable, False if still busy
         """
+        # Fetch fresh state before checking
+        instance.fetch(self._cc.compute)
+
         waited = 0
         wait_interval = initial_wait
         max_interval = 5  # Cap exponential backoff at 5 seconds
@@ -249,6 +319,95 @@ class OpenStackDriver(AbstractSystemsDriver):
         # Task still running after max_wait
         return False, instance
 
+    def _wait_for_power_state_stable(self, instance, max_wait=10):
+        """Wait for instance power state to stabilize after power operations
+
+        After power operations like stop_server(), Nova's power_state may
+        take time to reflect the actual state. This method waits for both
+        task_state to clear and power_state to stabilize, ensuring clients
+        get accurate state information.
+
+        :param instance: Current instance object
+        :param max_wait: Maximum time to wait in seconds (default 10)
+        :returns: Refreshed instance object
+        """
+        waited = 0
+        check_interval = 2
+
+        # First wait for task_state to clear
+        is_ready, instance = self._check_and_wait_for_task_state(
+            instance, max_wait=max_wait)
+        if not is_ready:
+            self._logger.debug(
+                'Instance %(identity)s still busy after %(wait)s seconds' %
+                {'identity': instance.id, 'wait': max_wait})
+            return instance
+
+        # Then add stability delay to let power_state fully settle
+        # This prevents race conditions where we report state too early
+        while waited < max_wait:
+            time.sleep(min(check_interval, max_wait - waited))
+            waited += check_interval
+
+            previous_power_state = instance.power_state
+            instance.fetch(self._cc.compute)
+
+            # Power state has stabilized if it hasn't changed
+            if instance.power_state == previous_power_state:
+                self._logger.debug(
+                    'Instance %(identity)s power state stable at '
+                    '%(power_state)s after %(waited)s seconds' %
+                    {'identity': instance.id,
+                     'power_state': instance.power_state,
+                     'waited': waited})
+                break
+
+        return instance
+
+    def _raise_unknown_power_state(self, state):
+        """Raise error for unknown power state
+
+        :param state: The unknown power state requested
+        :raises: `error.BadRequest` with descriptive message
+        """
+        raise error.BadRequest(
+            'Unknown ResetType "%(state)s"' % {'state': state})
+
+    def _unrescue_before_power_operation(self, instance):
+        """Unrescue instance before power operation
+
+        Nova doesn't allow power operations on rescued instances, so we need
+        to unrescue first. This method will raise FishyError(503) if the
+        unrescue operation hasn't completed yet.
+
+        :param instance: OpenStack instance object
+        :raises: `error.FishyError` with 503 if unrescue in progress
+        """
+        self._logger.debug(
+            'Instance %(identity)s in rescue mode, unrescuing before '
+            'power operation' % {'identity': instance.id})
+        self._cc.compute.unrescue_server(instance.id)
+
+        # Wait for unrescue to complete
+        is_ready, _ = self._check_and_wait_for_task_state(instance)
+        if not is_ready:
+            msg = ('SYS518: Cloud instance unrescuing, retry required')
+            raise error.FishyError(msg, 503)
+
+        # Verify vm_state changed from RESCUED to ACTIVE
+        instance.fetch(self._cc.compute)
+        if self._is_instance_in_rescue(instance):
+            self._logger.debug(
+                'Unrescue incomplete: instance=%(id)s still in vm_state '
+                'RESCUED, returning 503' % {'id': instance.id})
+            msg = ('SYS518: Cloud instance still in rescue mode, '
+                   'retry required')
+            raise error.FishyError(msg, 503)
+
+        self._logger.debug(
+            'Unrescue complete: instance=%(id)s successfully exited '
+            'rescue mode' % {'id': instance.id})
+
     def set_power_state(self, identity, state):
         """Set computer system power state
 
@@ -259,6 +418,9 @@ class OpenStackDriver(AbstractSystemsDriver):
 
         :raises: `error.FishyError` if power state can't be set
 
+        .. note::
+           *Nmi* is not supported as openstacksdk does not provide this
+           capability.
         """
         # Get instance (uses cache) then fetch fresh state
         instance = self._get_instance(identity)
@@ -274,6 +436,15 @@ class OpenStackDriver(AbstractSystemsDriver):
              'status': instance.status,
              'task_state': instance.task_state})
 
+        # Check if instance is in ERROR state
+        if instance.status == 'ERROR':
+            msg = ('Cloud instance %(identity)s is in ERROR state. '
+                   'Power operations cannot be performed. '
+                   'Please check Nova logs and fix the instance.' %
+                   {'identity': identity})
+            self._logger.error(msg)
+            raise error.FishyError(msg, 500)
+
         # Check if instance is ready before attempting any operations
         # Prevents power actions and rebuilds during busy states
         # (e.g. powering-off, powering-on, rebuilding, spawning)
@@ -283,17 +454,31 @@ class OpenStackDriver(AbstractSystemsDriver):
                    % instance.task_state)
             raise error.FishyError(msg, 503)
 
+        # Dispatch to appropriate power state handler
+        if self._rescue_pxe_enabled:
+            self._set_power_state_rescue(instance, state)
+        else:
+            self._set_power_state_default(instance, state)
+
+    def _set_power_state_default(self, instance, state):
+        """Set power state using default approach (libvirt boot ordering)
+
+        :param instance: OpenStack instance object
+        :param state: Power state to set
+        :raises: `error.FishyError` if power state can't be set
+        """
+        # Check for delayed media eject
         delayed_media_eject = instance.metadata.get('sushy-tools-delay-eject')
 
         if delayed_media_eject:
             self._logger.debug(
                 'Create task to rebuild with blank-image for %(identity)s' %
-                {'identity': identity})
+                {'identity': instance.id})
             # Not running async here, as long as the blank image used is small
             # this should finish in ~20 seconds.
             self._submit_future(
-                False, self._rebuild_with_blank_image, identity)
-            self._remove_delayed_eject_metadata(identity)
+                False, self._rebuild_with_blank_image, instance.id)
+            self._remove_delayed_eject_metadata(instance.id)
 
             # Always raise 503 after triggering rebuild to force client retry
             # This avoids race conditions and prevents exceeding 60s timeout
@@ -324,11 +509,147 @@ class OpenStackDriver(AbstractSystemsDriver):
                     instance.id, reboot_type='HARD'
                 )
 
-        # NOTE(etingof) can't support `state == "Nmi"` as
-        # openstacksdk does not seem to support that
         else:
-            raise error.BadRequest(
-                'Unknown ResetType "%(state)s"' % {'state': state})
+            self._raise_unknown_power_state(state)
+
+    def _set_power_state_rescue(self, instance, state):
+        """Set power state using rescue-based PXE boot approach
+
+        This method is used when SUSHY_EMULATOR_OS_RESCUE_PXE_BOOT is enabled.
+        It manages power state transitions while respecting the boot mode
+        setting to determine whether to use Nova's rescue mode (for PXE boot)
+        or regular boot (for disk boot).
+
+        :param instance: OpenStack instance object
+        :param state: Power state to set
+        :raises: `error.FishyError` if power state can't be set
+        """
+        # Get boot mode from persistent storage
+        boot_mode = self._get_boot_mode_for_rescue(instance)
+
+        self._logger.debug(
+            'Rescue power state handler: instance=%(id)s, state=%(state)s, '
+            'boot_mode=%(mode)s, vm_state=%(vm_state)s' %
+            {'id': instance.id, 'state': state, 'mode': boot_mode,
+             'vm_state': instance.vm_state})
+
+        if state in ('On', 'ForceOn'):
+            if instance.power_state != self.NOVA_POWER_STATE_ON:
+                self._power_on_with_boot_mode(instance, boot_mode)
+                # Wait for Nova state to stabilize
+                self._wait_for_power_state_stable(instance)
+
+        elif state == 'ForceOff':
+            if instance.power_state == self.NOVA_POWER_STATE_ON:
+                # Nova blocks stop on RESCUED instances, so unrescue first
+                in_rescue = self._is_instance_in_rescue(instance)
+                self._logger.debug(
+                    'ForceOff: instance=%(id)s, in_rescue=%(rescue)s' %
+                    {'id': instance.id, 'rescue': in_rescue})
+                if in_rescue:
+                    self._unrescue_before_power_operation(instance)
+                self._cc.compute.stop_server(instance.id)
+
+                # Wait for Nova state to stabilize
+                self._wait_for_power_state_stable(instance)
+
+        elif state == 'GracefulShutdown':
+            if instance.power_state == self.NOVA_POWER_STATE_ON:
+                # Nova blocks stop on RESCUED instances, so unrescue first
+                in_rescue = self._is_instance_in_rescue(instance)
+                self._logger.debug(
+                    'GracefulShutdown: instance=%(id)s, in_rescue=%(rescue)s' %
+                    {'id': instance.id, 'rescue': in_rescue})
+                if in_rescue:
+                    self._unrescue_before_power_operation(instance)
+                self._cc.compute.stop_server(instance.id)
+
+                # Wait for Nova state to stabilize
+                self._wait_for_power_state_stable(instance)
+
+        elif state == 'GracefulRestart':
+            if instance.power_state == self.NOVA_POWER_STATE_ON:
+                self._restart_with_boot_mode(instance, boot_mode, 'SOFT')
+                # Wait for Nova state to stabilize
+                self._wait_for_power_state_stable(instance)
+
+        elif state == 'ForceRestart':
+            if instance.power_state == self.NOVA_POWER_STATE_ON:
+                self._restart_with_boot_mode(instance, boot_mode, 'HARD')
+                # Wait for Nova state to stabilize
+                self._wait_for_power_state_stable(instance)
+
+        else:
+            self._raise_unknown_power_state(state)
+
+    def _power_on_with_boot_mode(self, instance, boot_mode):
+        """Power on instance with specified boot mode (rescue PXE feature)
+
+        Helper for _set_power_state_rescue(). Handles power-on logic based
+        on the desired boot mode, using Nova's rescue mode for PXE boot.
+
+        :param instance: OpenStack instance object
+        :param boot_mode: Boot mode (RESCUE_MODE_PXE or RESCUE_MODE_DISK)
+        """
+        is_in_rescue = self._is_instance_in_rescue(instance)
+
+        if boot_mode == self.RESCUE_MODE_PXE:
+            # PXE boot requested - use rescue
+            if not is_in_rescue:
+                self._rescue_with_pxe_image(instance)
+            else:
+                # Already in rescue - only start if not already running
+                # Nova will reject start if power_state indicates already
+                # running
+                if instance.power_state != self.NOVA_POWER_STATE_ON:
+                    self._cc.compute.start_server(instance.id)
+        else:
+            # Disk boot requested
+            if is_in_rescue:
+                # Need to unrescue first
+                self._unrescue_before_power_operation(instance)
+
+            # Refresh instance state after potential unrescue
+            instance.fetch(self._cc.compute)
+
+            # Only start if instance is not already running
+            # Nova will reject start if power_state indicates already running
+            if instance.power_state != self.NOVA_POWER_STATE_ON:
+                self._cc.compute.start_server(instance.id)
+
+    def _restart_with_boot_mode(self, instance, boot_mode, reboot_type):
+        """Restart instance with specified boot mode (rescue PXE feature)
+
+        Helper for _set_power_state_rescue(). Handles restart logic based
+        on the desired boot mode, using Nova's rescue mode for PXE boot.
+
+        :param instance: OpenStack instance object
+        :param boot_mode: Boot mode (RESCUE_MODE_PXE or RESCUE_MODE_DISK)
+        :param reboot_type: Reboot type ('SOFT' or 'HARD')
+        """
+        is_in_rescue = self._is_instance_in_rescue(instance)
+
+        if boot_mode == self.RESCUE_MODE_PXE:
+            # PXE boot requested
+            if not is_in_rescue:
+                # Transition ACTIVE -> RESCUED via rescue
+                self._rescue_with_pxe_image(instance)
+                # Nova's rescue automatically powers on, so reboot to
+                # complete restart
+                self._cc.compute.reboot_server(
+                    instance.id, reboot_type=reboot_type)
+            else:
+                # Already in RESCUED, just reboot (Nova preserves RESCUED
+                # state)
+                self._cc.compute.reboot_server(
+                    instance.id, reboot_type=reboot_type)
+        else:
+            # Disk boot requested
+            if is_in_rescue:
+                # Unrescue first to boot from disk
+                self._unrescue_before_power_operation(instance)
+            self._cc.compute.reboot_server(
+                instance.id, reboot_type=reboot_type)
 
     def get_boot_device(self, identity):
         """Get computer system boot device name
@@ -344,16 +665,23 @@ class OpenStackDriver(AbstractSystemsDriver):
         except error.FishyError:
             return
 
-        metadata = self._get_server_metadata(instance.id)
-
-        # NOTE(etingof): the following probably only works with
-        # libvirt-backed compute nodes
-
-        if metadata.get('libvirt:pxe-first'):
-            return self.BOOT_DEVICE_MAP_REV['network']
-
+        # Check boot device based on configuration
+        if self._rescue_pxe_enabled:
+            # Use rescue boot mode from persistent storage
+            boot_mode = self._get_boot_mode_for_rescue(instance)
+            if boot_mode == self.RESCUE_MODE_PXE:
+                return self.BOOT_DEVICE_MAP_REV['network']
+            else:
+                return self.BOOT_DEVICE_MAP_REV['hd']
         else:
-            return self.BOOT_DEVICE_MAP_REV['hd']
+            # Use libvirt:pxe-first metadata (default behavior)
+            # NOTE(etingof): the following probably only works with
+            # libvirt-backed compute nodes
+            metadata = self._get_server_metadata(instance.id)
+            if metadata.get('libvirt:pxe-first'):
+                return self.BOOT_DEVICE_MAP_REV['network']
+            else:
+                return self.BOOT_DEVICE_MAP_REV['hd']
 
     def set_boot_device(self, identity, boot_source):
         """Set computer system boot device name
@@ -375,12 +703,113 @@ class OpenStackDriver(AbstractSystemsDriver):
 
             raise error.BadRequest(msg)
 
-        # NOTE(etingof): the following probably only works with
-        # libvirt-backed compute nodes
-        self._cc.compute.set_server_metadata(
-            instance.id, **{'libvirt:pxe-first': '1'
-                            if target == 'network' else ''}
-        )
+        # Set boot mode based on configuration
+        if self._rescue_pxe_enabled:
+            # Use persistent storage
+            self._set_boot_mode_for_rescue(instance, target)
+        else:
+            # Use libvirt:pxe-first metadata (default/legacy behavior)
+            # NOTE(etingof): the following probably only works with
+            # libvirt-backed compute nodes
+            self._cc.compute.set_server_metadata(
+                instance.id,
+                **{'libvirt:pxe-first': '1'
+                   if target == self.BOOT_DEVICE_MAP['Pxe'] else ''}
+            )
+
+    def _is_instance_in_rescue(self, instance):
+        """Check if instance is in rescue mode
+
+        :param instance: OpenStack instance object
+            (expected to have fresh state)
+        :returns: True if instance is in RESCUED state, False otherwise
+        """
+        # Case-insensitive check (Nova returns lowercase 'rescued')
+        is_rescued = (instance.vm_state or '').upper() == 'RESCUED'
+        self._logger.debug(
+            'Checking rescue state: instance=%(id)s, vm_state=%(state)s, '
+            'is_rescued=%(rescued)s' %
+            {'id': instance.id, 'state': instance.vm_state,
+             'rescued': is_rescued})
+        return is_rescued
+
+    def _get_boot_mode_for_rescue(self, instance):
+        """Get boot mode from persistent storage
+
+        :param instance: OpenStack instance object
+        :returns: Boot mode string (RESCUE_MODE_PXE or RESCUE_MODE_DISK)
+        """
+        return self._rescue_boot_modes.get(instance.id, self.RESCUE_MODE_DISK)
+
+    def _set_boot_mode_for_rescue(self, instance, target):
+        """Set boot mode in persistent storage
+
+        Stores the boot mode (PXE or disk) for the instance. Rescue/unrescue
+        operations are performed during power state transitions based on this
+        stored setting.
+
+        :param instance: OpenStack instance object
+        :param target: boot device target from BOOT_DEVICE_MAP
+        """
+        if not self._rescue_pxe_enabled:
+            return
+
+        boot_mode = (self.RESCUE_MODE_PXE
+                     if target == self.BOOT_DEVICE_MAP['Pxe']
+                     else self.RESCUE_MODE_DISK)
+
+        self._logger.debug(
+            'Setting boot mode to %(mode)s for %(identity)s' %
+            {'mode': boot_mode, 'identity': instance.id})
+
+        self._rescue_boot_modes[instance.id] = boot_mode
+
+    def _rescue_with_pxe_image(self, instance):
+        """Rescue instance with appropriate iPXE image based on boot mode
+
+        Note: Nova does not support rescuing volume-backed instances. Only
+        instances booted from ephemeral storage (image or snapshot) can be
+        rescued. Attempting to rescue a volume-backed instance will result
+        in a BadRequestException from Nova.
+
+        :param instance: OpenStack instance object
+
+        :raises: `error.FishyError` if iPXE rescue image is not found
+        """
+        boot_mode = self.get_boot_mode(instance.id)
+
+        if boot_mode == 'UEFI':
+            image_name = self._config.get(
+                'SUSHY_EMULATOR_OS_RESCUE_PXE_IMAGE_UEFI',
+                'ipxe-rescue-uefi'
+            )
+        else:  # Legacy/BIOS
+            image_name = self._config.get(
+                'SUSHY_EMULATOR_OS_RESCUE_PXE_IMAGE_BIOS',
+                'ipxe-rescue-bios'
+            )
+
+        image = self._cc.image.find_image(image_name)
+        if image is None:
+            msg = ('iPXE rescue image not found: %(image_name)s' %
+                   {'image_name': image_name})
+            raise error.FishyError(msg)
+
+        self._logger.debug(
+            'Rescuing instance %(identity)s with image %(image)s' %
+            {'identity': instance.id, 'image': image.id})
+
+        # Trigger rescue operation with the iPXE image
+        self._cc.compute.rescue_server(instance.id,
+                                       image_ref=image.id)
+
+        # Wait for rescue operation to complete
+        is_ready, _ = self._check_and_wait_for_task_state(instance)
+        if not is_ready:
+            # Rescue still in progress - return 503 to allow client retry
+            msg = ('SYS518: Cloud instance entering rescue mode, '
+                   'retry required')
+            raise error.FishyError(msg, 503)
 
     def get_boot_mode(self, identity):
         """Get computer system boot mode.

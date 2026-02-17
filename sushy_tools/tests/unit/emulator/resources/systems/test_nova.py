@@ -650,15 +650,15 @@ class NovaDriverTestCase(base.BaseTestCase):
         self.assertEqual(2, mock_sleep.call_count)
         mock_sleep.assert_any_call(2)  # initial_wait
         mock_sleep.assert_any_call(4)  # stability_wait
-        # fetch() called once after stability check
-        server.fetch.assert_called_once_with(self._cc.compute)
+        # fetch() called twice: initial check + stability check
+        self.assertEqual(2, server.fetch.call_count)
 
     @mock.patch('time.sleep')
     def test_check_and_wait_task_state_becomes_ready(self, mock_sleep):
         """Test when instance becomes ready after polling"""
         server = mock.Mock(id=self.uuid, task_state='rebuilding')
 
-        # fetch() updates: busy -> ready -> ready (stability check)
+        # fetch() updates: initial->busy, busy->ready, ready (stability)
         fetch_states = ['rebuilding', None, None]
         fetch_call_count = [0]
 
@@ -673,8 +673,8 @@ class NovaDriverTestCase(base.BaseTestCase):
 
         self.assertTrue(is_ready)
         self.assertEqual(server, result_instance)
-        # Sleeps: 2s (busy), 4s (fetch->ready), 2s (check), 4s (stability)
-        self.assertEqual(4, mock_sleep.call_count)
+        # Sleeps: 2s (initial check->busy), 4s (backoff->ready), 4s (stability)
+        self.assertEqual(3, mock_sleep.call_count)
 
     @mock.patch('time.sleep')
     def test_check_and_wait_task_state_timeout(self, mock_sleep):
@@ -698,7 +698,7 @@ class NovaDriverTestCase(base.BaseTestCase):
         """Test when stability check detects a state change"""
         server = mock.Mock(id=self.uuid, task_state=None)
 
-        # fetch() updates: ready->busy (stability), busy->ready, ready
+        # fetch() updates: initial->busy, busy->busy, busy->ready, ready
         fetch_states = ['powering-off', 'powering-off', None, None]
         fetch_call_count = [0]
 
@@ -721,7 +721,7 @@ class NovaDriverTestCase(base.BaseTestCase):
         """Test exponential backoff behavior"""
         server = mock.Mock(id=self.uuid, task_state='rebuilding')
 
-        # fetch() updates: busy -> ready -> ready (stability)
+        # fetch() updates: initial->busy, busy->ready, ready (stability)
         fetch_states = ['rebuilding', None, None]
         fetch_call_count = [0]
 
@@ -737,9 +737,469 @@ class NovaDriverTestCase(base.BaseTestCase):
         self.assertTrue(is_ready)
         # Check that exponential backoff was used
         calls = [call[0][0] for call in mock_sleep.call_args_list]
-        # Should see: 2s (initial), 4s (2*2), 5s (capped), 4s (stability)
-        self.assertEqual(4, len(calls))
+        # Should see: 2s (initial), 4s (backoff->ready), 4s (stability)
+        self.assertEqual(3, len(calls))
         self.assertEqual(2, calls[0])  # initial_wait
         self.assertEqual(4, calls[1])  # exponential (2*2)
-        self.assertEqual(5, calls[2])  # capped at max_interval (4*2=8->5)
-        self.assertEqual(4, calls[3])  # stability_wait
+        self.assertEqual(4, calls[2])  # stability_wait
+
+
+@mock.patch.dict(OpenStackDriver.PERMANENT_CACHE)
+class NovaDriverRescuePXETestCase(base.BaseTestCase):
+    """Tests for Nova driver rescue PXE boot functionality"""
+
+    uuid = 'c7a5fdbd-cdaf-9455-926a-d65c16db1809'
+
+    def setUp(self):
+        super().setUp()
+        self.nova_patcher = mock.patch('openstack.connect', autospec=True)
+        self.nova_mock = self.nova_patcher.start()
+        self._cc = self.nova_mock.return_value
+
+    def tearDown(self):
+        self.nova_patcher.stop()
+        # Clear in-memory dict to prevent state pollution between tests
+        if hasattr(OpenStackDriver, '_rescue_boot_modes'):
+            OpenStackDriver._rescue_boot_modes = {}
+        # Reset class-level state
+        OpenStackDriver._rescue_pxe_enabled = False
+        super().tearDown()
+
+    def _create_driver(self, rescue_pxe_enabled=True):
+        """Helper to create driver with rescue PXE boot enabled"""
+        config = {
+            'SUSHY_EMULATOR_OS_RESCUE_PXE_BOOT': rescue_pxe_enabled,
+            'SUSHY_EMULATOR_OS_RESCUE_PXE_IMAGE_BIOS': 'ipxe-bios',
+            'SUSHY_EMULATOR_OS_RESCUE_PXE_IMAGE_UEFI': 'ipxe-uefi'
+        }
+
+        test_driver_class = OpenStackDriver.initialize(
+            config, mock.MagicMock(), 'fake-cloud')
+
+        # Replace PersistentDict with plain dict for tests (avoid SQLite)
+        if (rescue_pxe_enabled
+                and hasattr(test_driver_class, '_rescue_boot_modes')):
+            test_driver_class._rescue_boot_modes = {}
+
+        test_driver = test_driver_class()
+        test_driver._futures.clear()
+
+        return test_driver
+
+    @mock.patch('time.sleep')
+    def test_set_boot_device_pxe_sets_persistent_storage(self, mock_sleep):
+        """Test setting boot device to PXE stores in PersistentDict"""
+        test_driver = self._create_driver()
+
+        server = mock.Mock(id=self.uuid, vm_state='ACTIVE', task_state=None)
+        self.nova_mock.return_value.get_server.return_value = server
+        compute = self.nova_mock.return_value.compute
+
+        # Verify rescue PXE is enabled
+        self.assertTrue(test_driver._rescue_pxe_enabled)
+
+        # Set boot device to PXE
+        test_driver.set_boot_device(self.uuid, 'Pxe')
+
+        # Should store in PersistentDict
+        self.assertEqual('pxe', test_driver._rescue_boot_modes.get(self.uuid))
+
+        # Should NOT set metadata (rescue mode uses PersistentDict)
+        compute.set_server_metadata.assert_not_called()
+
+        # Should NOT trigger immediate rescue
+        compute.rescue_server.assert_not_called()
+
+    @mock.patch('time.sleep')
+    def test_set_boot_device_disk_sets_persistent_storage(self, mock_sleep):
+        """Test setting boot device to disk stores in PersistentDict"""
+        test_driver = self._create_driver()
+
+        server = mock.Mock(id=self.uuid, vm_state='RESCUED', task_state=None)
+        self.nova_mock.return_value.get_server.return_value = server
+        compute = self.nova_mock.return_value.compute
+
+        # Set boot device to Hdd
+        test_driver.set_boot_device(self.uuid, 'Hdd')
+
+        # Should store in PersistentDict
+        self.assertEqual('disk', test_driver._rescue_boot_modes[self.uuid])
+
+        # Should NOT set metadata (rescue mode uses PersistentDict)
+        compute.set_server_metadata.assert_not_called()
+
+        # Should NOT trigger immediate unrescue
+        compute.unrescue_server.assert_not_called()
+
+    @mock.patch('time.sleep')
+    def test_get_boot_device_pxe_from_persistent_storage(self, mock_sleep):
+        """Test get_boot_device returns PXE from PersistentDict"""
+        test_driver = self._create_driver()
+
+        server = mock.Mock(id=self.uuid, vm_state='RESCUED')
+        self.nova_mock.return_value.get_server.return_value = server
+
+        # Set boot mode in PersistentDict
+        test_driver._rescue_boot_modes[self.uuid] = 'pxe'
+
+        boot_device = test_driver.get_boot_device(self.uuid)
+
+        self.assertEqual('Pxe', boot_device)
+
+    @mock.patch('time.sleep')
+    def test_get_boot_device_disk_from_persistent_storage(self, mock_sleep):
+        """Test get_boot_device returns Hdd from PersistentDict"""
+        test_driver = self._create_driver()
+
+        server = mock.Mock(id=self.uuid, vm_state='ACTIVE')
+        self.nova_mock.return_value.get_server.return_value = server
+
+        # Set boot mode in PersistentDict
+        test_driver._rescue_boot_modes[self.uuid] = 'disk'
+
+        boot_device = test_driver.get_boot_device(self.uuid)
+
+        self.assertEqual('Hdd', boot_device)
+
+    @mock.patch.object(OpenStackDriver, '_check_and_wait_for_task_state')
+    @mock.patch('time.sleep')
+    def test_power_on_with_pxe_triggers_rescue(self, mock_sleep,
+                                               mock_check_wait):
+        """Test power on with PXE boot mode uses rescue"""
+        test_driver = self._create_driver()
+
+        server = mock.Mock(
+            id=self.uuid, power_state=0, vm_state='STOPPED',
+            task_state=None, image={'id': 'image-id'})
+        self.nova_mock.return_value.get_server.return_value = server
+        server.fetch.return_value = None
+        compute = self.nova_mock.return_value.compute
+
+        # Set boot mode in PersistentDict
+        test_driver._rescue_boot_modes[self.uuid] = 'pxe'
+
+        # Mock boot mode check and rescue image
+        image = mock.Mock(hw_firmware_type='uefi')
+        self.nova_mock.return_value.image.find_image.side_effect = [
+            image,  # boot mode check
+            mock.Mock(id='ipxe-uefi-id')  # rescue image
+        ]
+
+        # Mock _check_and_wait_for_task_state:
+        # First call (in set_power_state): ready
+        # Second call (in _rescue_with_pxe_image): not ready (triggers 503)
+        mock_check_wait.side_effect = [(True, server), (False, server)]
+
+        # Power on should trigger rescue, wait, then 503 if not ready
+        e = self.assertRaises(
+            error.FishyError,
+            test_driver.set_power_state, self.uuid, 'ForceOn')
+
+        self.assertEqual(503, e.code)
+        self.assertIn('entering rescue mode', str(e))
+        compute.rescue_server.assert_called_once_with(
+            self.uuid, image_ref='ipxe-uefi-id')
+        # Called twice: once in set_power_state, once in _rescue_with_pxe_image
+        self.assertEqual(2, mock_check_wait.call_count)
+
+    @mock.patch.object(OpenStackDriver, '_check_and_wait_for_task_state')
+    @mock.patch('time.sleep')
+    def test_power_off_in_rescue_unrescues_then_stops(
+            self, mock_sleep, mock_check_wait):
+        """Test power off while in rescue mode unrescues then stops"""
+        test_driver = self._create_driver()
+
+        server = mock.Mock(
+            id=self.uuid, power_state=1, vm_state='RESCUED',
+            task_state=None)
+        self.nova_mock.return_value.get_server.return_value = server
+
+        # Track fetch calls to simulate state transition
+        fetch_count = [0]
+
+        def fetch_side_effect(compute):
+            fetch_count[0] += 1
+            # After second fetch (after unrescue), vm_state changes to ACTIVE
+            if fetch_count[0] >= 2:
+                server.vm_state = 'ACTIVE'
+
+        server.fetch.side_effect = fetch_side_effect
+        compute = self.nova_mock.return_value.compute
+
+        # Set boot mode in PersistentDict
+        test_driver._rescue_boot_modes[self.uuid] = 'pxe'
+
+        # Mock _check_and_wait_for_task_state to always indicate ready
+        # Called twice: once in set_power_state, once in
+        # _unrescue_before_power_operation
+        mock_check_wait.return_value = (True, server)
+
+        # Power off
+        test_driver.set_power_state(self.uuid, 'ForceOff')
+
+        # Should unrescue first, then stop
+        compute.unrescue_server.assert_called_once_with(self.uuid)
+        compute.stop_server.assert_called_once_with(self.uuid)
+
+    @mock.patch('time.sleep')
+    def test_restart_in_rescue_preserves_rescue(self, mock_sleep):
+        """Test restart while in rescue preserves RESCUED state"""
+        test_driver = self._create_driver()
+
+        server = mock.Mock(
+            id=self.uuid, power_state=1, vm_state='RESCUED',
+            task_state=None)
+        self.nova_mock.return_value.get_server.return_value = server
+        server.fetch.return_value = None
+        compute = self.nova_mock.return_value.compute
+
+        # Set boot mode in PersistentDict
+        test_driver._rescue_boot_modes[self.uuid] = 'pxe'
+
+        # Restart
+        test_driver.set_power_state(self.uuid, 'ForceRestart')
+
+        # Should only reboot, not unrescue or re-rescue
+        compute.reboot_server.assert_called_once_with(
+            self.uuid, reboot_type='HARD')
+        compute.unrescue_server.assert_not_called()
+        compute.rescue_server.assert_not_called()
+
+    @mock.patch('time.sleep')
+    def test_power_on_when_already_active_noop(self, mock_sleep):
+        """Test power on when instance is already active is a no-op"""
+        test_driver = self._create_driver()
+
+        # Instance is already powered on with vm_state=ACTIVE
+        server = mock.Mock(
+            id=self.uuid, power_state=1, vm_state='ACTIVE',
+            task_state=None)
+        self.nova_mock.return_value.get_server.return_value = server
+        server.fetch.return_value = None
+        compute = self.nova_mock.return_value.compute
+
+        # Set boot mode to disk
+        test_driver._rescue_boot_modes[self.uuid] = 'disk'
+
+        # Power on should be a no-op (not call start_server)
+        test_driver.set_power_state(self.uuid, 'On')
+
+        # Should NOT call start_server since already active
+        compute.start_server.assert_not_called()
+
+    @mock.patch('time.sleep')
+    def test_power_on_in_rescue_when_already_active_noop(self, mock_sleep):
+        """Test power on when in rescue mode and already active is a no-op"""
+        test_driver = self._create_driver()
+
+        # Instance is in rescue mode and already powered on
+        server = mock.Mock(
+            id=self.uuid, power_state=1, vm_state='RESCUED',
+            task_state=None, image={'id': 'image-id'})
+        self.nova_mock.return_value.get_server.return_value = server
+        server.fetch.return_value = None
+        compute = self.nova_mock.return_value.compute
+
+        # Set boot mode to PXE (rescue)
+        test_driver._rescue_boot_modes[self.uuid] = 'pxe'
+
+        # Power on should be a no-op (not call start_server or rescue)
+        test_driver.set_power_state(self.uuid, 'ForceOn')
+
+        # Should NOT call start_server or rescue_server since already active
+        compute.start_server.assert_not_called()
+        compute.rescue_server.assert_not_called()
+
+    @mock.patch.object(OpenStackDriver, '_check_and_wait_for_task_state')
+    @mock.patch('time.sleep')
+    def test_power_on_after_unrescue_when_stopped(
+            self, mock_sleep, mock_check_wait):
+        """Test power on after unrescue when instance is stopped
+
+        After unrescue, if the instance is stopped (power_state=0),
+        we should call start_server to power it on.
+        """
+        test_driver = self._create_driver()
+
+        # Instance starts in rescue mode
+        server = mock.Mock(
+            id=self.uuid, power_state=0, vm_state='RESCUED',
+            task_state=None)
+        self.nova_mock.return_value.get_server.return_value = server
+
+        # Track fetch calls to simulate state transition
+        fetch_count = [0]
+
+        def fetch_side_effect(compute):
+            fetch_count[0] += 1
+            # After unrescue completes, vm_state becomes ACTIVE
+            # and instance is stopped (power_state=0)
+            if fetch_count[0] >= 2:
+                server.vm_state = 'ACTIVE'
+                server.power_state = 0  # Stopped
+
+        server.fetch.side_effect = fetch_side_effect
+        compute = self.nova_mock.return_value.compute
+
+        # Set boot mode to disk (will trigger unrescue)
+        test_driver._rescue_boot_modes[self.uuid] = 'disk'
+
+        # Mock _check_and_wait_for_task_state to always indicate ready
+        mock_check_wait.return_value = (True, server)
+
+        # Power on should unrescue and then call start_server
+        test_driver.set_power_state(self.uuid, 'On')
+
+        # Should unrescue first
+        compute.unrescue_server.assert_called_once_with(self.uuid)
+        # Should call start_server since power_state=0
+        compute.start_server.assert_called_once_with(self.uuid)
+
+    @mock.patch('time.sleep')
+    def test_power_on_when_already_running_is_noop(self, mock_sleep):
+        """Test power on when already running is a no-op
+
+        If the instance is already running (power_state=1), we should not
+        attempt any power operations at all, regardless of vm_state.
+        """
+        test_driver = self._create_driver()
+
+        # Instance is already running
+        server = mock.Mock(
+            id=self.uuid, power_state=1, vm_state='ACTIVE',
+            task_state=None)
+        self.nova_mock.return_value.get_server.return_value = server
+        server.fetch.return_value = None
+        compute = self.nova_mock.return_value.compute
+
+        # Set boot mode to disk
+        test_driver._rescue_boot_modes[self.uuid] = 'disk'
+
+        # Power on should be a no-op since already running
+        test_driver.set_power_state(self.uuid, 'On')
+
+        # Should NOT call start_server since power_state=1 (already running)
+        compute.start_server.assert_not_called()
+        # Should NOT call unrescue since not needed
+        compute.unrescue_server.assert_not_called()
+
+    @mock.patch.object(OpenStackDriver, '_check_and_wait_for_task_state')
+    @mock.patch('time.sleep')
+    def test_power_off_waits_for_state_stable(
+            self, mock_sleep, mock_check_wait):
+        """Test power off waits for power state to stabilize
+
+        This verifies the slow BMC behavior - waiting for Nova state to
+        fully settle before responding to avoid race conditions.
+        """
+        test_driver = self._create_driver()
+
+        server = mock.Mock(
+            id=self.uuid, power_state=1, vm_state='ACTIVE',
+            task_state=None)
+        self.nova_mock.return_value.get_server.return_value = server
+
+        # Simulate power state transition during stabilization
+        fetch_count = [0]
+
+        def fetch_side_effect(compute):
+            fetch_count[0] += 1
+            # After stop_server, power_state changes from 1 to 0
+            if fetch_count[0] >= 2:
+                server.power_state = 0
+
+        server.fetch.side_effect = fetch_side_effect
+        compute = self.nova_mock.return_value.compute
+
+        # Set boot mode to disk
+        test_driver._rescue_boot_modes[self.uuid] = 'disk'
+
+        # Mock _check_and_wait_for_task_state to indicate ready
+        mock_check_wait.return_value = (True, server)
+
+        # Power off should call stop_server and wait for state to stabilize
+        test_driver.set_power_state(self.uuid, 'ForceOff')
+
+        # Should call stop_server
+        compute.stop_server.assert_called_once_with(self.uuid)
+        # Should wait (verify sleep was called for stabilization)
+        self.assertTrue(mock_sleep.called)
+        # Should fetch state multiple times (initial + stability checks)
+        self.assertGreaterEqual(server.fetch.call_count, 2)
+
+    @mock.patch.object(OpenStackDriver, '_check_and_wait_for_task_state')
+    @mock.patch('time.sleep')
+    def test_power_off_in_rescue_waits_for_state_stable(
+            self, mock_sleep, mock_check_wait):
+        """Test power off in rescue mode waits for state to stabilize
+
+        Verifies that after unrescue + stop, we wait for stabilization.
+        """
+        test_driver = self._create_driver()
+
+        server = mock.Mock(
+            id=self.uuid, power_state=1, vm_state='RESCUED',
+            task_state=None)
+        self.nova_mock.return_value.get_server.return_value = server
+
+        # Simulate state transitions: RESCUED -> ACTIVE (unrescue) -> off
+        fetch_count = [0]
+
+        def fetch_side_effect(compute):
+            fetch_count[0] += 1
+            # After unrescue
+            if fetch_count[0] >= 2:
+                server.vm_state = 'ACTIVE'
+            # After stop_server
+            if fetch_count[0] >= 3:
+                server.power_state = 0
+
+        server.fetch.side_effect = fetch_side_effect
+        compute = self.nova_mock.return_value.compute
+
+        # Set boot mode to disk
+        test_driver._rescue_boot_modes[self.uuid] = 'disk'
+
+        # Mock _check_and_wait_for_task_state to indicate ready
+        # Called multiple times: initial check, unrescue wait, stop wait
+        mock_check_wait.return_value = (True, server)
+
+        # Power off should unrescue, stop, and wait for stabilization
+        test_driver.set_power_state(self.uuid, 'GracefulShutdown')
+
+        # Should unrescue first
+        compute.unrescue_server.assert_called_once_with(self.uuid)
+        # Should call stop_server
+        compute.stop_server.assert_called_once_with(self.uuid)
+        # Should wait (verify sleep was called)
+        self.assertTrue(mock_sleep.called)
+        # Should fetch state multiple times
+        self.assertGreaterEqual(server.fetch.call_count, 3)
+
+    def test_power_operations_on_error_instance_raise_error(self):
+        """Test any power operation fails when instance is in ERROR state
+
+        When Nova instance is in ERROR state, all power operations should
+        fail with a clear error message, not just power on.
+        """
+        test_driver = self._create_driver()
+
+        server = mock.Mock(
+            id=self.uuid, power_state=0, vm_state='ERROR',
+            task_state=None, status='ERROR')
+        self.nova_mock.return_value.get_server.return_value = server
+        server.fetch.return_value = None
+
+        # Test various power operations all fail with ERROR state
+        for power_state in ['On', 'ForceOn', 'ForceOff',
+                            'GracefulShutdown', 'ForceRestart',
+                            'GracefulRestart']:
+            err = self.assertRaises(
+                error.FishyError,
+                test_driver.set_power_state,
+                self.uuid, power_state)
+
+            # Verify error message mentions ERROR state
+            self.assertIn('ERROR state', str(err))
+            # Verify HTTP 500 error code
+            self.assertEqual(500, err.code)

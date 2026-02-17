@@ -267,6 +267,13 @@ The easiest way is probably to set up your OpenStack Virtual Baremetal cloud by
 following
 `its instructions <http://openstack-virtual-baremetal.readthedocs.io/en/latest/>`_.
 
+.. note::
+
+   The OVB documentation includes Nova patches to support the
+   ``libvirt:pxe-first`` metadata flag for PXE network booting. If you cannot
+   patch your Nova deployment, see the `PXE boot via Nova rescue mode`_
+   section for an alternative approach that works with vanilla Nova.
+
 Once your OVB cloud is operational, you log into the *BMC* instance and
 :ref:`set up sushy-tools <installation>` there.
 
@@ -383,6 +390,116 @@ The following is an example Openstack heat template for creating an instance:
            image_id: sushy-tools-blank-image
            volume_size: 5
            delete_on_termination: true
+
+PXE boot via Nova rescue mode
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The OpenStack driver supports PXE network booting of instances by leveraging
+Nova's rescue mode. This feature allows instances to boot from a network-boot
+image such as iPXE.
+
+This approach works with vanilla Nova deployments without requiring custom
+patches [1]_ to support the ``libvirt:pxe-first`` metadata flag, making it
+suitable for standard OpenStack environments.
+
+.. [1] https://opendev.org/openstack/openstack-virtual-baremetal/src/branch/stable/2.0/patches/nova
+
+Configuration
+^^^^^^^^^^^^^
+
+To enable this feature, configure the following in your emulator configuration:
+
+.. code-block:: python
+
+   # Enable PXE boot via rescue mode
+   SUSHY_EMULATOR_OS_RESCUE_PXE_BOOT = True
+
+   # Specify rescue images for BIOS and UEFI boot modes
+   SUSHY_EMULATOR_OS_RESCUE_PXE_IMAGE_BIOS = 'ipxe-rescue-bios'
+   SUSHY_EMULATOR_OS_RESCUE_PXE_IMAGE_UEFI = 'ipxe-rescue-uefi'
+
+   # Optional: Directory for persistent state storage
+   SUSHY_EMULATOR_STATE_DIR = '/var/lib/sushy-emulator'
+
+The rescue images should be pre-created in Glance and contain the necessary
+PXE boot environment (e.g., iPXE).
+
+.. note::
+
+   When ``SUSHY_EMULATOR_STATE_DIR`` is configured, boot mode settings persist
+   across emulator restarts.
+
+Requirements
+^^^^^^^^^^^^
+
+* Nova compute service must support the rescue operation
+* Rescue images must be available in Glance
+* Instances must be created with boot mode metadata (BIOS or UEFI)
+
+Usage
+^^^^^
+
+**Setting boot mode**: When a Redfish client sets ``BootSourceOverrideTarget``
+to ``Pxe``, the instance is configured to boot from the network on the next
+power cycle.
+
+**Power on**: When powering on an instance configured for PXE boot:
+
+* The instance boots into rescue mode using the appropriate rescue image
+  (BIOS or UEFI) based on the instance's boot mode
+* If the instance is already in rescue mode, it remains in rescue mode
+  (no new rescue operation is triggered)
+
+**Power off**: Powering off an instance in rescue mode automatically exits
+rescue mode before stopping the instance.
+
+**Reboot**: Rebooting an instance in rescue mode keeps it in rescue mode.
+
+**Changing boot device**: Setting ``BootSourceOverrideTarget`` back to ``Hdd``
+configures the instance to boot normally (without rescue mode) on the next
+power cycle.
+
+.. note::
+
+   During rescue and unrescue operations, the emulator may return
+   ``503 Service Unavailable`` (SYS518) if the operation is still in progress.
+   Clients should retry the request after a short delay.
+
+Example workflow
+^^^^^^^^^^^^^^^^
+
+.. code-block:: bash
+
+   # Set boot device to PXE
+   curl -X PATCH -H 'Content-Type: application/json' \
+       -d '{"Boot": {"BootSourceOverrideTarget": "Pxe"}}' \
+       http://localhost:8000/redfish/v1/Systems/<uuid>
+
+   # Power on (will boot via rescue with PXE image)
+   curl -d '{"ResetType":"On"}' \
+       -H "Content-Type: application/json" -X POST \
+       http://localhost:8000/redfish/v1/Systems/<uuid>/Actions/ComputerSystem.Reset
+
+   # Later, set boot back to disk
+   curl -X PATCH -H 'Content-Type: application/json' \
+       -d '{"Boot": {"BootSourceOverrideTarget": "Hdd"}}' \
+       http://localhost:8000/redfish/v1/Systems/<uuid>
+
+   # Reboot (will exit rescue and boot normally)
+   curl -d '{"ResetType":"ForceRestart"}' \
+       -H "Content-Type: application/json" -X POST \
+       http://localhost:8000/redfish/v1/Systems/<uuid>/Actions/ComputerSystem.Reset
+
+.. note::
+
+   Boot device changes take effect on the next power cycle, similar to
+   physical BMC behavior.
+
+Limitations
+^^^^^^^^^^^
+
+* Volume-backed instances are not supported (Nova does not support rescue for
+  volume-backed instances)
 
 Systems resource driver: Ironic
 ++++++++++++++++++++++++++++++++++
