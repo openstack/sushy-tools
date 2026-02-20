@@ -1,0 +1,11 @@
+---
+fixes:
+  - |
+    Fixes OpenStack Nova driver boot mode and secure boot detection to
+    correctly read image properties from OpenStack SDK Image objects.
+    The driver was incorrectly using ``getattr()`` to access
+    ``hw_firmware_type`` and ``os_secure_boot`` properties, but the SDK
+    stores these custom properties in the ``image.properties`` dict.
+    This caused ``get_boot_mode()`` to always return ``None`` instead of
+    the correct boot mode (UEFI or Legacy), and ``get_secure_boot()`` to
+    always return ``False`` even when secure boot was required.

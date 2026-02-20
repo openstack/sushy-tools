@@ -233,7 +233,7 @@ class NovaDriverTestCase(base.BaseTestCase):
         server = mock.Mock(id=self.uuid, image=dict(id=self.uuid))
         self.nova_mock.return_value.get_server.return_value = server
 
-        image = mock.Mock(hw_firmware_type='bios')
+        image = mock.Mock(properties={'hw_firmware_type': 'bios'})
 
         self.nova_mock.return_value.image.find_image.return_value = image
 
@@ -377,7 +377,7 @@ class NovaDriverTestCase(base.BaseTestCase):
         server = mock.Mock(id=self.uuid, image=dict(id=self.uuid))
         self.nova_mock.return_value.get_server.return_value = server
 
-        image = mock.Mock()
+        image = mock.Mock(properties={'hw_firmware_type': 'uefi'})
 
         self.nova_mock.return_value.image.find_image.return_value = image
 
@@ -387,7 +387,8 @@ class NovaDriverTestCase(base.BaseTestCase):
         server = mock.Mock(id=self.uuid, image=dict(id=self.uuid))
         self.nova_mock.return_value.get_server.return_value = server
 
-        image = mock.Mock(os_secure_boot='required')
+        image = mock.Mock(properties={'hw_firmware_type': 'uefi',
+                                      'os_secure_boot': 'required'})
 
         self.nova_mock.return_value.image.find_image.return_value = image
 

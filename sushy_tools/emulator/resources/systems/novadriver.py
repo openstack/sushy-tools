@@ -393,7 +393,8 @@ class OpenStackDriver(AbstractSystemsDriver):
         hw_firmware_type = None
         if instance.image.get('id') is not None:
             image = self._get_image_info(instance.image['id'])
-            hw_firmware_type = getattr(image, 'hw_firmware_type', None)
+            if image:
+                hw_firmware_type = image.properties.get('hw_firmware_type')
         elif len(instance.attached_volumes) > 0:
             vol = self._get_volume_info(instance.attached_volumes[0].id)
             hw_firmware_type = vol.volume_image_metadata.get(
@@ -433,7 +434,8 @@ class OpenStackDriver(AbstractSystemsDriver):
         os_secure_boot = None
         if instance.image.get('id') is not None:
             image = self._get_image_info(instance.image['id'])
-            os_secure_boot = getattr(image, 'os_secure_boot', None)
+            if image:
+                os_secure_boot = image.properties.get('os_secure_boot')
         elif len(instance.attached_volumes) > 0:
             vol = self._get_volume_info(instance.attached_volumes[0].id)
             os_secure_boot = vol.volume_image_metadata.get('os_secure_boot')
