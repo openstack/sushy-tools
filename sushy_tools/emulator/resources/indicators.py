@@ -27,10 +27,13 @@ class StaticDriver(base.DriverBase):
 
     def __init__(self, config, logger):
         super().__init__(config, logger)
-        self._indicators = memoize.PersistentDict()
-        if hasattr(self._indicators, 'make_permanent'):
-            self._indicators.make_permanent(
-                self._config.get('SUSHY_EMULATOR_STATE_DIR'), 'indicators')
+        if config.get('SUSHY_EMULATOR_NO_MEMOIZE'):
+            self._indicators = {}
+        else:
+            self._indicators = memoize.PersistentDict()
+            if hasattr(self._indicators, 'make_permanent'):
+                self._indicators.make_permanent(
+                    self._config.get('SUSHY_EMULATOR_STATE_DIR'), 'indicators')
         self._indicators.update(
             self._config.get('SUSHY_EMULATOR_INDICATOR_LEDS', {}))
 

@@ -45,14 +45,18 @@ class FakeDriver(AbstractSystemsDriver):
         config.setdefault('EXTERNAL_NOTIFICATION_URL', 'http://localhost:9999')
         cls._config = config
         cls._logger = logger
+        cls._no_memoize = config.get('SUSHY_EMULATOR_NO_MEMOIZE')
         return cls
 
     def __init__(self):
         super().__init__()
-        self._systems = memoize.PersistentDict()
-        if hasattr(self._systems, 'make_permanent'):
-            self._systems.make_permanent(
-                self._config.get('SUSHY_EMULATOR_STATE_DIR'), 'fakedriver')
+        if self._no_memoize:
+            self._systems = {}
+        else:
+            self._systems = memoize.PersistentDict()
+            if hasattr(self._systems, 'make_permanent'):
+                self._systems.make_permanent(
+                    self._config.get('SUSHY_EMULATOR_STATE_DIR'), 'fakedriver')
 
         for system in self._config['SUSHY_EMULATOR_FAKE_SYSTEMS']:
             # Be careful to reduce racing with other processes
