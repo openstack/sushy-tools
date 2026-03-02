@@ -1,0 +1,20 @@
+---
+features:
+  - |
+    The OpenStack Nova driver now supports network boot (PXE) via rescue mode
+    as an alternative to the ``libvirt:pxe-first`` metadata approach. This
+    feature enables network boot functionality on vanilla Nova deployments
+    without requiring custom patches [1]_ to support the ``libvirt:pxe-first``
+    metadata flag.
+
+    When enabled, setting the boot device to ``Pxe`` configures the instance
+    to boot from the network on the next power cycle using Nova's rescue mode
+    with an iPXE image. Setting the boot device to ``Hdd`` boots the instance
+    normally. The driver automatically selects the appropriate BIOS or UEFI
+    iPXE image based on the instance boot mode.
+
+    Enable this feature by setting ``SUSHY_EMULATOR_OS_RESCUE_PXE_BOOT`` to
+    ``True`` and configuring the iPXE rescue images in Glance. See the
+    documentation for complete configuration details.
+
+    .. [1] https://opendev.org/openstack/openstack-virtual-baremetal/src/branch/stable/2.0/patches/nova
