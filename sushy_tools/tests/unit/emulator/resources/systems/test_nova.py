@@ -451,7 +451,7 @@ class NovaDriverTestCase(base.BaseTestCase):
             self.uuid, 'http://fish.it/red.iso')
 
         self._cc.image.create_image.assert_called_once_with(
-            name='red.iso 0hIwh_vN', disk_format='raw',
+            name='red.iso 0hIwh_vN', disk_format='iso',
             container_format='bare', visibility='private')
 
         self._cc.image.import_image.assert_called_once_with(
@@ -463,20 +463,31 @@ class NovaDriverTestCase(base.BaseTestCase):
 
         self.assertEqual('aaa-bbb', image_id)
 
+    @mock.patch('builtins.open', autospec=True)
     @mock.patch.object(OpenStackDriver, 'get_boot_mode', autospec=True)
     @mock.patch.object(base64, 'urlsafe_b64encode', autospec=True)
-    def test_insert_image_file_upload(self, mock_b64e, mock_get_boot_mode):
+    def test_insert_image_file_upload(self, mock_b64e, mock_get_boot_mode,
+                                      mock_open):
         mock_get_boot_mode.return_value = None
         mock_b64e.return_value = b'0hIwh_vN'
         queued_image = mock.Mock(id='aaa-bbb')
 
         self._cc.image.create_image.return_value = queued_image
 
+        # Mock file reading for ISO detection
+        mock_file = mock.MagicMock()
+        mock_file.read.side_effect = [
+            b'\x00\x00\x00\x00',  # First 4 bytes (not QCOW2)
+            b'CD001'  # ISO signature at offset 32769
+        ]
+        mock_file.seek.return_value = None
+        mock_open.return_value.__enter__.return_value = mock_file
+
         image_id, image_name = self.test_driver.insert_image(
             self.uuid, 'http://fish.it/red.iso', '/alphabet/soup/red.iso')
 
         self._cc.image.create_image.assert_called_once_with(
-            name='red.iso 0hIwh_vN', disk_format='raw',
+            name='red.iso 0hIwh_vN', disk_format='iso',
             container_format='bare', visibility='private',
             filename='/alphabet/soup/red.iso')
         self._cc.image.import_image.assert_not_called()
@@ -487,6 +498,126 @@ class NovaDriverTestCase(base.BaseTestCase):
              'sushy-tools-import-image': 'aaa-bbb'})
 
         self.assertEqual('aaa-bbb', image_id)
+
+    @mock.patch('builtins.open', autospec=True)
+    def test_get_disk_format_from_content(self, mock_open):
+        """Test disk format detection from file content"""
+        # Test ISO format
+        mock_file = mock.MagicMock()
+        mock_file.read.side_effect = [
+            b'\x00\x00\x00\x00',  # First 4 bytes (not QCOW2)
+            b'CD001'  # ISO signature at offset 32769
+        ]
+        mock_file.seek.return_value = None
+        mock_open.return_value.__enter__.return_value = mock_file
+
+        result = self.test_driver._get_disk_format_from_content(
+            '/path/to/test.iso')
+        self.assertEqual('iso', result)
+        mock_file.seek.assert_called_once_with(32769)
+
+        # Test QCOW2 format
+        mock_file = mock.MagicMock()
+        mock_file.read.return_value = b'QFI\xfb'
+        mock_open.return_value.__enter__.return_value = mock_file
+
+        result = self.test_driver._get_disk_format_from_content(
+            '/path/to/test.qcow2')
+        self.assertEqual('qcow2', result)
+
+        # Test raw format (no recognized signature)
+        mock_file = mock.MagicMock()
+        mock_file.read.side_effect = [
+            b'\x00\x00\x00\x00',  # First 4 bytes (not QCOW2)
+            b'\x00\x00\x00\x00\x00'  # Not ISO signature
+        ]
+        mock_open.return_value.__enter__.return_value = mock_file
+
+        result = self.test_driver._get_disk_format_from_content(
+            '/path/to/test.img')
+        self.assertEqual('raw', result)
+
+        # Test error fallback
+        mock_open.side_effect = IOError('File not found')
+
+        result = self.test_driver._get_disk_format_from_content(
+            '/path/to/missing.img')
+        self.assertEqual('raw', result)
+
+    def test_get_disk_format_from_filename(self):
+        """Test disk format inference from filename extensions"""
+        # ISO format
+        self.assertEqual('iso',
+                         self.test_driver._get_disk_format_from_filename(
+                             'boot.iso'))
+        self.assertEqual('iso',
+                         self.test_driver._get_disk_format_from_filename(
+                             'BOOT.ISO'))
+        # QCOW2 format
+        self.assertEqual('qcow2',
+                         self.test_driver._get_disk_format_from_filename(
+                             'image.qcow2'))
+        self.assertEqual('qcow2',
+                         self.test_driver._get_disk_format_from_filename(
+                             'image.qcow'))
+        # Raw format (default for unknown extensions)
+        self.assertEqual('raw',
+                         self.test_driver._get_disk_format_from_filename(
+                             'disk.img'))
+        self.assertEqual('raw',
+                         self.test_driver._get_disk_format_from_filename(
+                             'disk.raw'))
+        self.assertEqual('raw',
+                         self.test_driver._get_disk_format_from_filename(
+                             'unknown'))
+
+    @mock.patch('builtins.open', autospec=True)
+    def test_get_disk_format_from_local_file(self, mock_open):
+        """Test _get_disk_format from local file uses content detection"""
+        mock_file = mock.MagicMock()
+        mock_file.read.side_effect = [
+            b'\x00\x00\x00\x00',  # First 4 bytes (not QCOW2)
+            b'CD001'  # ISO signature at offset 32769
+        ]
+        mock_open.return_value.__enter__.return_value = mock_file
+
+        result = self.test_driver._get_disk_format(
+            'boot.iso', '/local/path/boot.iso')
+
+        self.assertEqual('iso', result)
+
+    def test_get_disk_format_without_local_file(self):
+        """Test _get_disk_format without local file uses filename inference"""
+        result = self.test_driver._get_disk_format('image.qcow2', None)
+
+        self.assertEqual('qcow2', result)
+
+    @mock.patch('builtins.open', autospec=True)
+    def test_get_disk_format_with_override(self, mock_open):
+        """Test _get_disk_format respects configuration override"""
+        # Configure override to 'raw'
+        self.test_driver._config[
+            'SUSHY_EMULATOR_OS_VMEDIA_DISK_FORMAT_OVERRIDE'] = 'raw'
+
+        # Test with local file that would be detected as ISO
+        mock_file = mock.MagicMock()
+        mock_file.read.side_effect = [
+            b'\x00\x00\x00\x00',  # First 4 bytes (not QCOW2)
+            b'CD001'  # ISO signature at offset 32769
+        ]
+        mock_open.return_value.__enter__.return_value = mock_file
+
+        result = self.test_driver._get_disk_format(
+            'boot.iso', '/local/path/boot.iso')
+        self.assertEqual('raw', result)
+
+        # Test with filename that would be detected as qcow2
+        result = self.test_driver._get_disk_format('image.qcow2', None)
+        self.assertEqual('raw', result)
+
+        # Clean up
+        del self.test_driver._config[
+            'SUSHY_EMULATOR_OS_VMEDIA_DISK_FORMAT_OVERRIDE']
 
     @mock.patch.object(OpenStackDriver, 'get_boot_mode', autospec=True)
     def test_insert_image_fail(self, mock_get_boot_mode):

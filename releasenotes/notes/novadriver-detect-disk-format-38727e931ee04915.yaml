@@ -1,0 +1,21 @@
+---
+fixes:
+  - |
+    Fixes OpenStack Nova driver to correctly detect and set disk format when
+    uploading virtual media images to Glance. Previously, all images were
+    hardcoded as 'raw' format, causing uploads to fail when Glance's
+    ``require_image_format_match`` is enabled (the default). The driver now
+    inspects file content using magic bytes to detect ISO, QCOW2, and raw
+    formats when local files are available, or infers the format from the
+    filename extension for URL-based imports. This ensures uploaded images
+    pass Glance's format validation.
+upgrade:
+  - |
+    Following the fix to detect and set the actual disk format for virtual
+    media images, some OpenStack clouds may not support the detected format.
+    For example, clouds that restrict Glance disk formats to only ``raw`` and
+    ``qcow2`` will reject ``iso`` format images. If you encounter format
+    validation errors, set the
+    ``SUSHY_EMULATOR_OS_VMEDIA_DISK_FORMAT_OVERRIDE`` configuration parameter
+    to ``raw`` to override the auto-detection and force a format that your
+    cloud accepts.

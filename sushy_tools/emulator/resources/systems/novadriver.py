@@ -48,6 +48,16 @@ class OpenStackDriver(AbstractSystemsDriver):
         'Cd': 'cdrom',
     }
 
+    # Disk format detection constants
+    DISK_FORMAT_RAW = 'raw'
+    DISK_FORMAT_QCOW2 = 'qcow2'
+    DISK_FORMAT_ISO = 'iso'
+    QCOW_MAGIC_BYTES = b'QFI\xfb'  # QCOW/QCOW2 magic bytes at offset 0
+    ISO_MAGIC_BYTES = b'CD001'  # ISO 9660 signature
+    ISO_MAGIC_OFFSET = 32769  # First 32768 bytes reserved in ISO format
+    ISO_EXTENSION = '.iso'
+    QCOW_EXTENSIONS = ('.qcow2', '.qcow')
+
     BOOT_DEVICE_MAP_REV = {v: k for k, v in BOOT_DEVICE_MAP.items()}
 
     BOOT_MODE_MAP = {
@@ -1003,6 +1013,84 @@ class OpenStackDriver(AbstractSystemsDriver):
             self._submit_future(
                 True, self._rebuild_with_imported_image, identity, boot_image)
 
+    def _get_disk_format_from_content(self, file_path):
+        """Detect disk format by inspecting file content (magic bytes).
+
+        Detects ISO, QCOW, QCOW2, and raw formats using magic byte signatures.
+        Falls back to filename-based inference if content cannot be read.
+
+        :param file_path: Path to the image file
+        :returns: String disk format ('iso', 'qcow2', or 'raw')
+        """
+        disk_format = self.DISK_FORMAT_RAW
+        try:
+            with open(file_path, 'rb') as f:
+                header = f.read(len(self.QCOW_MAGIC_BYTES))
+                if header == self.QCOW_MAGIC_BYTES:
+                    disk_format = self.DISK_FORMAT_QCOW2
+                else:
+                    f.seek(self.ISO_MAGIC_OFFSET)
+                    iso_sig = f.read(len(self.ISO_MAGIC_BYTES))
+                    if iso_sig == self.ISO_MAGIC_BYTES:
+                        disk_format = self.DISK_FORMAT_ISO
+
+            self._logger.debug('Detected %s format for %s', disk_format,
+                               os.path.basename(file_path))
+        except (OSError, IOError) as e:
+            self._logger.warning(
+                'Failed to detect disk format for %s: %s. Falling back to '
+                'filename inference.', os.path.basename(file_path), e)
+            filename = os.path.basename(file_path)
+            disk_format = self._get_disk_format_from_filename(filename)
+
+        return disk_format
+
+    def _get_disk_format_from_filename(self, filename):
+        """Infer disk format from filename extension.
+
+        Used as fallback when file is not available locally for inspection.
+
+        :param filename: The filename to check
+        :returns: String disk format ('iso', 'qcow2', or 'raw')
+        """
+        disk_format = self.DISK_FORMAT_RAW
+        filename_lower = filename.lower()
+
+        if filename_lower.endswith(self.ISO_EXTENSION):
+            disk_format = self.DISK_FORMAT_ISO
+        elif filename_lower.endswith(self.QCOW_EXTENSIONS):
+            disk_format = self.DISK_FORMAT_QCOW2
+
+        self._logger.debug('Inferred disk format %s from filename %s',
+                           disk_format, filename)
+
+        return disk_format
+
+    def _get_disk_format(self, filename, local_file_path=None):
+        """Determine the disk format for an image.
+
+        Uses content inspection when local file is available, otherwise
+        infers from filename extension. Can be overridden by configuration.
+
+        :param filename: The filename of the image
+        :param local_file_path: Optional local path to the image file
+        :returns: String disk format ('iso', 'qcow2', or 'raw')
+        """
+        # Check for configuration override first
+        override_format = self._config.get(
+            'SUSHY_EMULATOR_OS_VMEDIA_DISK_FORMAT_OVERRIDE')
+        if override_format:
+            self._logger.debug('Using configured disk format override: %s',
+                               override_format)
+            return override_format
+
+        if local_file_path:
+            # File is local - inspect content for accurate detection
+            return self._get_disk_format_from_content(local_file_path)
+        else:
+            # No local file - use filename extension as hint
+            return self._get_disk_format_from_filename(filename)
+
     def insert_image(self, identity, image_url, local_file_path=None):
         self._logger.debug(
             'Creating task to insert image for %(identity)s' %
@@ -1012,13 +1100,14 @@ class OpenStackDriver(AbstractSystemsDriver):
 
     def _insert_image(self, identity, image_url, local_file_path=None):
         parsed_url = urlparse.urlparse(image_url)
-        local_file = os.path.basename(parsed_url.path)
+        filename = os.path.basename(parsed_url.path)
+        disk_format = self._get_disk_format(filename, local_file_path)
         unique = base64.urlsafe_b64encode(os.urandom(6)).decode('utf-8')
         boot_mode = self.get_boot_mode(identity)
 
         image_attrs = {
-            'name': '%s %s' % (local_file, unique),
-            'disk_format': 'raw',
+            'name': '%s %s' % (filename, unique),
+            'disk_format': disk_format,
             'container_format': 'bare',
             'visibility': 'private'
         }
