@@ -1,0 +1,48 @@
+---
+features:
+  - |
+    The OpenStack Nova driver now supports virtual media (CD/DVD) boot via
+    rescue mode as an alternative to the volume-based approach. This feature
+    enables virtual media functionality on older OpenStack clouds and works
+    around OVMF firmware issues that can occur with volume-backed virtual
+    media.
+
+    When enabled, inserting virtual media uploads the ISO image to Glance
+    asynchronously. Setting the boot device to ``Cd`` configures the instance
+    to boot from the ISO on the next power cycle using Nova's rescue mode.
+    The driver handles the complete lifecycle: image upload, rescue with ISO,
+    power operations, and cleanup on eject.
+
+    This approach is particularly useful for:
+
+    - Older OpenStack clouds lacking microversion 2.93 (volume multiattach)
+    - Environments where OVMF firmware has issues with volume-backed media
+    - Image-backed instances where volume attachment is not desired
+    - Deployments requiring simpler infrastructure (no Cinder volumes)
+
+    Enable this feature by setting ``SUSHY_EMULATOR_OS_VMEDIA_USE_RESCUE`` to
+    ``True``. The feature works with image-backed Nova instances and
+    automatically handles asynchronous image upload and rescue state
+    transitions. See the documentation for complete configuration details and
+    workflow examples.
+
+    This complements the existing volume-based virtual media (for Zed+ clouds)
+    and rescue-based PXE boot features, providing a unified rescue-mode
+    approach for both network and CD boot scenarios.
+upgrade:
+  - |
+    Virtual media state tracking has been refactored to use ``PersistentDict``
+    instead of Nova server metadata. This affects existing volume-based
+    virtual media users.
+
+    **Important**: Virtual media state (inserted images, boot mode, and image
+    URLs) is now stored in the local state file configured by
+    ``SUSHY_EMULATOR_STATE_DIR``. If you require virtual media state to
+    survive sushy-tools service restarts, you **must** configure a persistent
+    state directory. Without this configuration, virtual media state will be
+    lost on service restart, requiring media to be re-inserted.
+
+    Previously, virtual media state was stored in Nova server metadata, which
+    persisted across service restarts automatically. The new approach uses
+    local state management for better consistency with other stateful features
+    like rescue-based PXE boot.

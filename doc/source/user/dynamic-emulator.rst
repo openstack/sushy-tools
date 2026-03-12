@@ -322,8 +322,34 @@ And flip an instance's power state via the Redfish call:
 You can have as many OpenStack instances as you need. The instances can be
 concurrently managed over Redfish and functionally similar tools.
 
-Creating Openstack instances for virtual media boot
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Virtual media boot via volume rebuild
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The OpenStack driver supports virtual media (CD/DVD) booting of volume-backed
+instances by rebuilding the CD-ROM volume with the inserted ISO image. This
+approach requires Nova API microversion 2.93 (introduced in Zed release).
+
+Configuration
+^^^^^^^^^^^^^
+
+The volume-based virtual media implementation can be configured with the
+following options:
+
+.. code-block:: python
+
+   # Optional: Specify custom blank image name (default: sushy-tools-blank-image)
+   SUSHY_EMULATOR_OS_VMEDIA_BLANK_IMAGE = 'sushy-tools-blank-image'
+
+   # Optional: Directory for persistent state storage
+   SUSHY_EMULATOR_STATE_DIR = '/var/lib/sushy-emulator'
+
+.. note::
+
+   When ``SUSHY_EMULATOR_STATE_DIR`` is configured, virtual media state
+   persists across emulator restarts.
+
+Instance setup
+^^^^^^^^^^^^^^
 
 When creating Openstack instances for virtual media boot the instances must be
 configured to boot from volumes. One volume configured with
@@ -500,6 +526,178 @@ Limitations
 
 * Volume-backed instances are not supported (Nova does not support rescue for
   volume-backed instances)
+
+Virtual media boot via Nova rescue mode
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The OpenStack driver supports virtual media (CD/DVD) booting of instances by
+leveraging Nova's rescue mode. This feature allows instances to boot from ISO
+images inserted via the VirtualMedia resource.
+
+This approach provides an alternative to the volume-based virtual media
+implementation for environments where:
+
+* The OpenStack cloud does not support Nova API microversion 2.93 (introduced
+  in Zed release) required for volume-backed instance rebuilds
+* OVMF firmware issues prevent reliable CD-ROM volume attachment
+* Image-backed instances are preferred or required
+
+Configuration
+^^^^^^^^^^^^^
+
+To enable this feature, configure the following in your emulator configuration:
+
+.. code-block:: python
+
+   # Enable virtual media boot via rescue mode
+   SUSHY_EMULATOR_OS_VMEDIA_USE_RESCUE = True
+
+   # Optional: Specify rescue device bus type (default: 'sata')
+   SUSHY_EMULATOR_OS_VMEDIA_RESCUE_BUS = 'sata'
+
+   # Optional: Specify rescue device type (default: 'cdrom')
+   SUSHY_EMULATOR_OS_VMEDIA_RESCUE_DEVICE = 'cdrom'
+
+   # Optional: Directory for persistent state storage
+   SUSHY_EMULATOR_STATE_DIR = '/var/lib/sushy-emulator'
+
+.. note::
+
+   When ``SUSHY_EMULATOR_STATE_DIR`` is configured, boot mode settings and
+   virtual media image references persist across emulator restarts.
+
+.. note::
+
+   If instances successfully enter RESCUE state but do not boot from the
+   CD-ROM, try changing ``SUSHY_EMULATOR_OS_VMEDIA_RESCUE_BUS`` to ``'scsi'``.
+   Different OVMF UEFI firmware implementations may require specific bus types
+   to work with bootable ISO images.
+
+.. warning::
+
+   The rescue-based and volume-based virtual media implementations are mutually
+   exclusive. Do not enable both ``SUSHY_EMULATOR_OS_VMEDIA_USE_RESCUE`` and
+   configure volume-backed instances with CD-ROM volumes simultaneously.
+
+Requirements
+^^^^^^^^^^^^
+
+* Nova compute service must support the rescue operation
+* Instance type requirements depend on Nova version:
+
+  * **Image-backed instances**: Supported on all Nova versions
+  * **Volume-backed instances**: Requires Nova API microversion 2.87+
+    (Ussuri/21.0.0+) and compute host with ``COMPUTE_RESCUE_BFV`` trait
+    (libvirt driver). The required image properties are set automatically.
+
+* Instances should be created with boot mode metadata (BIOS or UEFI)
+
+Usage
+^^^^^
+
+**Inserting media**: When a Redfish client inserts an ISO image via the
+VirtualMedia resource:
+
+* The ISO is uploaded to Glance asynchronously
+* The image ID is stored in persistent state
+* The instance remains in its current state (no immediate rescue operation)
+* The boot device must be set to ``Cd`` separately (see example workflow below)
+
+**Power on with CD boot**: When powering on an instance with virtual media
+inserted:
+
+* The emulator checks if the ISO upload to Glance has completed
+* If the image is still importing, the emulator returns ``503 Service
+  Unavailable`` (SYS518) and the client should retry
+* Once the image is active, the instance boots into rescue mode using the
+  uploaded ISO image
+* The instance enters the ``RESCUED`` state and boots from the ISO
+
+**Power off from CD boot**: Powering off an instance booted from virtual media:
+
+* The instance exits rescue mode automatically
+* The instance is then stopped
+* The virtual media remains inserted for the next boot
+
+**Ejecting media**: When a Redfish client ejects the virtual media:
+
+* The uploaded ISO image is deleted from Glance
+* The boot mode is automatically reset to disk boot
+* The instance remains in its current state (if in rescue mode, it will exit
+  rescue on the next power cycle)
+
+**Reboot**: Rebooting an instance booted from virtual media keeps it in rescue
+mode with the same ISO image.
+
+.. note::
+
+   During image upload, rescue, and unrescue operations, the emulator may
+   return ``503 Service Unavailable`` (SYS518) if the operation is still in
+   progress. Clients should retry the request after a short delay.
+
+Example workflow
+^^^^^^^^^^^^^^^^
+
+.. code-block:: bash
+
+   # Insert an ISO image into the virtual CD drive
+   curl -d '{"Image": "http://example.com/rescue.iso", "Inserted": true}' \
+        -H "Content-Type: application/json" \
+        -X POST \
+        http://localhost:8000/redfish/v1/Systems/<uuid>/VirtualMedia/Cd/Actions/VirtualMedia.InsertMedia
+
+   # Set boot device to CD (automatically set by InsertMedia, but shown for clarity)
+   curl -X PATCH -H 'Content-Type: application/json' \
+       -d '{"Boot": {"BootSourceOverrideTarget": "Cd"}}' \
+       http://localhost:8000/redfish/v1/Systems/<uuid>
+
+   # Power on (will boot via rescue with the ISO image)
+   # Note: May return 503 if image upload is still in progress, retry if needed
+   curl -d '{"ResetType":"On"}' \
+       -H "Content-Type: application/json" -X POST \
+       http://localhost:8000/redfish/v1/Systems/<uuid>/Actions/ComputerSystem.Reset
+
+   # Instance is now in RESCUED state, booted from ISO
+   # Perform installation or rescue operations...
+
+   # Power off (will exit rescue and stop the instance)
+   curl -d '{"ResetType":"ForceOff"}' \
+       -H "Content-Type: application/json" -X POST \
+       http://localhost:8000/redfish/v1/Systems/<uuid>/Actions/ComputerSystem.Reset
+
+   # Eject the virtual media
+   curl -d '{}' \
+        -H "Content-Type: application/json" \
+        -X POST \
+        http://localhost:8000/redfish/v1/Systems/<uuid>/VirtualMedia/Cd/Actions/VirtualMedia.EjectMedia
+
+   # Power on again (will boot normally from disk)
+   curl -d '{"ResetType":"On"}' \
+       -H "Content-Type: application/json" -X POST \
+       http://localhost:8000/redfish/v1/Systems/<uuid>/Actions/ComputerSystem.Reset
+
+Limitations
+^^^^^^^^^^^
+
+* Only CD/DVD virtual media devices are supported (not Floppy or USB)
+* The ISO image must be accessible via HTTP/HTTPS URL for upload to Glance
+
+Comparison with volume-based virtual media
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The rescue-based approach differs from the volume-based implementation:
+
+**Volume-based**:
+
+* Uses volume rebuild with CD-ROM device type
+* Requires Nova API microversion 2.93 (Nova 26.0.0+/Zed)
+* Works with volume-backed instances
+
+**Rescue-based**:
+
+* Uses Nova rescue mode with ISO image
+* Works with older Nova versions
+* Supports both image-backed and volume-backed instances (see Requirements)
 
 Systems resource driver: Ironic
 ++++++++++++++++++++++++++++++++++

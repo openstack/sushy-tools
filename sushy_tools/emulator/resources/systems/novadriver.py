@@ -69,6 +69,7 @@ class OpenStackDriver(AbstractSystemsDriver):
 
     # Rescue boot mode metadata values
     RESCUE_MODE_PXE = 'pxe'
+    RESCUE_MODE_CDROM = 'cdrom'
     RESCUE_MODE_DISK = 'disk'
 
     PERMANENT_CACHE = {}
@@ -86,26 +87,124 @@ class OpenStackDriver(AbstractSystemsDriver):
         cls._rescue_pxe_enabled = config.get(
             'SUSHY_EMULATOR_OS_RESCUE_PXE_BOOT', False)
 
+        # Cache rescue vmedia enabled flag
+        cls._rescue_vmedia_enabled = config.get(
+            'SUSHY_EMULATOR_OS_VMEDIA_USE_RESCUE', False)
+
+        # Generic flag for any rescue-based feature
+        cls._rescue_enabled = (cls._rescue_pxe_enabled
+                               or cls._rescue_vmedia_enabled)
+
         # Validate rescue-based PXE boot configuration if enabled
         if cls._rescue_pxe_enabled:
             cls._validate_rescue_pxe_images()
 
-            # Initialize persistent storage for rescue boot modes
-            # This avoids ConflictException when instances are in
-            # RESCUED state (Nova blocks metadata updates in that state)
-            cls._rescue_boot_modes = memoize.PersistentDict()
-            try:
-                cls._rescue_boot_modes.make_permanent(
-                    config.get('SUSHY_EMULATOR_STATE_DIR'),
-                    'rescue_boot_modes')
-            except sqlite3.OperationalError as e:
-                # Handle concurrent initialization in multi-worker environments
-                # (e.g., Flask dev server with auto-reload)
-                logger.warning(
-                    'PersistentDict initialization warning: %s. '
-                    'This is normal in multi-worker environments.', e)
+        # Initialize persistent storage for rescue features
+        if cls._rescue_enabled:
+            cls._init_rescue_persistent_storage(config, logger)
+
+        # Initialize persistent storage for volume vmedia
+        # (unless rescue vmedia is enabled, which uses its own storage)
+        if not cls._rescue_vmedia_enabled:
+            cls._init_volume_vmedia_persistent_storage(config, logger)
 
         return cls
+
+    @classmethod
+    def _make_persistent_safe(cls, persistent_dict, state_dir, name, logger):
+        """Safely make a PersistentDict permanent with race condition handling
+
+        :param persistent_dict: PersistentDict instance to make permanent
+        :param state_dir: Directory for persistent storage
+        :param name: Name for the persistent storage file
+        :param logger: Logger instance
+        """
+        try:
+            persistent_dict.make_permanent(state_dir, name)
+        except sqlite3.OperationalError as e:
+            # Handle concurrent initialization in multi-worker environments
+            # (e.g., Flask dev server with auto-reload)
+            logger.warning(
+                'PersistentDict initialization warning for %s: %s. '
+                'This is normal in multi-worker environments.', name, e)
+
+    @classmethod
+    def _init_rescue_persistent_storage(cls, config, logger):
+        """Initialize persistent storage for rescue features
+
+        Used by both rescue PXE and rescue vmedia features.
+        This avoids ConflictException when instances are in RESCUED state
+        (Nova blocks metadata updates in that state).
+
+        :param config: Configuration object
+        :param logger: Logger instance
+        """
+        state_dir = config.get('SUSHY_EMULATOR_STATE_DIR')
+
+        if cls._rescue_enabled:
+            cls._rescue_boot_modes = memoize.PersistentDict()
+            cls._make_persistent_safe(
+                cls._rescue_boot_modes, state_dir, 'rescue_boot_modes', logger)
+
+        if cls._rescue_vmedia_enabled:
+            # Store per-instance image IDs for rescue operations
+            # Unlike PXE rescue (which uses shared iPXE images), each
+            # instance gets its own uploaded ISO image
+            cls._rescue_vmedia_images = memoize.PersistentDict()
+            cls._make_persistent_safe(
+                cls._rescue_vmedia_images, state_dir,
+                'rescue_vmedia_images', logger)
+
+            # Store per-instance vmedia attributes (image URL and local
+            # file path). Necessary because Nova blocks metadata updates
+            # in RESCUED state
+            cls._rescue_vmedia_attrs = memoize.PersistentDict()
+            cls._make_persistent_safe(
+                cls._rescue_vmedia_attrs, state_dir,
+                'rescue_vmedia_attrs', logger)
+
+            # Cache rescue device configuration for vmedia
+            cls._rescue_vmedia_device = config.get(
+                'SUSHY_EMULATOR_OS_VMEDIA_RESCUE_DEVICE', 'cdrom')
+            cls._rescue_vmedia_bus = config.get(
+                'SUSHY_EMULATOR_OS_VMEDIA_RESCUE_BUS', 'sata')
+
+            logger.info(
+                'Rescue-based vmedia enabled with device=%s, bus=%s',
+                cls._rescue_vmedia_device, cls._rescue_vmedia_bus
+            )
+
+    @classmethod
+    def _init_volume_vmedia_persistent_storage(cls, config, logger):
+        """Initialize persistent storage for volume-based vmedia
+
+        Stores image IDs and attributes for volume-based vmedia operations.
+        Uses PersistentDict instead of Nova metadata for consistency and
+        to avoid potential issues with metadata updates.
+
+        :param config: Configuration object
+        :param logger: Logger instance
+        """
+        state_dir = config.get('SUSHY_EMULATOR_STATE_DIR')
+
+        # Store per-instance image IDs for volume vmedia
+        cls._volume_vmedia_images = memoize.PersistentDict()
+        cls._make_persistent_safe(
+            cls._volume_vmedia_images, state_dir,
+            'volume_vmedia_images', logger)
+
+        # Store per-instance vmedia attributes (image URL and local
+        # file path)
+        cls._volume_vmedia_attrs = memoize.PersistentDict()
+        cls._make_persistent_safe(
+            cls._volume_vmedia_attrs, state_dir,
+            'volume_vmedia_attrs', logger)
+
+        # Store delay-eject flags
+        cls._volume_vmedia_delay_eject = memoize.PersistentDict()
+        cls._make_persistent_safe(
+            cls._volume_vmedia_delay_eject, state_dir,
+            'volume_vmedia_delay_eject', logger)
 
     @classmethod
     def _validate_rescue_pxe_images(cls):
@@ -465,7 +564,7 @@ class OpenStackDriver(AbstractSystemsDriver):
             raise error.FishyError(msg, 503)
 
         # Dispatch to appropriate power state handler
-        if self._rescue_pxe_enabled:
+        if self._rescue_enabled:
             self._set_power_state_rescue(instance, state)
         else:
             self._set_power_state_default(instance, state)
@@ -478,7 +577,7 @@ class OpenStackDriver(AbstractSystemsDriver):
         :raises: `error.FishyError` if power state can't be set
         """
         # Check for delayed media eject
-        delayed_media_eject = instance.metadata.get('sushy-tools-delay-eject')
+        delayed_media_eject = self._volume_vmedia_delay_eject.get(instance.id)
 
         if delayed_media_eject:
             self._logger.debug(
@@ -593,13 +692,15 @@ class OpenStackDriver(AbstractSystemsDriver):
             self._raise_unknown_power_state(state)
 
     def _power_on_with_boot_mode(self, instance, boot_mode):
-        """Power on instance with specified boot mode (rescue PXE feature)
+        """Power on instance with specified boot mode (rescue feature)
 
         Helper for _set_power_state_rescue(). Handles power-on logic based
-        on the desired boot mode, using Nova's rescue mode for PXE boot.
+        on the desired boot mode, using Nova's rescue mode for PXE boot or
+        CD boot (virtual media).
 
         :param instance: OpenStack instance object
-        :param boot_mode: Boot mode (RESCUE_MODE_PXE or RESCUE_MODE_DISK)
+        :param boot_mode: Boot mode (RESCUE_MODE_PXE, RESCUE_MODE_CDROM,
+            or RESCUE_MODE_DISK)
         """
         is_in_rescue = self._is_instance_in_rescue(instance)
 
@@ -607,6 +708,16 @@ class OpenStackDriver(AbstractSystemsDriver):
             # PXE boot requested - use rescue
             if not is_in_rescue:
                 self._rescue_with_pxe_image(instance)
+            else:
+                # Already in rescue - only start if not already running
+                # Nova will reject start if power_state indicates already
+                # running
+                if instance.power_state != self.NOVA_POWER_STATE_ON:
+                    self._cc.compute.start_server(instance.id)
+        elif boot_mode == self.RESCUE_MODE_CDROM:
+            # CD boot requested - use rescue with vmedia image
+            if not is_in_rescue:
+                self._rescue_with_vmedia_image(instance)
             else:
                 # Already in rescue - only start if not already running
                 # Nova will reject start if power_state indicates already
@@ -628,13 +739,15 @@ class OpenStackDriver(AbstractSystemsDriver):
                 self._cc.compute.start_server(instance.id)
 
     def _restart_with_boot_mode(self, instance, boot_mode, reboot_type):
-        """Restart instance with specified boot mode (rescue PXE feature)
+        """Restart instance with specified boot mode (rescue feature)
 
         Helper for _set_power_state_rescue(). Handles restart logic based
-        on the desired boot mode, using Nova's rescue mode for PXE boot.
+        on the desired boot mode, using Nova's rescue mode for PXE boot or
+        CD boot (virtual media).
 
         :param instance: OpenStack instance object
-        :param boot_mode: Boot mode (RESCUE_MODE_PXE or RESCUE_MODE_DISK)
+        :param boot_mode: Boot mode (RESCUE_MODE_PXE, RESCUE_MODE_CDROM,
+            or RESCUE_MODE_DISK)
         :param reboot_type: Reboot type ('SOFT' or 'HARD')
         """
         is_in_rescue = self._is_instance_in_rescue(instance)
@@ -644,6 +757,20 @@ class OpenStackDriver(AbstractSystemsDriver):
             if not is_in_rescue:
                 # Transition ACTIVE -> RESCUED via rescue
                 self._rescue_with_pxe_image(instance)
+                # Nova's rescue automatically powers on, so reboot to
+                # complete restart
+                self._cc.compute.reboot_server(
+                    instance.id, reboot_type=reboot_type)
+            else:
+                # Already in RESCUED, just reboot (Nova preserves RESCUED
+                # state)
+                self._cc.compute.reboot_server(
+                    instance.id, reboot_type=reboot_type)
+        elif boot_mode == self.RESCUE_MODE_CDROM:
+            # CD boot requested - use rescue with vmedia image
+            if not is_in_rescue:
+                # Transition ACTIVE -> RESCUED via rescue
+                self._rescue_with_vmedia_image(instance)
                 # Nova's rescue automatically powers on, so reboot to
                 # complete restart
                 self._cc.compute.reboot_server(
@@ -676,11 +803,13 @@ class OpenStackDriver(AbstractSystemsDriver):
             return
 
         # Check boot device based on configuration
-        if self._rescue_pxe_enabled:
+        if self._rescue_enabled:
             # Use rescue boot mode from persistent storage
             boot_mode = self._get_boot_mode_for_rescue(instance)
             if boot_mode == self.RESCUE_MODE_PXE:
                 return self.BOOT_DEVICE_MAP_REV['network']
+            elif boot_mode == self.RESCUE_MODE_CDROM:
+                return self.BOOT_DEVICE_MAP_REV['cdrom']
             else:
                 return self.BOOT_DEVICE_MAP_REV['hd']
         else:
@@ -714,7 +843,7 @@ class OpenStackDriver(AbstractSystemsDriver):
             raise error.BadRequest(msg)
 
         # Set boot mode based on configuration
-        if self._rescue_pxe_enabled:
+        if self._rescue_enabled:
             # Use persistent storage
             self._set_boot_mode_for_rescue(instance, target)
         else:
@@ -754,19 +883,22 @@ class OpenStackDriver(AbstractSystemsDriver):
     def _set_boot_mode_for_rescue(self, instance, target):
         """Set boot mode in persistent storage
 
-        Stores the boot mode (PXE or disk) for the instance. Rescue/unrescue
-        operations are performed during power state transitions based on this
-        stored setting.
+        Stores the boot mode (PXE, CD, or disk) for the instance.
+        Rescue/unrescue operations are performed during power state
+        transitions based on this stored setting.
 
         :param instance: OpenStack instance object
         :param target: boot device target from BOOT_DEVICE_MAP
         """
-        if not self._rescue_pxe_enabled:
+        if not self._rescue_enabled:
             return
 
-        boot_mode = (self.RESCUE_MODE_PXE
-                     if target == self.BOOT_DEVICE_MAP['Pxe']
-                     else self.RESCUE_MODE_DISK)
+        if target == self.BOOT_DEVICE_MAP['Pxe']:
+            boot_mode = self.RESCUE_MODE_PXE
+        elif target == self.BOOT_DEVICE_MAP['Cd']:
+            boot_mode = self.RESCUE_MODE_CDROM
+        else:
+            boot_mode = self.RESCUE_MODE_DISK
 
         self._logger.debug(
             'Setting boot mode to %(mode)s for %(identity)s' %
@@ -777,10 +909,13 @@ class OpenStackDriver(AbstractSystemsDriver):
     def _rescue_with_pxe_image(self, instance):
         """Rescue instance with appropriate iPXE image based on boot mode
 
-        Note: Nova does not support rescuing volume-backed instances. Only
-        instances booted from ephemeral storage (image or snapshot) can be
-        rescued. Attempting to rescue a volume-backed instance will result
-        in a BadRequestException from Nova.
+        Note: Nova rescue mode support depends on instance and cloud
+        configuration:
+        - Image-backed instances: Supported on all Nova versions
+        - Volume-backed instances: Requires microversion 2.87+
+          (Ussuri/21.0.0+), rescue image with hw_rescue_bus and
+          hw_rescue_device properties, and compute host with
+          COMPUTE_RESCUE_BFV trait (libvirt driver)
 
         :param instance: OpenStack instance object
 
@@ -817,6 +952,55 @@ class OpenStackDriver(AbstractSystemsDriver):
         is_ready, _ = self._check_and_wait_for_task_state(instance)
         if not is_ready:
             # Rescue still in progress - return 503 to allow client retry
+            msg = ('SYS518: Cloud instance entering rescue mode, '
+                   'retry required')
+            raise error.FishyError(msg, 503)
+
+    def _rescue_with_vmedia_image(self, instance):
+        """Rescue instance with virtual media ISO image
+
+        Checks image upload status and raises 503 if still importing.
+        Only proceeds with rescue if image is active.
+
+        Note: Nova rescue mode support depends on instance and cloud
+        configuration:
+        - Image-backed instances: Supported on all Nova versions
+        - Volume-backed instances: Requires microversion 2.87+
+          (Ussuri/21.0.0+), rescue image with hw_rescue_bus and
+          hw_rescue_device properties, and compute host with
+          COMPUTE_RESCUE_BFV trait (libvirt driver)
+
+        :param instance: OpenStack instance object
+
+        :raises: `error.FishyError` if no image inserted, image still
+            importing, or image import failed
+        """
+        image_id = self._rescue_vmedia_images.get(instance.id)
+
+        if not image_id:
+            raise error.FishyError(
+                'No virtual media image inserted for instance')
+
+        image = self._cc.image.get_image(image_id)
+
+        if image.status in ('queued', 'importing'):
+            msg = ('SYS518: Virtual media image still importing, '
+                   'retry required')
+            raise error.FishyError(msg, 503)
+
+        if image.status != 'active':
+            msg = ('Virtual media image import failed with status: %s'
+                   % image.status)
+            raise error.FishyError(msg, 500)
+
+        self._logger.debug(
+            'Rescuing instance %(identity)s with vmedia image %(image)s' %
+            {'identity': instance.id, 'image': image.id})
+
+        self._cc.compute.rescue_server(instance.id, image_ref=image.id)
+
+        is_ready, _ = self._check_and_wait_for_task_state(instance)
+        if not is_ready:
             msg = ('SYS518: Cloud instance entering rescue mode, '
                    'retry required')
             raise error.FishyError(msg, 503)
@@ -975,6 +1159,11 @@ class OpenStackDriver(AbstractSystemsDriver):
 
         :raises: `error.FishyError` if boot device can't be set
         """
+        # Rescue-based vmedia uses insert_image/eject_image workflow
+        # and doesn't use set_boot_image for rebuild operations
+        if self._rescue_vmedia_enabled:
+            return
+
         instance = self._get_instance(identity)
         instance_image = self._get_instance_image_id(instance)
 
@@ -987,10 +1176,9 @@ class OpenStackDriver(AbstractSystemsDriver):
         elif boot_image is None:
             if self._config.get('SUSHY_EMULATOR_OS_VMEDIA_DELAY_EJECT', True):
                 self._logger.debug(
-                    'Set instance metadata for vmedia eject on next power '
+                    'Set delay-eject flag for vmedia eject on next power '
                     'action for %(identity)s' % {'identity': identity})
-                server_metadata = {'sushy-tools-delay-eject': 'true'}
-                self._cc.set_server_metadata(identity, server_metadata)
+                self._volume_vmedia_delay_eject[instance.id] = True
             else:
                 self._logger.debug(
                     'Create task to rebuild with blank-image for '
@@ -1002,10 +1190,10 @@ class OpenStackDriver(AbstractSystemsDriver):
 
         else:
             if self._config.get('SUSHY_EMULATOR_OS_VMEDIA_DELAY_EJECT', True):
-                # Make sure sushy-tools-delay-eject is cleared when media is
+                # Make sure delay-eject flag is cleared when media is
                 # inserted. Avoid race in case media is ejected and then
                 # inserted without a power action.
-                self._remove_delayed_eject_metadata(identity)
+                self._volume_vmedia_delay_eject.pop(instance.id, None)
 
             self._logger.debug(
                 'Creating task to finish import and rebuild for %(identity)s' %
@@ -1099,38 +1287,57 @@ class OpenStackDriver(AbstractSystemsDriver):
             False, self._insert_image, identity, image_url, local_file_path)
 
     def _insert_image(self, identity, image_url, local_file_path=None):
+        # Common preparation for both approaches
         parsed_url = urlparse.urlparse(image_url)
         filename = os.path.basename(parsed_url.path)
         disk_format = self._get_disk_format(filename, local_file_path)
         unique = base64.urlsafe_b64encode(os.urandom(6)).decode('utf-8')
         boot_mode = self.get_boot_mode(identity)
 
+        # Build base image properties
+        image_properties = {}
+        if boot_mode == 'UEFI':
+            self._logger.debug('Setting UEFI image properties for '
+                               '%(identity)s' % {'identity': identity})
+            image_properties['hw_firmware_type'] = 'uefi'
+            image_properties['hw_machine_type'] = 'q35'
+
+        # Add rescue-specific properties if needed
+        if self._rescue_vmedia_enabled:
+            self._logger.debug(
+                'Setting rescue device properties for vmedia image: '
+                'hw_rescue_device=%(device)s, hw_rescue_bus=%(bus)s' %
+                {'device': self._rescue_vmedia_device,
+                 'bus': self._rescue_vmedia_bus})
+            image_properties['hw_rescue_device'] = self._rescue_vmedia_device
+            image_properties['hw_rescue_bus'] = self._rescue_vmedia_bus
+            images_dict = self._rescue_vmedia_images
+            attrs_dict = self._rescue_vmedia_attrs
+            vmedia_type = 'rescue'
+        else:
+            images_dict = self._volume_vmedia_images
+            attrs_dict = self._volume_vmedia_attrs
+            vmedia_type = 'volume'
+
+        # Build image attributes
         image_attrs = {
             'name': '%s %s' % (filename, unique),
             'disk_format': disk_format,
             'container_format': 'bare',
             'visibility': 'private'
         }
-        server_metadata = {'sushy-tools-image-url': image_url}
 
-        if boot_mode == 'UEFI':
-            self._logger.debug('Setting UEFI image properties for '
-                               '%(identity)s' % {'identity': identity})
-            image_attrs['properties'] = {
-                'hw_firmware_type': 'uefi',
-                'hw_machine_type': 'q35'
-            }
+        if image_properties:
+            image_attrs['properties'] = image_properties
 
         if local_file_path:
             image_attrs['filename'] = local_file_path
-            server_metadata['sushy-tools-image-local-file'] = local_file_path
 
         image = None
         try:
-            # Create image, and begin importing. Waiting for import to
-            # complete will be part of a long-running operation
+            # Create image and begin importing
             image = self._cc.image.create_image(**image_attrs)
-            server_metadata['sushy-tools-import-image'] = image.id
+
             if local_file_path:
                 self._logger.debug(
                     'Uploading image file %(file)s from source %(url)s '
@@ -1144,16 +1351,35 @@ class OpenStackDriver(AbstractSystemsDriver):
                 self._cc.image.import_image(image, method='web-download',
                                             uri=image_url)
 
-            self._cc.set_server_metadata(identity, server_metadata)
+            # Store all data in PersistentDict
+            instance = self._get_instance(identity)
+            images_dict[instance.id] = image.id
+
+            # Store vmedia attributes in PersistentDict for tracking
+            vmedia_attrs = {'image_url': image_url}
+            if local_file_path:
+                vmedia_attrs['local_file_path'] = local_file_path
+            attrs_dict[instance.id] = vmedia_attrs
+
+            self._logger.debug(
+                'Vmedia image %(image)s stored for %(identity)s (%(type)s)' %
+                {'image': image.id, 'identity': identity, 'type': vmedia_type})
 
         except Exception as ex:
             msg = 'Failed insert image from URL %s: %s' % (image_url, ex)
             self._logger.exception(msg)
             image_id = image.id if image else None
-            self._attempt_delete_image_local_file(
-                image_id, local_file_path, identity,
-                'sushy-tools-import-image',
-                'sushy-tools-image-local-file')
+            # Clean up on failure
+            if image_id:
+                try:
+                    self._cc.delete_image(image_id)
+                except Exception:
+                    pass
+            if local_file_path:
+                try:
+                    self._delete_local_file(local_file_path)
+                except Exception:
+                    pass
             if not isinstance(ex, error.FishyError):
                 ex = error.FishyError(msg)
             raise ex
@@ -1167,54 +1393,78 @@ class OpenStackDriver(AbstractSystemsDriver):
         self._submit_future(False, self._eject_image, identity)
 
     def _eject_image(self, identity):
-        image_url = None
-        try:
-            server = self._cc.compute.get_server(identity)
-            image_id = server.metadata.get('sushy-tools-import-image')
-            image_url = server.metadata.get('sushy-tools-image-url')
+        """Eject virtual media image for both volume and rescue approaches"""
+        # Select appropriate PersistentDict references
+        if self._rescue_vmedia_enabled:
+            images_dict = self._rescue_vmedia_images
+            attrs_dict = self._rescue_vmedia_attrs
+            vmedia_type = 'rescue'
+        else:
+            images_dict = self._volume_vmedia_images
+            attrs_dict = self._volume_vmedia_attrs
+            vmedia_type = 'volume'
 
-            # sushy-tools-import-image not set in metadata, nothing to do
+        instance = None
+        image_url = None
+        local_file_path = None
+        try:
+            instance = self._get_instance(identity)
+
+            # Retrieve vmedia attributes from PersistentDict
+            vmedia_attrs = attrs_dict.get(instance.id, {})
+            image_url = vmedia_attrs.get('image_url')
+            local_file_path = vmedia_attrs.get('local_file_path')
+
+            # Check PersistentDict for image ID
+            image_id = images_dict.get(instance.id)
+
             if image_id is None:
+                # Nothing to eject
+                self._logger.debug(
+                    'No %(type)s vmedia image to eject for %(identity)s' %
+                    {'type': vmedia_type, 'identity': identity})
                 return
 
+            # Delete image from Glance
             image = self._cc.image.find_image(image_id)
+            if image:
+                self._logger.debug(
+                    'Deleting %(type)s vmedia image %(image)s for '
+                    '%(identity)s' %
+                    {'type': vmedia_type, 'image': image.id,
+                     'identity': identity})
+                self._cc.delete_image(image.id)
+            else:
+                raise error.FishyError(
+                    'Image not found in image service.')
 
-            if image is None:
-                msg = ('Failed ejecting image %s. Image not found in image '
-                       'service.' % image_url)
-                raise error.FishyError(msg)
+            # Delete local file if it exists
+            if local_file_path:
+                try:
+                    self._delete_local_file(local_file_path)
+                except Exception:
+                    pass
 
-            self._attempt_delete_image_local_file(
-                image.id, None, identity,
-                'sushy-tools-import-image', 'sushy-tools-image-url')
+            # Clear PersistentDict entries
+            del images_dict[instance.id]
+            attrs_dict.pop(instance.id, None)
+
+            # Additional cleanup for rescue vmedia
+            if vmedia_type == 'rescue':
+                # Set boot mode back to disk (mimics hardware boot
+                # order fallback)
+                self._rescue_boot_modes[instance.id] = self.RESCUE_MODE_DISK
+
+            self._logger.debug(
+                'Vmedia ejected for %(identity)s (%(type)s)' %
+                {'identity': identity, 'type': vmedia_type})
+
         except Exception as ex:
-            msg = 'Failed eject image from URL %s: %s' % (image_url, ex)
+            # Always wrap with context message
+            msg = ('Failed ejecting image %s. %s' %
+                   (image_url if image_url else 'unknown', ex))
             self._logger.exception(msg)
-            if not isinstance(ex, error.FishyError):
-                ex = error.FishyError(msg)
-            raise ex
-
-    def _attempt_delete_image_local_file(self, image, local_file, identity,
-                                         *metadata_keys):
-        if image:
-            try:
-                self._logger.debug('Deleting image %(image)s' %
-                                   {'image': image})
-                self._cc.delete_image(image)
-            except Exception:
-                pass
-        if local_file:
-            try:
-                self._logger.debug('Deleting local file %(local_file)s' %
-                                   {'local_file': local_file})
-                self._delete_local_file(local_file)
-            except Exception:
-                pass
-        if identity and metadata_keys:
-            try:
-                self._cc.delete_server_metadata(identity, metadata_keys)
-            except Exception:
-                pass
+            raise error.FishyError(msg)
 
     def _submit_future(self, run_async, fn, identity, *args, **kwargs):
         future = self._futures.get(identity, None)
@@ -1244,14 +1494,18 @@ class OpenStackDriver(AbstractSystemsDriver):
     def _rebuild_with_imported_image(self, identity, image_id):
         image_url = None
         image = None
+        instance = None
+        image_url = None
         image_local_file = None
 
         try:
             image = self._cc.image.get_image(image_id)
-            server = self._cc.compute.get_server(identity)
-            image_url = server.metadata.get('sushy-tools-image-url')
-            image_local_file = server.metadata.get(
-                'sushy-tools-image-local-file')
+            instance = self._get_instance(identity)
+
+            # Retrieve vmedia attributes from PersistentDict
+            vmedia_attrs = self._volume_vmedia_attrs.get(instance.id, {})
+            image_url = vmedia_attrs.get('image_url')
+            image_local_file = vmedia_attrs.get('local_file_path')
 
             # Wait for image to be imported
             while image.status in ('queued', 'importing'):
@@ -1278,22 +1532,40 @@ class OpenStackDriver(AbstractSystemsDriver):
         except Exception as ex:
             msg = 'Failed insert image from URL %s: %s' % (image_url, ex)
             self._logger.exception(msg)
-            self._attempt_delete_image_local_file(
-                image.id, image_local_file, identity,
-                'sushy-tools-import-image', 'sushy-tools-image-local-file')
+            # Clean up on failure
+            if image:
+                try:
+                    self._cc.delete_image(image.id)
+                except Exception:
+                    pass
+            if image_local_file:
+                try:
+                    self._delete_local_file(image_local_file)
+                except Exception:
+                    pass
+            # Clear PersistentDict entries only if instance was retrieved
+            if instance:
+                self._volume_vmedia_images.pop(instance.id, None)
+                self._volume_vmedia_attrs.pop(instance.id, None)
             if not isinstance(ex, error.FishyError):
                 ex = error.FishyError(msg)
             raise ex
         finally:
-            self._attempt_delete_image_local_file(
-                None, image_local_file, identity,
-                'sushy-tools-image-local-file')
+            # Clean up local file after successful rebuild
+            if image_local_file:
+                try:
+                    self._delete_local_file(image_local_file)
+                except Exception:
+                    pass
 
     def _rebuild_with_blank_image(self, identity):
         image_url = None
         try:
-            server = self._cc.compute.get_server(identity)
-            image_url = server.metadata.get('sushy-tools-image-url')
+            instance = self._get_instance(identity)
+
+            # Retrieve vmedia attributes from PersistentDict
+            vmedia_attrs = self._volume_vmedia_attrs.get(instance.id, {})
+            image_url = vmedia_attrs.get('image_url')
             blank_image = self._config.get(
                 'SUSHY_EMULATOR_OS_VMEDIA_BLANK_IMAGE',
                 'sushy-tools-blank-image')
@@ -1333,8 +1605,12 @@ class OpenStackDriver(AbstractSystemsDriver):
             pass
 
     def _remove_delayed_eject_metadata(self, identity):
+        """Remove delayed eject flag from PersistentDict
+
+        :param identity: node name or ID
+        """
         try:
-            self._cc.delete_server_metadata(identity,
-                                            ['sushy-tools-delay-eject'])
+            instance = self._get_instance(identity)
+            self._volume_vmedia_delay_eject.pop(instance.id, None)
         except Exception:
             pass
