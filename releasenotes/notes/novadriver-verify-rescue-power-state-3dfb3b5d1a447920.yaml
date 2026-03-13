@@ -1,0 +1,12 @@
+---
+fixes:
+  - |
+    Fixes OpenStack Nova driver to verify power state after rescue
+    operations. Previously, the driver only checked if the power state
+    was stable (not changing), but did not verify it matched the
+    expected state. This caused false success reports when rescue
+    operations failed to power on instances, leading to 120-second
+    timeouts in clients like Ironic. The driver now waits for the
+    correct power state and raises detailed errors with fault
+    information and full instance data when verification fails,
+    enabling faster failure detection and easier debugging.

@@ -428,7 +428,8 @@ class OpenStackDriver(AbstractSystemsDriver):
         # Task still running after max_wait
         return False, instance
 
-    def _wait_for_power_state_stable(self, instance, max_wait=10):
+    def _wait_for_power_state_stable(self, instance, max_wait=10,
+                                     expected_power_state=None):
         """Wait for instance power state to stabilize after power operations
 
         After power operations like stop_server(), Nova's power_state may
@@ -438,7 +439,12 @@ class OpenStackDriver(AbstractSystemsDriver):
 
         :param instance: Current instance object
         :param max_wait: Maximum time to wait in seconds (default 10)
+        :param expected_power_state: Optional expected power state value
+            (e.g., NOVA_POWER_STATE_ON). If provided, raises FishyError
+            if final stable state doesn't match expected state.
         :returns: Refreshed instance object
+        :raises: `error.FishyError` if expected_power_state is provided and
+            final state doesn't match
         """
         waited = 0
         check_interval = 2
@@ -463,13 +469,81 @@ class OpenStackDriver(AbstractSystemsDriver):
 
             # Power state has stabilized if it hasn't changed
             if instance.power_state == previous_power_state:
-                self._logger.debug(
-                    'Instance %(identity)s power state stable at '
-                    '%(power_state)s after %(waited)s seconds' %
+                # If expected state is specified, only consider stable if it
+                # matches the expected state
+                if expected_power_state is not None:
+                    if instance.power_state == expected_power_state:
+                        self._logger.debug(
+                            'Instance %(identity)s power state stable at '
+                            'expected state %(power_state)s after '
+                            '%(waited)s seconds' %
+                            {'identity': instance.id,
+                             'power_state': instance.power_state,
+                             'waited': waited})
+                        return instance
+                    # Stable but at wrong state - continue waiting
+                    self._logger.debug(
+                        'Instance %(identity)s power state stable at '
+                        '%(power_state)s but expected %(expected)s, '
+                        'continuing to wait' %
+                        {'identity': instance.id,
+                         'power_state': instance.power_state,
+                         'expected': expected_power_state})
+                    continue
+                else:
+                    # No expected state specified, any stable state is OK
+                    self._logger.debug(
+                        'Instance %(identity)s power state stable at '
+                        '%(power_state)s after %(waited)s seconds' %
+                        {'identity': instance.id,
+                         'power_state': instance.power_state,
+                         'waited': waited})
+                    break
+
+        # If we exited the loop and expected_power_state was specified,
+        # verify we reached the expected state
+        if expected_power_state is not None:
+            instance.fetch(self._cc.compute)
+            if instance.power_state != expected_power_state:
+                # Build detailed error message with fault info if available
+                fault_info = ''
+                if hasattr(instance, 'fault') and instance.fault:
+                    fault_code = instance.fault.get('code', 'N/A')
+                    fault_msg = instance.fault.get('message', 'N/A')
+                    fault_info = (', fault_code=%s, fault_message=%s' %
+                                  (fault_code, fault_msg))
+
+                msg = (
+                    'Power state verification failed for instance '
+                    '%(identity)s after %(waited)s seconds. Expected '
+                    'power_state=%(expected)s but got '
+                    'power_state=%(actual)s. Instance details: '
+                    'status=%(status)s, vm_state=%(vm_state)s, '
+                    'task_state=%(task_state)s%(fault)s' %
                     {'identity': instance.id,
-                     'power_state': instance.power_state,
-                     'waited': waited})
-                break
+                     'waited': waited,
+                     'expected': expected_power_state,
+                     'actual': instance.power_state,
+                     'status': instance.status,
+                     'vm_state': instance.vm_state,
+                     'task_state': instance.task_state,
+                     'fault': fault_info})
+                self._logger.error(msg)
+
+                # Dump full instance data as JSON for diagnostics
+                try:
+                    import json
+                    instance_dict = instance.to_dict()
+                    instance_json = json.dumps(
+                        instance_dict, indent=2, default=str)
+                    self._logger.debug(
+                        'Full instance data for %(identity)s: %(data)s' %
+                        {'identity': instance.id, 'data': instance_json})
+                except Exception as e:
+                    self._logger.debug(
+                        'Failed to serialize instance data: %s', e)
+
+                raise error.FishyError(msg, 500)
 
         return instance
 
@@ -645,8 +719,9 @@ class OpenStackDriver(AbstractSystemsDriver):
         if state in ('On', 'ForceOn'):
             if instance.power_state != self.NOVA_POWER_STATE_ON:
                 self._power_on_with_boot_mode(instance, boot_mode)
-                # Wait for Nova state to stabilize
-                self._wait_for_power_state_stable(instance)
+                # Wait for Nova state to stabilize and verify power on
+                self._wait_for_power_state_stable(
+                    instance, expected_power_state=self.NOVA_POWER_STATE_ON)
 
         elif state == 'ForceOff':
             if instance.power_state == self.NOVA_POWER_STATE_ON:
@@ -659,7 +734,9 @@ class OpenStackDriver(AbstractSystemsDriver):
                     self._unrescue_before_power_operation(instance)
                 self._cc.compute.stop_server(instance.id)
 
-                # Wait for Nova state to stabilize
+                # Wait for Nova state to stabilize and verify power off
+                # Note: Nova power_state for SHUTOFF is not NOVA_POWER_STATE_ON
+                # We expect any state other than ON (typically 4 for SHUTOFF)
                 self._wait_for_power_state_stable(instance)
 
         elif state == 'GracefulShutdown':
@@ -674,19 +751,23 @@ class OpenStackDriver(AbstractSystemsDriver):
                 self._cc.compute.stop_server(instance.id)
 
                 # Wait for Nova state to stabilize
+                # Note: We don't verify expected power state for shutdown
+                # operations as the final state can vary
                 self._wait_for_power_state_stable(instance)
 
         elif state == 'GracefulRestart':
             if instance.power_state == self.NOVA_POWER_STATE_ON:
                 self._restart_with_boot_mode(instance, boot_mode, 'SOFT')
-                # Wait for Nova state to stabilize
-                self._wait_for_power_state_stable(instance)
+                # Wait for Nova state to stabilize and verify power on
+                self._wait_for_power_state_stable(
+                    instance, expected_power_state=self.NOVA_POWER_STATE_ON)
 
         elif state == 'ForceRestart':
             if instance.power_state == self.NOVA_POWER_STATE_ON:
                 self._restart_with_boot_mode(instance, boot_mode, 'HARD')
-                # Wait for Nova state to stabilize
-                self._wait_for_power_state_stable(instance)
+                # Wait for Nova state to stabilize and verify power on
+                self._wait_for_power_state_stable(
+                    instance, expected_power_state=self.NOVA_POWER_STATE_ON)
 
         else:
             self._raise_unknown_power_state(state)

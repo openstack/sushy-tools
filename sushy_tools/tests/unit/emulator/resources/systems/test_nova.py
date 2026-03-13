@@ -1216,22 +1216,25 @@ class NovaDriverRescuePXETestCase(base.BaseTestCase):
         # Instance starts in rescue mode
         server = mock.Mock(
             id=self.uuid, power_state=0, vm_state='RESCUED',
-            task_state=None)
+            task_state=None, status='ACTIVE')
         self.nova_mock.return_value.get_server.return_value = server
+        compute = self.nova_mock.return_value.compute
 
         # Track fetch calls to simulate state transition
         fetch_count = [0]
 
-        def fetch_side_effect(compute):
+        def fetch_side_effect(compute_arg):
             fetch_count[0] += 1
             # After unrescue completes, vm_state becomes ACTIVE
             # and instance is stopped (power_state=0)
             if fetch_count[0] >= 2:
                 server.vm_state = 'ACTIVE'
-                server.power_state = 0  # Stopped
+                server.power_state = 0  # Stopped initially
+            # After start_server is called, power_state becomes ON
+            if compute.start_server.called:
+                server.power_state = 1
 
         server.fetch.side_effect = fetch_side_effect
-        compute = self.nova_mock.return_value.compute
 
         # Set boot mode to disk (will trigger unrescue)
         test_driver._rescue_boot_modes[self.uuid] = 'disk'
@@ -2018,22 +2021,25 @@ class NovaDriverRescueVMediaTestCase(base.BaseTestCase):
         # Instance starts in rescue mode but stopped
         server = mock.Mock(
             id=self.uuid, power_state=0, vm_state='RESCUED',
-            task_state=None)
+            task_state=None, status='ACTIVE')
         self.nova_mock.return_value.get_server.return_value = server
+        compute = self.nova_mock.return_value.compute
 
         # Track fetch calls to simulate state transition
         fetch_count = [0]
 
-        def fetch_side_effect(compute):
+        def fetch_side_effect(compute_arg):
             fetch_count[0] += 1
             # After unrescue completes, vm_state becomes ACTIVE
             # and instance is stopped (power_state=0)
             if fetch_count[0] >= 2:
                 server.vm_state = 'ACTIVE'
-                server.power_state = 0  # Stopped
+                server.power_state = 0  # Stopped initially
+            # After start_server is called, power_state becomes ON
+            if compute.start_server.called:
+                server.power_state = 1
 
         server.fetch.side_effect = fetch_side_effect
-        compute = self.nova_mock.return_value.compute
 
         # Set boot mode to disk (will trigger unrescue)
         test_driver._rescue_boot_modes[self.uuid] = 'disk'
@@ -2140,10 +2146,21 @@ class NovaDriverRescueVMediaTestCase(base.BaseTestCase):
 
         server = mock.Mock(
             id=self.uuid, power_state=0, vm_state='STOPPED',
-            task_state=None, image={'id': 'image-id'})
+            task_state=None, image={'id': 'image-id'}, status='ACTIVE')
         self.nova_mock.return_value.get_server.return_value = server
-        server.fetch.return_value = None
         compute = self.nova_mock.return_value.compute
+
+        # Simulate power state change after rescue: OFF -> ON
+        fetch_count = [0]
+
+        def fetch_side_effect(*args):
+            fetch_count[0] += 1
+            # After rescue_server is called, instance powers on
+            if compute.rescue_server.called:
+                server.power_state = 1
+                server.vm_state = 'RESCUED'
+
+        server.fetch.side_effect = fetch_side_effect
 
         # Set boot mode and image ID in PersistentDict
         test_driver._rescue_boot_modes[self.uuid] = 'cdrom'
@@ -2635,10 +2652,18 @@ class NovaDriverRescueVMediaTestCase(base.BaseTestCase):
 
         server = mock.Mock(
             id=self.uuid, power_state=1, vm_state='ACTIVE',
-            task_state=None, image={'id': 'image-id'})
+            task_state=None, image={'id': 'image-id'}, status='ACTIVE')
         self.nova_mock.return_value.get_server.return_value = server
-        server.fetch.return_value = None
         compute = self.nova_mock.return_value.compute
+
+        # Simulate state changes: rescue powers on, reboot maintains power on
+        def fetch_side_effect(*args):
+            # After rescue_server is called, instance stays powered on
+            if compute.rescue_server.called:
+                server.power_state = 1
+                server.vm_state = 'RESCUED'
+
+        server.fetch.side_effect = fetch_side_effect
 
         # Set boot mode to CD
         test_driver._rescue_boot_modes[self.uuid] = 'cdrom'
