@@ -138,8 +138,16 @@ class Application(flask.Flask):
     def feature_set(self):
         return self.config.get('SUSHY_EMULATOR_FEATURE_SET', 'full')
 
+    @property
+    def vendor(self):
+        # Optional ServiceRoot `Vendor`; unset by default (field omitted).
+        # Settable via config file or the SUSHY_EMULATOR_VENDOR env var.
+        return (self.config.get('SUSHY_EMULATOR_VENDOR')
+                or os.environ.get('SUSHY_EMULATOR_VENDOR'))
+
     def render_template(self, template_name, /, **params):
         params.setdefault('feature_set', self.feature_set)
+        params.setdefault('vendor', self.vendor)
         return flask.render_template(template_name, **params)
 
     @property
