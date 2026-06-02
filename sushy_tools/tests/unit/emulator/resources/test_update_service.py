@@ -58,6 +58,15 @@ class UpdateServiceTestCase(test_main.EmulatorTestCase):
         self.assertTrue(resp.json['ServiceEnabled'])
         self.assertEqual(softwareinventory, resp.json['SoftwareInventory'])
 
+    def test_firmware_inventory_get(self):
+        resp = self.app.get('/redfish/v1/UpdateService/FirmwareInventory')
+        self.assertEqual(200, resp.status_code)
+
+    def test_firmware_inventory_get_reduced_feature_set(self):
+        self.set_feature_set("vmedia")
+        resp = self.app.get('/redfish/v1/UpdateService/FirmwareInventory')
+        self.assertEqual(404, resp.status_code)
+
     @test_main.patch_resource('storage')
     @test_main.patch_resource('indicators')
     @test_main.patch_resource('chassis')
