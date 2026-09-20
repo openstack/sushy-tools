@@ -1,28 +1,26 @@
 - job:
     name: sushy-tools-tempest-bios-redfish-pxe
     parent: ironic-tempest-bios-redfish-pxe
-    irrelevant-files:
+    irrelevant-files: &irrelevant_files
       - ^.*\.rst$
+      - ^tox\.ini$
+      - ^LICENSE$
+      - ^\.coveragerc$
+      - ^\/.gitconfig$
+      - ^\/.gitreview$
+      - ^\.mailmap$
+      - ^\.pre-commit-config\.yaml$
+      - ^\.stestr.conf$
       - ^doc/.*$
-      - ^releasenotes/.*$
-      - ^setup.cfg$
       - ^test-requirements.txt$
       - ^sushy_tools/tests/.*$
-      - ^tox.ini$
     required-projects:
       - openstack/sushy-tools
 
 - job:
     name: sushy-tools-tempest-uefi-redfish-vmedia
     parent: ironic-tempest-uefi-redfish-vmedia
-    irrelevant-files:
-      - ^.*\.rst$
-      - ^doc/.*$
-      - ^releasenotes/.*$
-      - ^setup.cfg$
-      - ^test-requirements.txt$
-      - ^sushy_tools/tests/.*$
-      - ^tox.ini$
+    irrelevant-files: *irrelevant_files
     required-projects:
       - openstack/sushy-tools
 
