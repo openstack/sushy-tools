@@ -26,10 +26,12 @@ from werkzeug import exceptions as wz_exc
 
 from sushy_tools.emulator import api_utils
 from sushy_tools.emulator import auth_basic
+from sushy_tools.emulator.controllers import account_service as acctctl
 from sushy_tools.emulator.controllers import certificate_service as certctl
 from sushy_tools.emulator.controllers import update_service as usctl
 from sushy_tools.emulator.controllers import virtual_media as vmctl
 from sushy_tools.emulator import memoize
+from sushy_tools.emulator.resources import accounts as accdriver
 from sushy_tools.emulator.resources import chassis as chsdriver
 from sushy_tools.emulator.resources import drives as drvdriver
 from sushy_tools.emulator.resources import indicators as inddriver
@@ -168,6 +170,8 @@ class Application(flask.Flask):
     def render_template(self, template_name, /, **params):
         params.setdefault('feature_set', self.feature_set)
         params.setdefault('vendor', self.vendor)
+        params.setdefault('account_service_enabled',
+                          self.accounts is not None)
         return flask.render_template(template_name, **params)
 
     @property
@@ -251,8 +255,17 @@ class Application(flask.Flask):
     def volumes(self):
         return voldriver.StaticDriver(self.config, self.logger)
 
+    @property
+    @memoize.memoize()
+    def accounts(self):
+        auth_file = self.config.get("SUSHY_EMULATOR_AUTH_FILE")
+        if not auth_file:
+            return None
+        return accdriver.StaticDriver(self.config, self.logger, auth_file)
+
 
 app = Application()
+app.register_blueprint(acctctl.account_service)
 app.register_blueprint(certctl.certificate_service)
 app.register_blueprint(vmctl.virtual_media)
 app.register_blueprint(usctl.update_service)

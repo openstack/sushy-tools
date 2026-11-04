@@ -54,6 +54,13 @@ class FeatureNotAvailable(NotFound):
         super().__init__(f"Feature {feature} not available", code=code)
 
 
+class MethodNotAllowed(FishyError):
+    """Method is not allowed in the current mode."""
+
+    def __init__(self, msg, code=405):
+        super().__init__(msg, code)
+
+
 class Conflict(FishyError):
     """Conflict with current state of the resource."""
 

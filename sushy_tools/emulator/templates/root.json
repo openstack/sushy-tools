@@ -20,6 +20,11 @@
         "@odata.id": "/redfish/v1/Managers"
     },
     {% endif %}
+    {% if account_service_enabled %}
+    "AccountService": {
+        "@odata.id": "/redfish/v1/AccountService"
+    },
+    {% endif %}
     {% if feature_set == "full" %}
     "Registries": {
         "@odata.id": "/redfish/v1/Registries"
