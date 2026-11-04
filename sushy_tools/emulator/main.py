@@ -111,12 +111,32 @@ class RedfishAuthMiddleware(auth_basic.BasicAuthMiddleware):
         return response
 
 
+@api_utils.returns_json
+def all_exception_handler(message):
+    if isinstance(message, error.AliasAccessError):
+        url = flask.url_for(flask.request.endpoint, identity=message.args[0])
+        return flask.redirect(url, code=307, Response=flask.Response)
+
+    code = getattr(message, 'code', 500)
+    if (isinstance(message, error.FishyError)
+            or isinstance(message, wz_exc.HTTPException)):
+        flask.current_app.logger.debug(
+            'Request failed with %s: %s', message.__class__.__name__, message)
+    else:
+        flask.current_app.logger.exception(
+            'Unexpected %s: %s', message.__class__.__name__, message)
+
+    return flask.render_template('error.json', message=message), code
+
+
 class Application(flask.Flask):
 
     def __init__(self):
         super().__init__(__name__)
         # Turn off strict_slashes on all routes
         self.url_map.strict_slashes = False
+        # Render errors (e.g. from drivers) as Redfish error responses
+        self.register_error_handler(Exception, all_exception_handler)
         # This is needed for WSGI since it cannot process argv
         self.configure(config_file=os.environ.get('SUSHY_EMULATOR_CONFIG'))
 
@@ -236,25 +256,6 @@ app = Application()
 app.register_blueprint(certctl.certificate_service)
 app.register_blueprint(vmctl.virtual_media)
 app.register_blueprint(usctl.update_service)
-
-
-@app.errorhandler(Exception)
-@api_utils.returns_json
-def all_exception_handler(message):
-    if isinstance(message, error.AliasAccessError):
-        url = flask.url_for(flask.request.endpoint, identity=message.args[0])
-        return flask.redirect(url, code=307, Response=flask.Response)
-
-    code = getattr(message, 'code', 500)
-    if (isinstance(message, error.FishyError)
-            or isinstance(message, wz_exc.HTTPException)):
-        app.logger.debug(
-            'Request failed with %s: %s', message.__class__.__name__, message)
-    else:
-        app.logger.exception(
-            'Unexpected %s: %s', message.__class__.__name__, message)
-
-    return flask.render_template('error.json', message=message), code
 
 
 @app.route('/redfish/v1/')
